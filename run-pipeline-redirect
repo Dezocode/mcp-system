@@ -1,0 +1,4 @@
+#!/bin/bash
+# FAIL-SAFE: Always redirect to interactive version
+echo "🔄 Auto-redirecting to interactive pipeline..."
+exec ./run-pipeline-claude-interactive "$@"

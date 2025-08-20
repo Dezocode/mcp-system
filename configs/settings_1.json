@@ -1,0 +1,105 @@
+{
+  "feedbackSurveyState": {
+    "lastShownTime": 1754061748536
+  },
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_PROMPT\" | grep -iq \"^/codemap\\|code.*map\\|dependency.*graph\\|function.*map\\|analyze.*code\\|comprehensive.*analysis\"; then echo \"\\n🎯 CODEMAP ACTIVATION DETECTED\\n📋 Running codemap-tool for function-level dependency analysis\\n⚡ Generating comprehensive code mapping with timestamps\\n\"; cd /Users/dezmondhollins/my-web-app/codemap-tool && TZ=America/Chicago node bin/codemap.js --path \"$CLAUDE_PROJECT_DIR\" --level function --format svg --timestamp 2>&1 || echo \"CODEMAP tool completed with Chicago timezone\"; fi",
+            "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_PROMPT\" | grep -iq \"^/fixmappedcode\\|fix.*mapped.*code\\|resolve.*unresolved\\|fix.*broken.*calls\"; then echo \"\\n🔧 FIXMAPPEDCODE ACTIVATION DETECTED\\n🚨 Processing codemap reports to fix unresolved calls\\n📋 Enforcing prettier-lang and end-to-end SOP compliance\\n⚡ Removing duplicates/placeholders/competing code\\n\"; \"$HOME/.claude/scripts/fix-mapped-code.sh\" \"$CLAUDE_PROJECT_DIR\" 2>&1 || echo \"FIXMAPPEDCODE processing completed\"; fi",
+            "timeout": 300
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_PROMPT\" | grep -Eq \"^/gtst( |$)|GTST.*enforcement|grep.*trace.*snowball\"; then echo \"\\n🚨 GTST COMMAND ACTIVATED - $(TZ=America/Chicago date '+%Y-%m-%d %H:%M:%S CST')\\n📋 GTST ENFORCEMENT PROTOCOL LOADING\\n⚡ --VERBOSE AND --DANGEROUSLY-SKIP-PERMISSIONS ACTIVE\\n🔍 DOM-EXPECTED-FUNCTIONS.MD AWARE ANALYSIS\\n\\n🎯 GTST Commands Available:\\n  • /gtst help - Show comprehensive command documentation\\n  • /gtst planning [feature] - Create mandatory TRACE file with 7+ grep checkpoints\\n  • /gtst validate [file] - Validate compliance (score ≥85/100 required)\\n  • /gtst snowball [transition] - Analyze dependencies between steps\\n  • /gtst rm-analysis - DOM-aware duplicate detection and removal planning\\n  • /gtst patch-generate - Create comprehensive cleanup patch script\\n  • /gtst enforcement - Full protocol activation with live blocking\\n\\n🛡️ ENFORCEMENT FEATURES:\\n  • --VERBOSE: Detailed output for all operations\\n  • --DANGEROUSLY-SKIP-PERMISSIONS: Bypass all permission checks\\n  • Live violation blocking during all operations\\n  • DOM workflow preservation (89+ elements documented)\\n  • Function-level mandatory analysis\\n  • Chicago Time (CST) timestamping on all documentation\\n  • Exit code 2 blocking on violations\\n  • Automatic TRACE file generation\\n\\n📊 EXECUTING GTST COMMAND...\\n\"; export GTST_DANGEROUS_SKIP_PERMISSIONS=1 && export GTST_VERBOSE=1 && export GTST_COMMAND_MODE=1 && /Users/dezmondhollins/.claude/hooks/gtst-command-handler.sh \"$CLAUDE_PROMPT\" 2>&1 && echo \"\\n✅ GTST COMMAND EXECUTION COMPLETE - $(TZ=America/Chicago date '+%H:%M:%S CST')\\n📋 Ready for GTST-compliant development workflow\\n🛡️ Live blocking enforcement remains active\\n🎯 Use /gtst help for detailed command documentation\\n\" || echo \"\\n❌ GTST EXECUTION BLOCKED - Violations detected\\n🚨 Review TRACE files for compliance requirements\\n📋 Use /gtst help for troubleshooting guidance\\n\"; fi",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command", 
+            "command": "if [[ -n \"$CLAUDE_PROJECT_DIR\" ]] && [[ -d \"$CLAUDE_PROJECT_DIR\" ]]; then if find \"$CLAUDE_PROJECT_DIR\" -name \"*.js\" -o -name \"*.html\" -o -name \"*.css\" | head -1 | grep -q .; then echo \"\\n🔍 CODE ANALYSIS REQUIRED\\n📊 Detected code files - generating timestamped dependency graph\\n\"; cd /Users/dezmondhollins/my-web-app/codemap-tool && TZ=America/Chicago node bin/codemap.js --path \"$CLAUDE_PROJECT_DIR\" --level function --format svg --timestamp --report 2>/dev/null || echo \"CODEMAP analysis with report generated\"; echo \"\\n⚠️  Timestamped SVG and actionable report generated\\n🎯 Chicago timezone timestamps applied to all functions\\n📈 Complete end-to-end dependency tracing completed\\n\"; fi; fi",
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/dezmondhollins/.claude/hooks/gtst-post-tool.sh",
+            "timeout": 90
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" =~ \\.(js|html|css)$ ]] || [[ \"$CLAUDE_TOOL_INPUT\" =~ \"function.*dependencies\" ]]; then echo \"\\n📋 CODE FILE ANALYSIS DETECTED\\n🔧 Preparing comprehensive mapping analysis\\n\"; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$CLAUDE_PROJECT_DIR\" ]] && [[ -f \"$CLAUDE_PROJECT_DIR/CODEMAP-DEPENDENCY-GRAPH.svg\" ]]; then echo \"\\n📊 CODEMAP STATUS CHECK\\n\"; if grep -q \"TEMPLATE CREATED - AI ANALYSIS REQUIRED\" \"$CLAUDE_PROJECT_DIR/CODEMAP-DEPENDENCY-GRAPH.svg\"; then echo \"⚠️  CODEMAP TEMPLATE DETECTED - COMPREHENSIVE AI ANALYSIS STILL REQUIRED\"; echo \"🎯 AI must replace template sections with actual function mapping\"; echo \"📈 Complete end-to-end dependency tracing needed\"; echo \"🔍 Every JavaScript function must be mapped with line numbers\"; echo \"🔗 All IPC handlers and missing connections must be identified\"; else echo \"✅ CODEMAP appears to contain actual analysis\"; fi; echo \"\\n📁 File location: $CLAUDE_PROJECT_DIR/CODEMAP-DEPENDENCY-GRAPH.svg\\n\"; fi",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "/Users/dezmondhollins/.claude/hooks/gtst-final-validation.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" =~ CODEMAP.*svg ]] && [[ -n \"$CLAUDE_PROJECT_DIR\" ]]; then echo \"\\n🚨 CODEMAP SVG MODIFICATION DETECTED\\n✅ AI is updating the dependency graph\\n📊 Ensuring comprehensive function-level analysis\\n⚡ Validating end-to-end connection mapping\\n\"; \"$HOME/.claude/scripts/code-map.sh\" --validate 2>/dev/null || echo \"CODEMAP validation initiated\"; fi",
+            "timeout": 90
+          },
+          {
+            "type": "command",
+            "command": "/Users/dezmondhollins/.claude/hooks/gtst-pre-tool.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"\\n🎯 CODEMAP TOOL ACTIVATED\\n📋 Comprehensive Function-Level Dependency Analysis System\\n⚡ Generates detailed end-to-end code mapping\\n\\n🔧 Available Commands:\\n  - \\\"/codemap\\\" - Quick command to generate dependency graph\\n  - \\\"Create code map\\\" or \\\"Generate dependency graph\\\"\\n  - \\\"Analyze code structure\\\" or \\\"Map all functions\\\"\\n  - \\\"Comprehensive code analysis\\\"\\n\\n📊 Output: Function-level dependency graph with:\\n  • All JavaScript functions with line numbers\\n  • Call relationships and dependencies\\n  • Missing/broken connections highlighted\\n  • Actionable reports for unresolved calls\\n\\n🚨 GTST ENFORCEMENT SYSTEM ACTIVE\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n• Live Violation Blocking: ENABLED for SOP prevention\\n• DOM-Expected-Functions.md: 89+ elements documented\\n• Function-Level Enforcement: MANDATORY\\n• Chicago Time Stamping: REQUIRED\\n• Commands: /gtst [planning|validate|snowball|rm-analysis|patch-generate]\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n\\n🏗️ MY-WEB-APP Architecture Rules Loaded\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n• Load Order: types-definitions.js → core-store.js → utils.js\\n• SNAPE: ES5 only, ActionChains required\\n• File Limit: <3 new files per feature\\n• Check architecture.md for placement rules\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\"; if [[ -n \"$CLAUDE_PROJECT_DIR\" ]] && [[ -f \"$CLAUDE_PROJECT_DIR/codemap-tool/tmp/function-level-graph.svg\" ]]; then echo \"\\n📁 Existing graph: $CLAUDE_PROJECT_DIR/codemap-tool/tmp/function-level-graph.svg\"; fi",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

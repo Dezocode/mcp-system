@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "mcp-system": {
+      "command": "/Users/dezmondhollins/bin/mcp-universal",
+      "args": ["router"],
+      "env": {
+        "MCP_SYSTEM_PATH": "/Users/dezmondhollins/.mcp-system",
+        "MCP_AUTO_DISCOVERY": "true"
+      }
+    }
+  },
+  "mcp_system_integration": {
+    "enabled": true,
+    "auto_discovery": true,
+    "safe_mode": true,
+    "installation_path": "/Users/dezmondhollins/.mcp-system",
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "directory_rules": {
+    "scripts/": {
+      "patterns": [
+        "*_keeper.py",
+        "*_agent*.py",
+        "*_loop.py",
+        "claude_*.py"
+      ],
+      "description": "Core system scripts and agents"
+    },
+    "installers/": {
+      "patterns": [
+        "install*.py",
+        "setup*.py",
+        "*installer*.py"
+      ],
+      "description": "Installation and setup scripts"
+    },
+    "configs/": {
+      "patterns": [
+        "*.json",
+        "*.yaml",
+        "*.yml",
+        "*.toml",
+        "*config*"
+      ],
+      "exclude_patterns": [
+        "package*.json",
+        "pyproject.toml"
+      ],
+      "description": "Configuration files"
+    },
+    "docs/": {
+      "patterns": [
+        "*.md",
+        "README*",
+        "*guide*",
+        "*documentation*"
+      ],
+      "exclude_patterns": [
+        "CLAUDE.md"
+      ],
+      "description": "Documentation files"
+    },
+    "bin/": {
+      "patterns": [
+        "run-*",
+        "*.sh",
+        "quick-*"
+      ],
+      "description": "Executable scripts and binaries"
+    },
+    "utils/": {
+      "patterns": [
+        "*util*.py",
+        "*helper*.py",
+        "*tool*.py"
+      ],
+      "description": "Utility and helper scripts"
+    },
+    "tests/": {
+      "patterns": [
+        "test_*.py",
+        "*_test.py",
+        "conftest.py"
+      ],
+      "description": "Test files"
+    },
+    ".mcp-system-backups-disconnected/": {
+      "patterns": [
+        "*.backup",
+        "*_backup*",
+        "*-backup*",
+        "*.bak",
+        "*.orig",
+        "*.old",
+        "*-enhanced*",
+        "*_enhanced*",
+        "*-v[0-9]*",
+        "*_v[0-9]*",
+        "*_original*",
+        "*_updated*",
+        "*legacy*"
+      ],
+      "description": "Backup and legacy files"
+    }
+  },
+  "file_type_rules": {
+    ".py": {
+      "priority": "high",
+      "organize": true
+    },
+    ".json": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".md": {
+      "priority": "low",
+      "organize": true
+    },
+    ".sh": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".yaml": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".yml": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".toml": {
+      "priority": "medium",
+      "organize": true
+    }
+  },
+  "last_updated": 1755698338.6149728
+}

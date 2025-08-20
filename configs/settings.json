@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit",
+        "hooks": [
+          {
+            "command": "bash -c 'if [[ -f .mcp-pipeline-state.json ]] && grep -q \"SCAN_COMPLETE\" .mcp-pipeline-state.json; then echo \"🔄 Auto-running pipeline to validate fixes...\"; ./run-pipeline-claude-interactive; fi'",
+            "description": "Auto-run pipeline after edits when in fix mode",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  },
+  "commands": {
+    "pipeline": {
+      "description": "Start the MCP pipeline fix cycle - STRICT: Only run ./run-pipeline-claude-interactive",
+      "command": "bash -c 'echo \"🚀 STRICT MODE: Running ./run-pipeline-claude-interactive\" && ./run-pipeline-claude-interactive'"
+    },
+    "pipeline-reset": {
+      "description": "Reset pipeline state and start fresh - STRICT MODE",
+      "command": "bash -c 'echo \"🧹 RESETTING: Removing state files\" && rm -f .mcp-pipeline-state.json .claude-fixes.json && echo \"🚀 STRICT MODE: Running ./run-pipeline-claude-interactive\" && ./run-pipeline-claude-interactive'"
+    }
+  }
+}

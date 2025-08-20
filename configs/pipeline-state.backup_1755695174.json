@@ -1,0 +1,49 @@
+{
+  "pipeline_id": "20250820_080614",
+  "start_time": "2025-08-20T08:06:14.553623",
+  "current_phase": "continuous_integration_loop",
+  "phases_completed": [],
+  "phases_failed": [
+    "continuous_integration_loop"
+  ],
+  "component_outputs": {
+    "integration_loop": {
+      "component": "integration_loop",
+      "phase": "continuous_integration_loop",
+      "success": false,
+      "return_code": 1,
+      "duration_seconds": 0.051304,
+      "start_time": "2025-08-20T08:06:14.554964",
+      "end_time": "2025-08-20T08:06:14.606268",
+      "stdout": "Traceback (most recent call last):\n  File \"/Users/dezmondhollins/mcp-system-complete/scripts/claude_code_integration_loop.py\", line 2951, in <module>\n    main()\nTypeError: main() missing 14 required positional arguments: 'max_iterations', 'auto_fix_threshold', 'claude_integration', 'quality_threshold', 'branch', 'dry_run', 'continuous_rerun', 'max_cycles', 'target_issues', 'publish_pipeline', 'non_interactive', 'session_dir', 'protocol_enabled', and 'direct_mode'\n",
+      "stderr": "",
+      "checkpoint_id": "continuous_integration_loop_integration_loop_1755695174",
+      "metrics": {}
+    }
+  },
+  "issue_counts": [],
+  "monitoring_data": {},
+  "redundancy_checkpoints": [
+    {
+      "id": "continuous_integration_loop_integration_loop_1755695174",
+      "file": "/Users/dezmondhollins/mcp-system-complete/.mcp-pipeline-checkpoints/continuous_integration_loop_integration_loop_1755695174.json",
+      "timestamp": "2025-08-20T08:06:14.555389",
+      "data": {
+        "component": "integration_loop",
+        "phase": "continuous_integration_loop",
+        "command": [
+          "python3",
+          "/Users/dezmondhollins/mcp-system-complete/scripts/claude_code_integration_loop.py",
+          "--continuous-rerun",
+          "--max-cycles=999",
+          "--target-issues=0",
+          "--non-interactive",
+          "--publish-pipeline",
+          "--claude-integration"
+        ],
+        "start_time": "2025-08-20T08:06:14.554964"
+      }
+    }
+  ],
+  "claude_work_assignments": []
+}

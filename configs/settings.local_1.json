@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(node:*)",
+      "Bash(rm:*)",
+      "Bash(kill:*)",
+      "Bash(grep:*)",
+      "Bash(npm run restart-dev:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git pull:*)",
+      "Bash(python scripts/validate_templates.py:*)",
+      "Bash(python3 scripts/validate_templates.py:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(./run-pipeline)",
+      "Bash(./mcp-system-complete/run-pipeline)",
+      "Bash(timeout:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": [],
+    "defaultMode": "acceptEdits"
+  }
+}

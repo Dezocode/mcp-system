@@ -1,0 +1,214 @@
+{
+  "directory_rules": {
+    "core/": {
+      "patterns": [
+        "mcp-*.py",
+        "claude-*.py",
+        "auto-discovery-system.py",
+        "direct-mem0-usage.py"
+      ],
+      "exclude_patterns": [
+        "mcp-file-sync-manager.py"
+      ],
+      "description": "Core MCP system files",
+      "priority": 1
+    },
+    "scripts/": {
+      "patterns": [
+        "*_keeper.py",
+        "*_agent*.py",
+        "*_loop.py",
+        "claude_*.py"
+      ],
+      "description": "Core system scripts and agents"
+    },
+    "installers/": {
+      "patterns": [
+        "install*.py",
+        "setup*.py",
+        "*installer*.py"
+      ],
+      "description": "Installation and setup scripts"
+    },
+    "bin/": {
+      "patterns": [
+        "run-*",
+        "*.sh",
+        "quick-*"
+      ],
+      "description": "Executable scripts and binaries"
+    },
+    "configs/": {
+      "patterns": [
+        "*.json",
+        "*.yaml",
+        "*.yml",
+        "*.toml",
+        "*config*"
+      ],
+      "exclude_patterns": [
+        "package*.json",
+        "pyproject.toml"
+      ],
+      "description": "Configuration files"
+    },
+    "reports/": {
+      "patterns": [
+        "*report*.json",
+        "*lint*.json",
+        "*audit*.json",
+        "bandit-*.json",
+        "safety-*.json"
+      ],
+      "description": "Generated reports and analysis files"
+    },
+    "sessions/": {
+      "patterns": [
+        "*session*.json",
+        "*patch*.json",
+        "*state*.json",
+        "*checkpoint*.json"
+      ],
+      "description": "Session and pipeline state files"
+    },
+    "docs/": {
+      "patterns": [
+        "*.md",
+        "README*",
+        "*guide*",
+        "*documentation*"
+      ],
+      "exclude_patterns": [
+        "CLAUDE.md"
+      ],
+      "description": "Documentation files"
+    },
+    "utils/": {
+      "patterns": [
+        "*util*.py",
+        "*helper*.py",
+        "*tool*.py"
+      ],
+      "description": "Utility and helper scripts"
+    },
+    "tests/": {
+      "patterns": [
+        "test_*.py",
+        "*_test.py",
+        "conftest.py"
+      ],
+      "description": "Test files"
+    },
+    ".mcp-system-backups-disconnected/": {
+      "patterns": [
+        "*.backup",
+        "*_backup*",
+        "*-backup*",
+        "*.bak",
+        "*.orig",
+        "*.old",
+        "*-enhanced*",
+        "*_enhanced*",
+        "*-v[0-9]*",
+        "*_v[0-9]*",
+        "*_original*",
+        "*_updated*",
+        "*legacy*"
+      ],
+      "description": "Backup and legacy files"
+    },
+    ".mcp-system-trash-internal/auto-removed/system/": {
+      "patterns": [
+        ".DS_Store",
+        "Thumbs.db",
+        ".gitkeep",
+        "*.tmp",
+        "*.temp",
+        "*.swp",
+        "*.swo",
+        "*~",
+        ".#*"
+      ],
+      "description": "System generated and temporary files"
+    },
+    ".mcp-system-trash-internal/auto-removed/cache/": {
+      "patterns": [
+        "*.pyc",
+        "*.pyo",
+        "*.egg-info",
+        ".pytest_cache",
+        "__pycache__",
+        "*.cache",
+        ".coverage",
+        "node_modules"
+      ],
+      "description": "Cache and compiled files"
+    },
+    ".mcp-system-trash-internal/auto-removed/logs/": {
+      "patterns": [
+        "*.log",
+        "*.trace",
+        "*.debug",
+        "pipeline-daemon-*.log",
+        ".pipeline-*.log",
+        "audit-*.log",
+        "error-*.log"
+      ],
+      "description": "Log and debug files"
+    },
+    ".mcp-system-trash-internal/auto-removed/temp/": {
+      "patterns": [
+        "*.pid",
+        "*.lock",
+        "*.socket",
+        "*.monitor.pid",
+        ".running"
+      ],
+      "description": "Lock and process files"
+    },
+    "./": {
+      "patterns": [
+        "mcp-*.py",
+        "claude-*.py",
+        "auto-discovery-system.py",
+        "direct-mem0-usage.py"
+      ],
+      "exclude_patterns": [
+        "mcp-file-sync-manager.py"
+      ],
+      "description": "Core MCP system files in root directory",
+      "priority": 1
+    }
+  },
+  "file_type_rules": {
+    ".py": {
+      "priority": "high",
+      "organize": true
+    },
+    ".json": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".md": {
+      "priority": "low",
+      "organize": true
+    },
+    ".sh": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".yaml": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".yml": {
+      "priority": "medium",
+      "organize": true
+    },
+    ".toml": {
+      "priority": "medium",
+      "organize": true
+    }
+  },
+  "last_updated": 1755699881.5916538
+}

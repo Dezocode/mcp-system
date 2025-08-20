@@ -91,6 +91,7 @@ extend-exclude = '''
   | \.venv
   | build
   | dist
+  | \.mcp-system-backups-disconnected
 )/
 '''
 

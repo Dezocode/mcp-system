@@ -1,0 +1,390 @@
+#!/usr/bin/env python3
+"""
+Universal MCP Server Launcher - Launch any MCP server with one command
+Usage: mcp [server-name] [action] [options]
+"""
+
+import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Dict, Optional
+
+import requests
+
+
+class MCPLauncher:
+    def __init__(self):
+        self.config_file = Path.home() / ".mcp-servers.json"
+        self.runtime_dir = Path.home() / ".mcp-runtime"
+        self.runtime_dir.mkdir(exist_ok=True)
+        
+        # Load server configurations
+        if not self.config_file.exists():
+            print(f"Error: No config file found at {self.config_file}")
+            print("Creating default config...")
+            self.create_default_config()
+        
+        self.servers = json.loads(self.config_file.read_text())
+    
+    def create_default_config(self):
+        """Create a default configuration file"""
+        default = {
+            "example": {
+                "name": "Example MCP Server",
+                "path": "~/mcp-example",
+                "command": "python src/main.py",
+                "port": 8050,
+                "dependencies": {}
+            }
+        }
+        self.config_file.write_text(json.dumps(default, indent=2))
+    
+    def list_servers(self):
+        """List all available MCP servers"""
+        print("\n📦 Available MCP Servers:")
+        print("-" * 50)
+        for key, server in self.servers.items():
+            status = "✅ Running" if self.is_running(key) else "⭕ Stopped"
+            port = server.get('port', 'N/A')
+            print(f"  {key:15} {status:12} Port: {port:5} {server.get('name', '')}")
+        print()
+    
+    def is_running(self, server_name: str) -> bool:
+        """Check if a server is running"""
+        pid_file = self.runtime_dir / f"{server_name}.pid"
+        if pid_file.exists():
+            try:
+                pid = int(pid_file.read_text())
+                # Check if process is running
+                os.kill(pid, 0)
+                return True
+            except (ProcessLookupError, ValueError):
+                # Process not running, clean up pid file
+                pid_file.unlink()
+                return False
+        return False
+    
+    def get_server_config(self, server_name: str) -> Optional[Dict]:
+        """Get server configuration by name or partial match"""
+        # Exact match
+        if server_name in self.servers:
+            return self.servers[server_name]
+        
+        # Partial match
+        matches = [k for k in self.servers.keys() if k.startswith(server_name)]
+        if len(matches) == 1:
+            return self.servers[matches[0]]
+        elif len(matches) > 1:
+            print(f"Ambiguous server name '{server_name}'. Matches: {', '.join(matches)}")
+            return None
+        
+        print(f"Unknown server: {server_name}")
+        print("Use 'mcp list' to see available servers")
+        return None
+    
+    def start_dependencies(self, server_config: Dict) -> bool:
+        """Start server dependencies"""
+        deps = server_config.get("dependencies", {})
+        
+        for dep_name, dep in deps.items():
+            if dep["type"] == "docker":
+                # Check if container is running
+                result = subprocess.run(
+                    f"docker ps -q -f name={dep['name']}", 
+                    shell=True, 
+                    capture_output=True, 
+                    text=True
+                )
+                
+                if not result.stdout.strip():
+                    print(f"  Starting {dep_name} (Docker)...")
+                    
+                    # Try to start existing container
+                    start_result = subprocess.run(
+                        f"docker start {dep['name']}", 
+                        shell=True, 
+                        capture_output=True
+                    )
+                    
+                    if start_result.returncode != 0:
+                        # Create new container
+                        env_args = " ".join([f"-e {k}={v}" for k, v in dep.get("env", {}).items()])
+                        port_args = " ".join([f"-p {k}:{v}" for k, v in dep.get("ports", {}).items()])
+                        
+                        cmd = f"docker run --name {dep['name']} {env_args} {port_args} -d {dep['image']}"
+                        subprocess.run(cmd, shell=True, check=True)
+                    
+                    time.sleep(2)
+            
+            elif dep["type"] == "service":
+                # Check if service is accessible
+                check_url = dep.get("check_url")
+                if check_url:
+                    try:
+                        requests.get(check_url, timeout=1)
+                    except:
+                        print(f"  Starting {dep_name} service...")
+                        subprocess.Popen(
+                            dep["command"],
+                            shell=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+                        time.sleep(2)
+        
+        return True
+    
+    def start_server(self, server_name: str, foreground: bool = False) -> bool:
+        """Start an MCP server"""
+        # Resolve server name
+        server_config = self.get_server_config(server_name)
+        if not server_config:
+            return False
+        
+        # Get full server name (in case of partial match)
+        full_name = next(k for k, v in self.servers.items() if v == server_config)
+        
+        # Check if already running
+        if self.is_running(full_name):
+            print(f"Server '{full_name}' is already running")
+            port = server_config.get('port', 'unknown')
+            print(f"Access at: http://localhost:{port}")
+            return True
+        
+        print(f"Starting '{full_name}'...")
+        
+        # Start dependencies
+        self.start_dependencies(server_config)
+        
+        # Prepare environment
+        env = os.environ.copy()
+        if "env" in server_config:
+            for key, value in server_config["env"].items():
+                # Expand environment variables
+                env[key] = os.path.expandvars(value)
+        
+        # Load .env file if specified
+        if "env_file" in server_config:
+            env_file = Path(server_config["path"]).expanduser() / server_config["env_file"]
+            if env_file.exists():
+                with open(env_file) as f:
+                    for line in f:
+                        if line.strip() and not line.startswith('#'):
+                            key, value = line.strip().split('=', 1)
+                            env[key] = value
+        
+        # Change to server directory
+        server_path = Path(server_config["path"]).expanduser()
+        if not server_path.exists():
+            print(f"Error: Server path does not exist: {server_path}")
+            return False
+        
+        # Run install command if specified and needed
+        if "install" in server_config:
+            install_marker = server_path / ".mcp_installed"
+            if not install_marker.exists():
+                print(f"  Running installation: {server_config['install']}")
+                subprocess.run(server_config["install"], shell=True, cwd=server_path, check=True)
+                install_marker.touch()
+        
+        # Start the server
+        command = server_config["command"]
+        
+        if foreground:
+            # Run in foreground
+            print(f"Running in foreground (Ctrl+C to stop)...")
+            try:
+                subprocess.run(command, shell=True, cwd=server_path, env=env)
+            except KeyboardInterrupt:
+                print("\nServer stopped")
+            return True
+        else:
+            # Run in background
+            log_file = self.runtime_dir / f"{full_name}.log"
+            pid_file = self.runtime_dir / f"{full_name}.pid"
+            
+            with open(log_file, 'w') as log:
+                process = subprocess.Popen(
+                    command,
+                    shell=True,
+                    cwd=server_path,
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT
+                )
+            
+            # Save PID
+            pid_file.write_text(str(process.pid))
+            
+            # Wait a moment and check if it started
+            time.sleep(2)
+            if process.poll() is None:
+                port = server_config.get('port', 'unknown')
+                print(f"✅ Server '{full_name}' started")
+                print(f"   PID: {process.pid}")
+                print(f"   Port: {port}")
+                print(f"   Logs: {log_file}")
+                print(f"   Access: http://localhost:{port}")
+                return True
+            else:
+                print(f"❌ Failed to start server")
+                print(f"   Check logs: {log_file}")
+                pid_file.unlink()
+                return False
+    
+    def stop_server(self, server_name: str) -> bool:
+        """Stop an MCP server"""
+        server_config = self.get_server_config(server_name)
+        if not server_config:
+            return False
+        
+        full_name = next(k for k, v in self.servers.items() if v == server_config)
+        pid_file = self.runtime_dir / f"{full_name}.pid"
+        
+        if not pid_file.exists():
+            print(f"Server '{full_name}' is not running")
+            return False
+        
+        try:
+            pid = int(pid_file.read_text())
+            os.kill(pid, signal.SIGTERM)
+            pid_file.unlink()
+            print(f"✅ Server '{full_name}' stopped (PID: {pid})")
+            return True
+        except (ProcessLookupError, ValueError):
+            pid_file.unlink()
+            print(f"Server '{full_name}' was not running (cleaned up stale PID file)")
+            return False
+    
+    def restart_server(self, server_name: str) -> bool:
+        """Restart an MCP server"""
+        self.stop_server(server_name)
+        time.sleep(1)
+        return self.start_server(server_name)
+    
+    def show_logs(self, server_name: str, follow: bool = True):
+        """Show server logs"""
+        server_config = self.get_server_config(server_name)
+        if not server_config:
+            return
+        
+        full_name = next(k for k, v in self.servers.items() if v == server_config)
+        log_file = self.runtime_dir / f"{full_name}.log"
+        
+        if not log_file.exists():
+            print(f"No logs found for '{full_name}'")
+            return
+        
+        if follow:
+            print(f"Following logs for '{full_name}' (Ctrl+C to stop)...")
+            subprocess.run(f"tail -f {log_file}", shell=True)
+        else:
+            print(log_file.read_text())
+    
+    def status(self, server_name: Optional[str] = None):
+        """Show status of server(s)"""
+        if server_name:
+            server_config = self.get_server_config(server_name)
+            if not server_config:
+                return
+            
+            full_name = next(k for k, v in self.servers.items() if v == server_config)
+            
+            if self.is_running(full_name):
+                pid_file = self.runtime_dir / f"{full_name}.pid"
+                pid = pid_file.read_text().strip()
+                port = server_config.get('port', 'N/A')
+                print(f"✅ '{full_name}' is running")
+                print(f"   PID: {pid}")
+                print(f"   Port: {port}")
+                print(f"   URL: http://localhost:{port}")
+            else:
+                print(f"⭕ '{full_name}' is stopped")
+        else:
+            self.list_servers()
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Universal MCP Server Launcher",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  mcp list                    # List all available servers
+  mcp mem0 start              # Start the mem0 server
+  mcp github start            # Start the GitHub server
+  mcp mem start               # Start mem0 (partial match)
+  mcp all start               # Start all servers
+  mcp mem0 stop               # Stop the mem0 server
+  mcp mem0 restart            # Restart the mem0 server
+  mcp mem0 status             # Check mem0 status
+  mcp mem0 logs               # Follow mem0 logs
+  mcp status                  # Show all server statuses
+        """
+    )
+    
+    parser.add_argument("server", nargs="?", help="Server name (or 'all' for all servers)")
+    parser.add_argument("action", nargs="?", choices=["start", "stop", "restart", "status", "logs", "list"],
+                       help="Action to perform")
+    parser.add_argument("-f", "--foreground", action="store_true", help="Run in foreground")
+    parser.add_argument("--no-follow", action="store_true", help="Don't follow logs")
+    
+    args = parser.parse_args()
+    
+    launcher = MCPLauncher()
+    
+    # Handle special cases
+    if not args.server or args.server == "list":
+        launcher.list_servers()
+        return
+    
+    if args.server == "status" and not args.action:
+        launcher.status()
+        return
+    
+    # Default action is start
+    if not args.action:
+        args.action = "start"
+    
+    # Handle 'all' servers
+    if args.server == "all":
+        if args.action in ["start", "stop", "restart"]:
+            success_count = 0
+            for server_name in launcher.servers.keys():
+                print(f"\n{'='*50}")
+                if args.action == "start":
+                    if launcher.start_server(server_name, args.foreground):
+                        success_count += 1
+                elif args.action == "stop":
+                    if launcher.stop_server(server_name):
+                        success_count += 1
+                elif args.action == "restart":
+                    if launcher.restart_server(server_name):
+                        success_count += 1
+            
+            print(f"\n{'='*50}")
+            print(f"Completed: {success_count}/{len(launcher.servers)} servers")
+        else:
+            print("Action not supported for 'all' servers")
+        return
+    
+    # Handle individual server
+    if args.action == "start":
+        launcher.start_server(args.server, args.foreground)
+    elif args.action == "stop":
+        launcher.stop_server(args.server)
+    elif args.action == "restart":
+        launcher.restart_server(args.server)
+    elif args.action == "status":
+        launcher.status(args.server)
+    elif args.action == "logs":
+        launcher.show_logs(args.server, not args.no_follow)
+    elif args.action == "list":
+        launcher.list_servers()
+
+if __name__ == "__main__":
+    main()

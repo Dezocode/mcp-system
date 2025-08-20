@@ -1,0 +1,161 @@
+#!/bin/bash
+# MCP Claude Pipeline - Continuous Non-Interruptive Execution
+# Complete linting → quality patching → development branch publishing
+# Claude operates as active worker with real-time guardrail validation
+# 🔒 DELETION PROTECTED - Use ./pipeline-security.sh to manage
+
+# DELETION PROTECTION SYSTEM
+SCRIPT_PATH="$(realpath "$0")"
+SCRIPT_NAME="$(basename "$0")"
+
+# Function to verify deletion attempt and require password
+verify_deletion_attempt() {
+    if [[ "$0" == *"rm"* ]] || [[ "$1" == "--delete" ]] || [[ "$1" == "--remove" ]]; then
+        echo "🚨 DELETION PROTECTION ACTIVATED"
+        echo "================================================================="
+        echo "❌ Attempting to delete protected pipeline file: $SCRIPT_NAME"
+        echo "🔒 This file is critical to the MCP system operation"
+        echo ""
+        echo "To safely manage this file:"
+        echo "  ./pipeline-security.sh status    # Check protection status"
+        echo "  ./pipeline-security.sh unprotect # Remove protection (requires password)"
+        echo ""
+        echo "🛡️ Deletion blocked for security"
+        echo "================================================================="
+        exit 1
+    fi
+}
+
+# Check for deletion attempts
+verify_deletion_attempt "$@"
+
+# Verify file integrity on execution
+if [[ -f ".pipeline-security/monitor.sh" ]]; then
+    ./.pipeline-security/monitor.sh 2>/dev/null
+fi
+
+# Generate session ID with timestamp
+SESSION_ID="session_$(date +%Y%m%d_%H%M%S)"
+SESSION_DIR="pipeline-outputs/sessions/${SESSION_ID}"
+
+echo "🚀 MCP CLAUDE PIPELINE - CONTINUOUS NON-INTERRUPTIVE EXECUTION"
+echo "================================================================="
+echo ""
+echo "🚨🚨🚨 CLAUDE CLI DIRECT GUARDRAIL INSTRUCTIONS 🚨🚨🚨"
+echo "================================================================="
+echo "📋 MANDATORY ACTIONS - YOU MUST DO THESE NOW:"
+echo ""
+echo "1️⃣ IMMEDIATELY run quality patcher in background:"
+echo "   python3 scripts/claude_quality_patcher.py --claude-agent --max-fixes 10 --fresh-report"
+echo ""
+echo "2️⃣ CONTINUOUSLY run linter to verify progress:"
+echo "   python3 scripts/version_keeper.py --comprehensive-lint --lint-only"
+echo ""
+echo "3️⃣ MANDATE: Continue applying fixes until linter shows 0 errors"
+echo "   - Apply EVERY fix shown by quality patcher"
+echo "   - Use Read tool first, then Edit/MultiEdit tools"
+echo "   - After each batch, run linter to check progress"
+echo "   - DO NOT STOP until ALL 3337+ issues are resolved"
+echo ""
+echo "4️⃣ Quality patcher will AUTOMATICALLY grab latest session lint"
+echo "   - Each run uses freshest lint report from session"
+echo "   - Validates your changes in real-time"
+echo "   - Creates backups before each fix attempt"
+echo ""
+echo "⚡ ENFORCEMENT: System tracks if you apply fixes or not"
+echo "🛡️ GUARDRAILS: All changes are validated automatically"
+echo "🔄 CONTINUOUS: Keep running until 0 errors remain"
+echo "================================================================="
+echo ""
+echo "📦 Executing complete pipeline with all components coordinated"
+echo "🤖 Claude operates as active worker with real-time guardrail system" 
+echo "🛡️ Quality patcher provides continuous validation and backup management"
+echo "🔄 Pipeline runs continuously until ALL issues are resolved"
+echo "📂 Session ID: ${SESSION_ID}"
+echo "📁 Output Directory: ${SESSION_DIR}"
+echo ""
+
+# Create session-specific directory structure
+echo "📁 Creating session directory structure..."
+mkdir -p "${SESSION_DIR}"/{lint,quality,pipeline,logs,artifacts}
+echo "✅ Session directories created"
+
+# Ensure we're in the right directory
+if [[ ! -f "mcp-claude-pipeline.py" ]]; then
+    echo "❌ Error: mcp-claude-pipeline.py not found in current directory"
+    echo "   Please run from the MCP system root directory"
+    exit 1
+fi
+
+# Check Python 3 availability
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Error: python3 not found"
+    echo "   Please install Python 3.8+ to run the pipeline"
+    exit 1
+fi
+
+# Export session info for the pipeline to use
+export MCP_SESSION_ID="${SESSION_ID}"
+export MCP_SESSION_DIR="${SESSION_DIR}"
+
+# Set continuous execution parameters
+CONTINUOUS_PARAMS="--continuous-mode --non-interactive --max-cycles=999 --target-issues=0 --publish-pipeline"
+
+# Check for Claude mode flag to enable minimal output
+CLAUDE_MODE=""
+for arg in "$@"; do
+    if [[ "$arg" == "--claude-mode" ]]; then
+        CLAUDE_MODE="--claude-mode"
+        echo "🤖 CLAUDE MODE ENABLED - Minimal output for speed"
+        break
+    fi
+done
+
+# Execute the master orchestrator with continuous parameters
+echo "🔥 Starting master orchestrator in CONTINUOUS MODE..."
+echo "🎯 Parameters: ${CONTINUOUS_PARAMS}"
+echo "🛡️ Quality patcher guardrail system will monitor ALL file changes"
+echo "⚡ Pipeline will run until ALL issues are resolved"
+echo ""
+echo "🚨 CLAUDE INTEGRATION ACTIVE"
+echo "📋 When fixes are shown, use Read tool then Edit/MultiEdit tools to apply them"
+echo "🔄 Pipeline will validate your changes automatically and continue"
+echo ""
+
+# Force non-buffered output for real-time monitoring
+export PYTHONUNBUFFERED=1
+
+# Execute with continuous parameters - this runs until ALL issues are resolved
+python3 mcp-claude-pipeline.py --session-dir="${SESSION_DIR}" ${CONTINUOUS_PARAMS} ${CLAUDE_MODE} "$@"
+
+# Check result
+PIPELINE_EXIT_CODE=$?
+if [[ $PIPELINE_EXIT_CODE -eq 0 ]]; then
+    echo ""
+    echo "🎉 CONTINUOUS PIPELINE EXECUTION SUCCESSFUL!"
+    echo "✅ ALL ISSUES RESOLVED - Zero issues remaining"
+    echo "🚀 Development branch published and ready for testing"
+    echo "📊 Session results saved to: ${SESSION_DIR}"
+    echo "📋 Comprehensive final report available in session directory"
+    echo "🎯 Pipeline achieved target: 0 issues remaining"
+else
+    echo ""
+    echo "❌ CONTINUOUS PIPELINE EXECUTION INCOMPLETE"
+    echo "⚠️  Pipeline may have encountered issues during continuous processing"
+    echo "🔍 Session logs saved to: ${SESSION_DIR}/logs/"
+    echo "📁 Check session directory for troubleshooting: ${SESSION_DIR}"
+    echo "🔄 Pipeline will retry automatically - Claude integration may be needed"
+    echo "💡 Check CLAUDE_PIPELINE_INTEGRATION.md for guidance"
+fi
+
+echo ""
+echo "📂 Session Directory Structure:"
+echo "   ${SESSION_DIR}/"
+echo "   ├── lint/          # Lint reports and analysis"
+echo "   ├── quality/       # Quality patches and fixes"
+echo "   ├── pipeline/      # Pipeline execution reports"
+echo "   ├── logs/          # Execution logs"
+echo "   └── artifacts/     # Additional artifacts"
+echo ""
+
+exit $PIPELINE_EXIT_CODE

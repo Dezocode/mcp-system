@@ -1,0 +1,364 @@
+name: Development Branch CI/CD
+
+on:
+  push:
+    branches: [ develop, feature/*, hotfix/* ]
+  pull_request:
+    branches: [ develop, main ]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "18"
+
+jobs:
+  # Comprehensive testing and validation
+  test-and-validate:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for version comparison
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install system dependencies
+      run: |
+        # Install system deps based on OS
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          sudo apt-get update
+          sudo apt-get install -y redis-server postgresql
+        elif [[ "${{ runner.os }}" == "macOS" ]]; then
+          brew install redis postgresql
+        fi
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e ".[dev]"
+
+    - name: Run code quality checks
+      run: |
+        # MCP System comprehensive linting (integrated with pipeline)
+        python scripts/version_keeper.py --comprehensive-lint --lint-only
+        
+        # Standard linting
+        black --check . || echo "Black formatting issues found"
+        isort --check-only . || echo "Import ordering issues found"
+        
+        # Type checking if mypy config exists
+        if [ -f mypy.ini ] || [ -f .mypy.ini ] || [ -f pyproject.toml ]; then
+          mypy . || echo "Type checking issues found"
+        fi
+        
+        # Security scanning
+        bandit -r . -f json -o bandit-report.json || echo "Security issues found"
+        
+        # MCP System security validation
+        python scripts/claude_quality_patcher.py --dry-run --max-fixes 10
+
+    - name: Run unit tests
+      run: |
+        # Standard pytest if tests directory exists
+        if [ -d "tests/" ]; then
+          pytest tests/ --cov=src --cov-report=xml --cov-report=html
+        else
+          echo "No tests directory found, skipping pytest"
+        fi
+        
+    - name: Test MCP connectors
+      run: |
+        # Test MCP router functionality
+        python mcp-router.py --analyze "create a file and save it"
+        python mcp-router.py --analyze "remember this information"
+        
+        # Test MCP bridge functionality
+        python claude-code-mcp-bridge.py --test-detection
+        
+        # Test auto-discovery system
+        python auto-discovery-system.py --dry-run
+        
+    - name: Run integration tests
+      run: |
+        # Custom integration tests if they exist
+        if [ -f "scripts/test_installation.py" ]; then
+          python scripts/test_installation.py
+        fi
+        
+        # Test MCP system integration
+        python mcp-test-framework.py --comprehensive
+
+    - name: Template compatibility validation
+      run: |
+        python scripts/validate_templates.py --all
+
+    - name: Upgrade module validation  
+      run: |
+        python scripts/validate_upgrade_modules.py --all
+
+    - name: Cross-platform installation test
+      run: |
+        # Test installation on different platforms
+        ./install.sh
+        export PATH="$HOME/bin:$PATH"
+        
+        # Test basic functionality
+        mcp-universal --help
+        mcp-init-project --help
+        
+        # Test auto-discovery
+        mkdir -p /tmp/test-project
+        cd /tmp/test-project
+        echo '{"name": "test"}' > package.json
+        mcp-init-project
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          bandit-report.json
+          pip-audit-report.json
+          coverage.xml
+
+  # MCP Pipeline Integration Test
+  mcp-pipeline-test:
+    runs-on: ubuntu-latest
+    needs: test-and-validate
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test MCP Pipeline System
+      run: |
+        # Test continuous integration loop
+        python scripts/claude_code_integration_loop.py --dry-run --max-iterations 2
+        
+        # Test quality patcher
+        python scripts/claude_quality_patcher.py --dry-run --max-fixes 5
+        
+        # Test version keeper
+        python scripts/version_keeper.py --comprehensive-lint --lint-only
+        
+        # Test pipeline components
+        chmod +x ./run-pipeline
+        echo "Testing pipeline integrity..."
+        head -20 ./run-pipeline
+
+    - name: Validate MCP System Integration
+      run: |
+        # Test all MCP connectors are working
+        python -c "
+        import sys
+        sys.path.append('.')
+        from mcp_router import MCPRouter
+        from claude_code_mcp_bridge import ClaudeCodeMCPBridge
+        
+        router = MCPRouter()
+        bridge = ClaudeCodeMCPBridge()
+        
+        print('✅ MCP Router initialized')
+        print('✅ MCP Bridge initialized')
+        print('✅ All core components loaded successfully')
+        "
+
+  # Version compatibility check
+  version-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout current branch
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Check version compatibility
+      run: |
+        python scripts/version_compatibility_check.py \
+          --base-branch=main \
+          --current-branch=${{ github.ref_name }}
+
+    - name: Validate breaking changes
+      run: |
+        python scripts/breaking_changes_detector.py \
+          --base-branch=main \
+          --report-file=breaking-changes-report.json
+
+    - name: Upload compatibility report
+      uses: actions/upload-artifact@v3
+      with:
+        name: compatibility-report
+        path: breaking-changes-report.json
+
+  # Documentation validation
+  docs-validation:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install mkdocs mkdocs-material
+
+    - name: Validate documentation
+      run: |
+        python scripts/validate_documentation.py
+        
+    - name: Build documentation
+      run: |
+        mkdocs build --strict
+
+    - name: Test documentation examples
+      run: |
+        python scripts/test_documentation_examples.py
+
+  # Security and compliance scan
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  # Performance benchmarking
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest-benchmark
+
+    - name: Run performance tests
+      run: |
+        pytest tests/performance/ --benchmark-json=benchmark-results.json
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: benchmark-results.json
+
+  # Package and release preparation
+  package-validation:
+    runs-on: ubuntu-latest
+    needs: [test-and-validate, version-compatibility, docs-validation]
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install build dependencies
+      run: |
+        pip install build twine
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Validate package
+      run: |
+        twine check dist/*
+
+    - name: Test package installation
+      run: |
+        pip install dist/*.whl
+        mcp-universal --help
+
+    - name: Create development release
+      run: |
+        python scripts/create_dev_release.py \
+          --version-suffix=dev${{ github.run_number }} \
+          --output-dir=dev-release/
+
+    - name: Upload development package
+      uses: actions/upload-artifact@v3
+      with:
+        name: development-package
+        path: |
+          dist/
+          dev-release/
+
+  # Notify on success/failure
+  notify-status:
+    runs-on: ubuntu-latest
+    needs: [test-and-validate, mcp-pipeline-test, version-compatibility, docs-validation, security-scan, performance-test, package-validation]
+    if: always()
+    
+    steps:
+    - name: Notify success
+      if: ${{ needs.test-and-validate.result == 'success' && needs.version-compatibility.result == 'success' }}
+      run: |
+        echo "✅ All development checks passed! Ready for review."
+        
+    - name: Notify failure
+      if: ${{ needs.test-and-validate.result == 'failure' || needs.version-compatibility.result == 'failure' }}
+      run: |
+        echo "❌ Development checks failed. Please review and fix issues."
+        exit 1

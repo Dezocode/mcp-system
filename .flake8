@@ -1,0 +1,26 @@
+[flake8]
+# Extend ignore to preserve default ignore list while adding W503
+extend-ignore = W503
+
+# W503 line break before binary operator (contradicts W504 and modern PEP 8)
+# This is disabled because:
+# 1. Black formatter prefers line breaks before binary operators
+# 2. PEP 8 updated in 2016 to recommend this style  
+# 3. W503 and W504 are mutually exclusive - can't satisfy both
+# 4. Modern Python tooling (Black, etc.) follows W503 style
+
+# Set line length to 88 (Black's default, more permissive than PEP 8's 79)
+max-line-length = 88
+
+# Additional settings for consistency
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .tox,
+    .eggs,
+    *.egg,
+    build,
+    dist,
+    .mcp-system-backups-disconnected

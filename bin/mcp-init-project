@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# MCP Project Initializer
+# Automatically sets up MCP for any project
+#
+
+SCRIPT_DIR="$HOME/.mcp-system"
+
+# Auto-detect and initialize
+if [ -d ".claude" ] || [ -f "CLAUDE.md" ]; then
+    echo "🎯 Claude project detected - initializing MCP integration..."
+    python3 "$SCRIPT_DIR/components/claude-code-mcp-bridge.py" init
+elif [ -f "package.json" ]; then
+    echo "🎯 Node.js project detected"
+    mcp-universal create "$(basename $(pwd))-tools" --template typescript-node
+elif [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+    echo "🎯 Python project detected"
+    mcp-universal create "$(basename $(pwd))-tools" --template python-fastmcp
+else
+    echo "🎯 Generic project - setting up basic MCP integration"
+    mcp-universal create "$(basename $(pwd))-tools" --template minimal-python
+fi

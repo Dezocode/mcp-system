@@ -1,0 +1,12 @@
+-/.claude-session/
+-/.claude_patches/
+-/.mcp-system-backups-disconnected/
+-/.mcp-system-trash-internal/
+-/sessions/
+-/.git/
+-/__pycache__/
+-/*.pyc
+-/build/
+-/dist/
+-/.pytest_cache/
+-/.mypy_cache/

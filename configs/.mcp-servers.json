@@ -1,0 +1,75 @@
+{
+  "mem0": {
+    "name": "Mem0 Memory Server",
+    "path": "~/mcp-mem0",
+    "command": "uv run python src/main.py",
+    "port": 8050,
+    "env_file": ".env",
+    "dependencies": {
+      "postgres": {
+        "type": "docker",
+        "image": "pgvector/pgvector:pg16",
+        "name": "mem0-postgres",
+        "env": {
+          "POSTGRES_PASSWORD": "mysecretpassword",
+          "POSTGRES_DB": "mem0db"
+        },
+        "ports": {
+          "5432": "5432"
+        }
+      },
+      "ollama": {
+        "type": "service",
+        "command": "ollama serve",
+        "check_url": "http://localhost:11434/api/tags"
+      }
+    }
+  },
+  "filesystem": {
+    "name": "Filesystem MCP Server",
+    "path": "~/mcp-filesystem",
+    "command": "node build/index.js",
+    "port": 8051,
+    "install": "npm install && npm run build",
+    "dependencies": {}
+  },
+  "github": {
+    "name": "GitHub MCP Server",
+    "path": "~/mcp-github",
+    "command": "python -m mcp_github",
+    "port": 8052,
+    "env": {
+      "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+    },
+    "dependencies": {}
+  },
+  "slack": {
+    "name": "Slack MCP Server",
+    "path": "~/mcp-slack",
+    "command": "python src/main.py",
+    "port": 8053,
+    "env": {
+      "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+      "SLACK_APP_TOKEN": "${SLACK_APP_TOKEN}"
+    },
+    "dependencies": {}
+  },
+  "weather": {
+    "name": "Weather MCP Server",
+    "path": "~/mcp-weather",
+    "command": "node index.js",
+    "port": 8054,
+    "env": {
+      "OPENWEATHER_API_KEY": "${OPENWEATHER_API_KEY}"
+    },
+    "dependencies": {}
+  },
+  "test-project-tools": {
+    "name": "Test Project Tools MCP Server",
+    "path": "/Users/dezmondhollins/mcp-test-project-tools",
+    "command": "npm start",
+    "port": 8055,
+    "env_file": ".env",
+    "dependencies": {}
+  }
+}
