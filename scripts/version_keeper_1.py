@@ -1444,7 +1444,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                             f"'{dup['function']}' from {dup['file2']}:{dup['line2']} "
                             f"as it already exists in "
                             f"{dup['file1']}:{dup['line1']}"
-                        ),
+                            ),
                     },
                 }
             )

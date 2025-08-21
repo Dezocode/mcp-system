@@ -15,31 +15,32 @@ import subprocess
 
 class MinimalVersionKeeper:
     """Minimal version keeper focused on pipeline integration"""
-    
+
     def __init__(self):
         self.current_version = "1.0.0"
         self.git_branch = "main"
-        
-    def run_comprehensive_lint(self, session_dir=None, output_format="text", output_file=None):
+
+    def run_comprehensive_lint(self, session_dir=None, output_format="text",
+                               output_file=None):
         """Run comprehensive linting and return results"""
-        
+
         # Simulate comprehensive linting
         print("🔍 Running comprehensive lint scan...")
-        
+
         # Create session directory if provided
         if session_dir:
             Path(session_dir).mkdir(parents=True, exist_ok=True)
-            
+
         # Run actual linting tools
         issues = []
         total_issues = 0
-        
+
         # Try to run flake8 if available
         try:
             result = subprocess.run(
-                ["flake8", "--format=json", "."], 
-                capture_output=True, 
-                text=True, 
+                ["flake8", "--format=json", "."],
+                capture_output=True,
+                text=True,
                 timeout=30
             )
             if result.stdout:
@@ -48,7 +49,7 @@ class MinimalVersionKeeper:
                     for item in flake8_output:
                         issues.append({
                             "type": "quality",
-                            "tool": "flake8", 
+                            "tool": "flake8",
                             "file": item.get("filename", "unknown"),
                             "line": item.get("line_number", 0),
                             "message": item.get("text", ""),
@@ -60,7 +61,7 @@ class MinimalVersionKeeper:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             # Flake8 not available or timeout
             pass
-            
+
         # Generate report structure
         lint_report = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -90,11 +91,13 @@ class MinimalVersionKeeper:
                 "issues_per_second": total_issues / 2.5 if total_issues > 0 else 0
             },
             "recommendations": [
-                f"Found {total_issues} issues to fix" if total_issues > 0 else "No issues found",
-                "Run quality patcher to apply automated fixes" if total_issues > 0 else "Code quality is good"
+                (f"Found {total_issues} issues to fix" if total_issues > 0
+                 else "No issues found"),
+                ("Run quality patcher to apply automated fixes" if total_issues > 0
+                 else "Code quality is good")
             ]
         }
-        
+
         # Output handling
         if output_format == "json":
             if output_file:
@@ -108,12 +111,12 @@ class MinimalVersionKeeper:
                 print(json.dumps(lint_report, indent=2))
         else:
             # Text output
-            print(f"📊 Lint Report Summary:")
+            print("📊 Lint Report Summary:")
             print(f"  Version: {self.current_version}")
             print(f"  Branch: {self.git_branch}")
             print(f"  Total Issues: {total_issues}")
             print(f"  Files Analyzed: {lint_report['performance']['files_analyzed']}")
-            
+
         return lint_report
 
 
@@ -236,22 +239,22 @@ def main(
     output_file,
 ):
     """Minimal Version Keeper - Pipeline Integration Ready"""
-    
+
     print("🚀 Minimal Version Keeper - Pipeline Integration")
     print("=" * 50)
-    
+
     keeper = MinimalVersionKeeper()
-    
+
     if lint_only or comprehensive_lint:
         print("🔍 Lint-only mode enabled")
-        
+
         # Run comprehensive linting
         lint_report = keeper.run_comprehensive_lint(
             session_dir=session_dir,
-            output_format=output_format, 
+            output_format=output_format,
             output_file=output_file
         )
-        
+
         print("✅ Lint-only mode complete")
         if lint_report["summary"]["total_issues"] > 0:
             print(f"⚠️ Found {lint_report['summary']['total_issues']} issues")
@@ -259,7 +262,7 @@ def main(
         else:
             print("✅ No issues found")
             sys.exit(0)
-    
+
     # Regular version keeper functionality would go here
     print("📋 Regular version keeper functionality not implemented in minimal version")
     print("Use --lint-only or --comprehensive-lint for pipeline integration")
