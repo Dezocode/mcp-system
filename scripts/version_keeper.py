@@ -816,9 +816,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 "name": node.name,
                             }
 
-                            if str(py_file) != str(functions_map[func_signature]["file"]):
                     # Recursively process child nodes
-                                        "file1": str(functions_map[func_signature]["file"]),
                     for child in ast.iter_child_nodes(node):
                         walk_with_class_context(child, class_name)
 
@@ -846,10 +844,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         if duplicates["similar_classes"]:
             duplicates["recommendations"].append(
                 "Consider merging similar class implementations"
-            duplicates["recommendations"].append(
             )
         if duplicates["redundant_files"]:
+            duplicates["recommendations"].append(
                 "Remove redundant file copies"
+            )
             duplicates["recommendations"].append("Remove redundant file copies")
             backup_patterns = [
 

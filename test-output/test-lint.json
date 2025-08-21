@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-21T12:25:46.764100",
+  "session_id": "test-session",
+  "summary": {
+    "total_issues": 1,
+    "lint_errors": 1,
+    "type_errors": 0,
+    "format_errors": 0
+  },
+  "details": {
+    "linting": {
+      "flake8_errors": [
+        {
+          "file": "test.py",
+          "line": 1,
+          "message": "E302 expected 2 blank lines"
+        }
+      ],
+      "mypy_errors": [],
+      "black_errors": [],
+      "isort_errors": []
+    }
+  },
+  "overall_status": "ISSUES_FOUND"
+}
