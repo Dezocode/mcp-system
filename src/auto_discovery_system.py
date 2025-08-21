@@ -167,13 +167,27 @@ class MCPAutoDiscovery:
         if path is None:
             path = Path.cwd()
             
+        project_types = self.discover_project_type(path)
+        existing_servers = self.discover_mcp_servers(path)
+        
         analysis = {
             "path": str(path),
-            "project_types": self.discover_project_type(path),
-            "existing_servers": self.discover_mcp_servers(path),
+            "project_types": project_types,
+            "detected_environments": project_types,  # For test compatibility
+            "existing_servers": existing_servers,
+            "suggested_servers": [],
             "opportunities": [],
             "complexity": "simple"
         }
+        
+        # Generate suggested servers based on project types
+        if "python" in project_types and not existing_servers:
+            analysis["suggested_servers"].append("python-tools")
+            analysis["opportunities"].append("Create Python MCP server with fastmcp")
+            
+        if "nodejs" in project_types and not existing_servers:
+            analysis["suggested_servers"].append("nodejs-tools")
+            analysis["opportunities"].append("Create Node.js MCP server")
         
         # Analyze complexity
         py_files = list(path.glob("**/*.py"))
@@ -181,13 +195,6 @@ class MCPAutoDiscovery:
             analysis["complexity"] = "complex"
         elif len(py_files) > 10:
             analysis["complexity"] = "medium"
-            
-        # Identify opportunities
-        if "python" in analysis["project_types"] and not analysis["existing_servers"]:
-            analysis["opportunities"].append("Create Python MCP server with fastmcp")
-            
-        if "nodejs" in analysis["project_types"] and not analysis["existing_servers"]:
-            analysis["opportunities"].append("Create Node.js MCP server")
             
         return analysis
     

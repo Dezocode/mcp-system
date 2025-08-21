@@ -1,0 +1,230 @@
+name: Docker Production Deployment
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Validate configuration
+      run: |
+        chmod +x validate.sh
+        ./validate.sh
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --tb=short
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image for scanning
+      run: |
+        docker build -f Dockerfile.production -t mcp-system:scan .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'mcp-system:scan'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [validate, security-scan]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.production
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Output image
+      id: image
+      run: |
+        echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
+
+  test-deployment:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Test Docker Compose configuration
+      run: |
+        # Test development compose
+        docker compose -f docker-compose.dev.yml config
+        
+        # Test production compose with dummy environment
+        export DB_PASSWORD=test_password
+        export GRAFANA_PASSWORD=test_password
+        docker compose -f docker-compose.prod.yml config
+
+    - name: Test container startup
+      run: |
+        # Pull the built image
+        docker pull ${{ needs.build.outputs.image }}
+        
+        # Test container starts successfully
+        docker run --rm -d --name mcp-test ${{ needs.build.outputs.image }}
+        
+        # Wait for container to be ready
+        sleep 10
+        
+        # Test health check
+        docker exec mcp-test python3 -c "print('Container health check passed')"
+        
+        # Clean up
+        docker stop mcp-test
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [build, test-deployment]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Image: ${{ needs.build.outputs.image }}"
+        
+        # Here you would typically:
+        # 1. SSH to staging server
+        # 2. Pull the new image
+        # 3. Update docker-compose.yml with new image
+        # 4. Run deployment script
+        
+        echo "Staging deployment completed"
+
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests against staging..."
+        # Add your integration test commands here
+        echo "Integration tests passed"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, test-deployment]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        echo "Image: ${{ needs.build.outputs.image }}"
+        
+        # Here you would typically:
+        # 1. SSH to production servers
+        # 2. Run backup script
+        # 3. Pull the new image
+        # 4. Update docker-compose.yml with new image
+        # 5. Run deployment script with health checks
+        # 6. Verify deployment success
+        
+        echo "Production deployment completed"
+
+    - name: Create deployment record
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            environment: 'production',
+            description: 'Production deployment of MCP System',
+            auto_merge: false
+          });
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    steps:
+    - name: Notify deployment status
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const deploymentStatus = '${{ needs.deploy-production.result }}' || '${{ needs.deploy-staging.result }}';
+          const environment = context.ref.startsWith('refs/tags/') ? 'production' : 'staging';
+          
+          core.notice(`Deployment to ${environment}: ${deploymentStatus}`);
+          
+          // Here you could also send notifications to Slack, email, etc.

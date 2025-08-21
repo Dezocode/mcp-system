@@ -119,7 +119,7 @@ class ClaudeCodeMCPBridge:
         """Create safe MCP integration configuration"""
         return {
             "mcpServers": {
-                "mcp-system": {
+                "mcp-universal": {  # Changed to match test expectation
                     "command": "python",
                     "args": ["-m", "src.pipeline_mcp_server"],
                     "env": {
