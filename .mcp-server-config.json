@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "pipeline-mcp-server": {
+      "command": "python",
+      "args": [
+        "src/pipeline_mcp_server.py"
+      ],
+      "cwd": "/home/runner/work/mcp-system/mcp-system",
+      "env": {
+        "PYTHONPATH": "/home/runner/work/mcp-system/mcp-system/src"
+      }
+    }
+  }
+}
