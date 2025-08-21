@@ -92,7 +92,6 @@ class MCPVersionKeeper:
         current = semantic_version.Version(self.current_version)
 
         if bump_type == "major":
-            f"📝 Updating version from {self.current_version} to {new_version}"
             new_version = current.next_major()
         elif bump_type == "minor":
             new_version = current.next_minor()
@@ -100,7 +99,8 @@ class MCPVersionKeeper:
             new_version = current.next_patch()
         else:
             raise ValueError(f"Invalid bump type: {bump_type}")
-
+        
+        print(f"📝 Updating version from {self.current_version} to {new_version}")
         return str(new_version)
 
     def update_version_files(self, new_version: str):
@@ -816,9 +816,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 "name": node.name,
                             }
 
-                            if str(py_file) != str(functions_map[func_signature]["file"]):
                     # Recursively process child nodes
-                                        "file1": str(functions_map[func_signature]["file"]),
                     for child in ast.iter_child_nodes(node):
                         walk_with_class_context(child, class_name)
 
@@ -846,10 +844,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         if duplicates["similar_classes"]:
             duplicates["recommendations"].append(
                 "Consider merging similar class implementations"
-            duplicates["recommendations"].append(
             )
         if duplicates["redundant_files"]:
+            duplicates["recommendations"].append(
                 "Remove redundant file copies"
+            )
             duplicates["recommendations"].append("Remove redundant file copies")
             backup_patterns = [
 
@@ -2359,6 +2358,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     is_flag=True,
     help="Filter out false positives and focus on genuine issues",
 )
+@click.option(
+    "--output-format",
+    default="text",
+    type=click.Choice(["text", "json"]),
+    help="Output format for reports",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(),
+    help="Output file path for JSON reports",
+)
 def main(
     bump_type,
     base_branch,
@@ -2377,6 +2387,8 @@ def main(
     exclude_backups,
     exclude_duplicates,
     real_issues_only,
+    output_format,
+    output_file,
 ):
     """MCP System Version Keeper - Enhanced with Protocol Integration"""
 
@@ -2673,6 +2685,48 @@ def main(
         print("\n💡 Recommendations:")
         for rec in report["recommendations"]:
             print(f"  • {rec}")
+
+    # Generate JSON output if requested
+    if output_format == "json":
+        json_report = {
+            "timestamp": datetime.now().isoformat(),
+            "session_id": session_id,
+            "version": keeper.current_version,
+            "summary": {
+                "total_issues": sum([
+                    len(linting.get("flake8_errors", [])),
+                    len(linting.get("mypy_errors", [])),
+                    len(linting.get("black_errors", [])),
+                    len(linting.get("isort_errors", [])),
+                ]) if linting else 0,
+                "lint_errors": len(linting.get("flake8_errors", [])) if linting else 0,
+                "type_errors": len(linting.get("mypy_errors", [])) if linting else 0,
+                "format_errors": len(linting.get("black_errors", [])) + len(linting.get("isort_errors", [])) if linting else 0,
+                "duplicate_issues": len(duplicates.get("exact_duplicates", [])) + len(duplicates.get("similar_functions", [])) if duplicates else 0,
+                "connection_issues": len(connections.get("undefined_functions", [])) + len(connections.get("broken_imports", [])) if connections else 0,
+            },
+            "details": {
+                "linting": linting if linting else {},
+                "duplicates": duplicates if duplicates else {},
+                "connections": connections if connections else {},
+                "compatibility": compatibility if compatibility else {},
+                "tests": tests if tests else {},
+                "checks": checks if checks else {},
+            },
+            "recommendations": report.get("recommendations", []),
+            "overall_status": report.get("overall_status", "UNKNOWN"),
+        }
+        
+        # Save JSON report
+        if output_file:
+            json_path = Path(output_file)
+        else:
+            json_path = Path(output_dir) / f"lint-report-{session_id or 'default'}.json" if output_dir else Path("lint-report.json")
+            
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(json_path, "w") as f:
+            json.dump(json_report, f, indent=2)
+        print(f"📄 JSON report saved to: {json_path}")
 
     # Apply changes if validation passes and not dry run
         output_path = (

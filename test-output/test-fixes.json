@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-08-21T12:25:47.811434",
+  "session_id": "test-output",
+  "summary": {
+    "fixes_applied": 1,
+    "fixes_skipped": 0,
+    "fixes_failed": 0,
+    "remaining_issues": 0,
+    "success_rate": 100.0
+  },
+  "performance": {
+    "fixes_per_minute": 60,
+    "average_fix_time": 1.0
+  },
+  "session_results": "Test session completed successfully"
+}

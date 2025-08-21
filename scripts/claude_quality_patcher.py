@@ -3207,6 +3207,22 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
     is_flag=True,
     help="Use direct Claude CLI integration for automated fix application",
 )
+@click.option(
+    "--output-format",
+    default="text",
+    type=click.Choice(["text", "json"]),
+    help="Output format for reports",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(),
+    help="Output file path for JSON reports",
+)
+@click.option(
+    "--auto-apply",
+    is_flag=True,
+    help="Automatically apply fixes without confirmation",
+)
 def main(
     lint_report,
     max_fixes,
@@ -3224,6 +3240,9 @@ def main(
     background,
     monitor_lint,
     claude_cli,
+    output_format,
+    output_file,
+    auto_apply,
 ):
     """Enhanced Claude Quality Patcher v2.0 - Protocol Integrated"""
 
@@ -3371,6 +3390,34 @@ def main(
     # Generate and show report
     report = patcher.generate_session_report(session_results)
     print("\\n" + report)
+
+    # Generate JSON output if requested
+    if output_format == "json":
+        json_report = {
+            "timestamp": datetime.now().isoformat(),
+            "session_id": session_dir.name if session_dir else "default",
+            "summary": {
+                "fixes_applied": patcher.fixes_applied,
+                "fixes_skipped": patcher.fixes_skipped,
+                "fixes_failed": patcher.fixes_failed,
+                "remaining_issues": len(patcher.lint_report.get("issues", [])) - patcher.fixes_applied,
+                "success_rate": (patcher.fixes_applied / max(patcher.fixes_applied + patcher.fixes_failed, 1)) * 100,
+            },
+            "performance": patcher.performance_metrics,
+            "session_results": session_results,
+            "fixes_applied_details": patcher.session_log,
+        }
+        
+        # Save JSON report
+        if output_file:
+            json_path = Path(output_file)
+        else:
+            json_path = session_dir / "fixes-report.json" if session_dir else Path("fixes-report.json")
+            
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(json_path, "w") as f:
+            json.dump(json_report, f, indent=2)
+        print(f"📄 JSON report saved to: {json_path}")
 
     # Save session log
     patcher.save_session_log()
