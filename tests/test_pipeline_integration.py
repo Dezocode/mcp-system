@@ -13,6 +13,7 @@ Version: 1.0.0
 """
 
 import asyncio
+import importlib.util
 import json
 import os
 import subprocess

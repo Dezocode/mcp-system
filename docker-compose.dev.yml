@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  mcp-system:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    environment:
+      - MCP_ENV=development
+      - MCP_DEBUG=true
+      - MCP_AUTO_DISCOVERY=true
+      - MCP_SAFE_MODE=true
+      - PYTHONPATH=/app/src:/app/core
+    volumes:
+      - mcp_data:/home/mcpuser/.mcp-system
+      - mcp_logs:/var/log/mcp-system
+    healthcheck:
+      test: ["CMD", "python3", "-c", "print('Health OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mcp_data:
+  mcp_logs:

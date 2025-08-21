@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  mcp-system:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    ports:
+      - "8050-8060:8050-8060"
+    environment:
+      - MCP_ENV=production
+      - DATABASE_URL=postgresql://mcpuser:${DB_PASSWORD}@postgres:5432/mcpsystem
+      - REDIS_URL=redis://redis:6379/0
+      - MCP_SYSTEM_PATH=/home/mcpuser/.mcp-system
+      - MCP_AUTO_DISCOVERY=true
+      - MCP_SAFE_MODE=true
+      - MCP_DEBUG=false
+      - MCP_LOG_LEVEL=warning
+      - PROMETHEUS_ENABLED=true
+    volumes:
+      - mcp_data:/home/mcpuser/.mcp-system
+      - mcp_logs:/var/log/mcp-system
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "mcp-universal", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mcpsystem
+      - POSTGRES_USER=mcpuser
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcpuser"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl/certs:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - mcp-system
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backup:
+    image: postgres:15-alpine
+    restart: "no"
+    environment:
+      - POSTGRES_DB=mcpsystem
+      - POSTGRES_USER=mcpuser  
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - mcp_backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    command: ["sh", "/backup.sh"]
+    depends_on:
+      - postgres
+    profiles:
+      - backup
+
+volumes:
+  mcp_data:
+    driver: local
+  mcp_logs:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  mcp_backups:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
