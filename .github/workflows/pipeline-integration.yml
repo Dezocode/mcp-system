@@ -1,0 +1,404 @@
+name: Enhanced Pipeline Integration
+"on":
+  push:
+    branches: [ main, develop, version-0.2 ]
+    paths:
+      - 'src/**'
+      - 'core/**'
+      - 'scripts/**'
+      - '*.py'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+  pull_request:
+    branches: [ main, version-0.2 ]
+    paths:
+      - 'src/**'
+      - 'core/**'
+      - 'scripts/**'
+      - '*.py'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+  workflow_dispatch:
+    inputs:
+      max_fixes:
+        description: 'Maximum number of fixes to apply'
+        required: false
+        default: '10'
+      force_fresh_report:
+        description: 'Force generation of fresh lint report'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.11'
+  MAX_PIPELINE_CYCLES: 5
+  PIPELINE_SESSION_DIR: pipeline-sessions
+
+jobs:
+  version-keeper-scan:
+    name: Version Keeper - Scan & Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      has-issues: ${{ steps.lint-check.outputs.has-issues }}
+      session-id: ${{ steps.setup-session.outputs.session-id }}
+      issues-count: ${{ steps.lint-check.outputs.issues-count }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 mypy black isort semantic-version
+        
+    - name: Setup session directory
+      id: setup-session
+      run: |
+        SESSION_ID="gh-pipeline-$(date +%Y%m%d_%H%M%S)-${{ github.run_number }}"
+        echo "session-id=$SESSION_ID" >> $GITHUB_OUTPUT
+        mkdir -p ${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID
+        echo "SESSION_ID=$SESSION_ID" >> $GITHUB_ENV
+        
+    - name: Run Version Keeper comprehensive lint
+      id: lint-check
+      run: |
+        echo "🔍 Running comprehensive lint scan..."
+        cd ${{ github.workspace }}
+        
+        # Run version keeper with comprehensive linting
+        python3 scripts/version_keeper.py \
+          --comprehensive-lint \
+          --lint-only \
+          --session-dir="${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}" \
+          --output-format=json \
+          --output-file="${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}/lint-report.json"
+        
+        # Check if issues were found
+        if [ -f "${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}/lint-report.json" ]; then
+          ISSUES_COUNT=$(jq '.summary.total_issues // 0' "${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}/lint-report.json")
+          echo "issues-count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ "$ISSUES_COUNT" -gt 0 ]; then
+            echo "has-issues=true" >> $GITHUB_OUTPUT
+            echo "❌ Found $ISSUES_COUNT linting issues"
+          else
+            echo "has-issues=false" >> $GITHUB_OUTPUT
+            echo "✅ No linting issues found"
+          fi
+        else
+          echo "has-issues=false" >> $GITHUB_OUTPUT
+          echo "issues-count=0" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload lint report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: lint-report-${{ env.SESSION_ID }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}/
+        retention-days: 7
+        
+    - name: Comment on PR with lint results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = '${{ env.PIPELINE_SESSION_DIR }}/${{ env.SESSION_ID }}/lint-report.json';
+          
+          if (fs.existsSync(path)) {
+            const report = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const issuesCount = report.summary?.total_issues || 0;
+            
+            const body = issuesCount > 0 
+              ? `🔍 **Version Keeper Scan Results**\n\n❌ Found ${issuesCount} issues that need attention.\n\nThe Quality Patcher will attempt to fix these automatically.`
+              : `🔍 **Version Keeper Scan Results**\n\n✅ No linting issues found! Code quality looks good.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          }
+
+  quality-patcher:
+    name: Quality Patcher - Auto Fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: version-keeper-scan
+    if: needs.version-keeper-scan.outputs.has-issues == 'true'
+    outputs:
+      fixes-applied: ${{ steps.quality-fix.outputs.fixes-applied }}
+      remaining-issues: ${{ steps.quality-fix.outputs.remaining-issues }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 mypy black isort semantic-version
+        
+    - name: Download lint report
+      uses: actions/download-artifact@v4
+      with:
+        name: lint-report-${{ needs.version-keeper-scan.outputs.session-id }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ needs.version-keeper-scan.outputs.session-id }}/
+        
+    - name: Run Quality Patcher
+      id: quality-fix
+      run: |
+        echo "🔧 Running Quality Patcher with automatic fixes..."
+        cd ${{ github.workspace }}
+        
+        SESSION_ID="${{ needs.version-keeper-scan.outputs.session-id }}"
+        
+        # Run quality patcher with the lint report
+        python3 scripts/claude_quality_patcher.py \
+          --claude-agent \
+          --max-fixes="${{ github.event.inputs.max_fixes || '10' }}" \
+          --session-dir="${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID" \
+          --lint-report="${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/lint-report.json" \
+          --auto-apply \
+          --output-format=json \
+          --output-file="${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/fixes-report.json"
+        
+        # Check results
+        if [ -f "${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/fixes-report.json" ]; then
+          FIXES_APPLIED=$(jq '.summary.fixes_applied // 0' "${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/fixes-report.json")
+          REMAINING_ISSUES=$(jq '.summary.remaining_issues // 0' "${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/fixes-report.json")
+          
+          echo "fixes-applied=$FIXES_APPLIED" >> $GITHUB_OUTPUT
+          echo "remaining-issues=$REMAINING_ISSUES" >> $GITHUB_OUTPUT
+          
+          echo "🔧 Applied $FIXES_APPLIED fixes"
+          echo "⚠️ $REMAINING_ISSUES issues remaining"
+        else
+          echo "fixes-applied=0" >> $GITHUB_OUTPUT
+          echo "remaining-issues=0" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload quality patcher results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: quality-fixes-${{ needs.version-keeper-scan.outputs.session-id }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ needs.version-keeper-scan.outputs.session-id }}/
+        retention-days: 7
+
+  version-keeper-validate:
+    name: Version Keeper - Validate Fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [version-keeper-scan, quality-patcher]
+    if: always() && needs.quality-patcher.outputs.fixes-applied != '0'
+    outputs:
+      validation-passed: ${{ steps.validate.outputs.validation-passed }}
+      final-issues-count: ${{ steps.validate.outputs.final-issues-count }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 mypy black isort semantic-version
+        
+    - name: Download previous artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: quality-fixes-${{ needs.version-keeper-scan.outputs.session-id }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ needs.version-keeper-scan.outputs.session-id }}/
+        
+    - name: Validate fixes with Version Keeper
+      id: validate
+      run: |
+        echo "✅ Validating applied fixes..."
+        cd ${{ github.workspace }}
+        
+        SESSION_ID="${{ needs.version-keeper-scan.outputs.session-id }}"
+        
+        # Run version keeper validation
+        python3 scripts/version_keeper.py \
+          --comprehensive-lint \
+          --lint-only \
+          --session-dir="${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID" \
+          --output-format=json \
+          --output-file="${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/validation-report.json"
+        
+        # Check validation results
+        if [ -f "${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/validation-report.json" ]; then
+          FINAL_ISSUES=$(jq '.summary.total_issues // 0' "${{ env.PIPELINE_SESSION_DIR }}/$SESSION_ID/validation-report.json")
+          echo "final-issues-count=$FINAL_ISSUES" >> $GITHUB_OUTPUT
+          
+          if [ "$FINAL_ISSUES" -eq 0 ]; then
+            echo "validation-passed=true" >> $GITHUB_OUTPUT
+            echo "✅ Validation passed! All issues resolved."
+          else
+            echo "validation-passed=false" >> $GITHUB_OUTPUT
+            echo "❌ Validation failed. $FINAL_ISSUES issues remaining."
+          fi
+        else
+          echo "validation-passed=false" >> $GITHUB_OUTPUT
+          echo "final-issues-count=999" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload validation results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: validation-${{ needs.version-keeper-scan.outputs.session-id }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ needs.version-keeper-scan.outputs.session-id }}/
+        retention-days: 7
+
+  github-integration:
+    name: GitHub Integration - Stage & Commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [version-keeper-scan, quality-patcher, version-keeper-validate]
+    if: |
+      always() && 
+      (needs.version-keeper-scan.outputs.has-issues == 'false' || 
+       needs.version-keeper-validate.outputs.validation-passed == 'true')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action - Pipeline Integration"
+        
+    - name: Download artifacts if fixes were applied
+      if: needs.quality-patcher.outputs.fixes-applied != '0'
+      uses: actions/download-artifact@v4
+      with:
+        name: validation-${{ needs.version-keeper-scan.outputs.session-id }}
+        path: ${{ env.PIPELINE_SESSION_DIR }}/${{ needs.version-keeper-scan.outputs.session-id }}/
+        
+    - name: Stage and commit changes
+      run: |
+        echo "🚀 Staging and committing validated changes..."
+        
+        # Check if there are any changes to commit
+        if git diff --quiet && git diff --staged --quiet; then
+          echo "✅ No changes to commit"
+          exit 0
+        fi
+        
+        # Stage all changes
+        git add .
+        
+        # Create commit message
+        if [ "${{ needs.quality-patcher.outputs.fixes-applied }}" != "0" ]; then
+          COMMIT_MSG="🤖 Auto-fix: Applied ${{ needs.quality-patcher.outputs.fixes-applied }} quality fixes
+          
+          - Version Keeper identified ${{ needs.version-keeper-scan.outputs.issues-count }} issues
+          - Quality Patcher applied ${{ needs.quality-patcher.outputs.fixes-applied }} fixes
+          - Final validation: ${{ needs.version-keeper-validate.outputs.final-issues-count }} issues remaining
+          - Session: ${{ needs.version-keeper-scan.outputs.session-id }}
+          
+          Auto-generated by Pipeline Integration workflow"
+        else
+          COMMIT_MSG="🤖 Pipeline validation: No issues found
+          
+          - Version Keeper scan completed successfully
+          - No quality fixes needed
+          - Session: ${{ needs.version-keeper-scan.outputs.session-id }}
+          
+          Auto-generated by Pipeline Integration workflow"
+        fi
+        
+        # Commit changes
+        git commit -m "$COMMIT_MSG" || {
+          echo "✅ No changes to commit"
+          exit 0
+        }
+        
+        # Push changes only if this is not a PR
+        if [ "${{ github.event_name }}" != "pull_request" ]; then
+          git push origin ${{ github.ref_name }}
+          echo "✅ Changes pushed to ${{ github.ref_name }}"
+        else
+          echo "📝 Changes ready for PR (not pushing to avoid conflicts)"
+        fi
+        
+    - name: Create summary comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const hasIssues = '${{ needs.version-keeper-scan.outputs.has-issues }}' === 'true';
+          const fixesApplied = parseInt('${{ needs.quality-patcher.outputs.fixes-applied || 0 }}');
+          const validationPassed = '${{ needs.version-keeper-validate.outputs.validation-passed }}' === 'true';
+          
+          let body = '🚀 **Pipeline Integration Results**\n\n';
+          
+          if (!hasIssues) {
+            body += '✅ **Perfect!** No linting issues found.\n';
+          } else if (validationPassed) {
+            body += `✅ **Success!** Applied ${fixesApplied} fixes and validation passed.\n`;
+          } else {
+            body += `⚠️ **Partial Success** Applied ${fixesApplied} fixes but some issues remain.\n`;
+          }
+          
+          body += `\n📊 **Session**: ${{ needs.version-keeper-scan.outputs.session-id }}`;
+          body += `\n🔗 Check the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed results.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [version-keeper-scan, quality-patcher, version-keeper-validate, github-integration]
+    if: always()
+    
+    steps:
+    - name: Cleanup session data
+      run: |
+        echo "🧹 Pipeline session ${{ needs.version-keeper-scan.outputs.session-id }} completed"
+        echo "📊 Summary:"
+        echo "  - Issues found: ${{ needs.version-keeper-scan.outputs.issues-count || 0 }}"
+        echo "  - Fixes applied: ${{ needs.quality-patcher.outputs.fixes-applied || 0 }}"
+        echo "  - Final issues: ${{ needs.version-keeper-validate.outputs.final-issues-count || 0 }}"
+        echo "  - Validation passed: ${{ needs.version-keeper-validate.outputs.validation-passed || 'N/A' }}"

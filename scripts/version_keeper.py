@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -816,9 +816,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 "name": node.name,
                             }
 
-                            if str(py_file) != str(functions_map[func_signature]["file"]):
                     # Recursively process child nodes
-                                        "file1": str(functions_map[func_signature]["file"]),
                     for child in ast.iter_child_nodes(node):
                         walk_with_class_context(child, class_name)
 
@@ -846,24 +844,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         if duplicates["similar_classes"]:
             duplicates["recommendations"].append(
                 "Consider merging similar class implementations"
-            duplicates["recommendations"].append(
             )
         if duplicates["redundant_files"]:
-                "Remove redundant file copies"
             duplicates["recommendations"].append("Remove redundant file copies")
-            backup_patterns = [
-
-                "backups/",
         return duplicates
-                ".claude_patches/",
-
-                "-enhanced",  # Skip old enhanced files
     def should_skip_file(self, file_path: Path, exclude_backups: bool = False) -> bool:
-                "_enhanced",
         """Check if file should be skipped during duplicate detection"""
-                "v1.0-original/",
         
-            skip_patterns.extend(backup_patterns)
         # ALWAYS skip these patterns (including backup files by default)
         skip_patterns = [
             "__pycache__",
@@ -982,7 +969,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             # Quick scan for similar function names in the same file
             content = file_path.read_text()
             for old_suffix, new_suffix in duplicate_patterns:
-            if any(pattern in str(file_path) for pattern in ["enhanced", "v2", "backup", "original"]):
                 # Check if there's a pattern like func_name_old vs func_name_new
                 old_variant = func_name + old_suffix
                 new_variant = func_name + new_suffix
@@ -990,11 +976,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     return True
 
             # Check for common duplicate code scenarios
-            if any(
-                pattern in str(file_path)
-    def get_function_signature(self, node: ast.FunctionDef, class_name: str = None) -> str:
-                for pattern in ["enhanced", "v2", "backup", "original"]
-            ):
+            if any(pattern in str(file_path) for pattern in ["enhanced", "v2", "backup", "original"]):
                 # In enhanced/versioned files, undefined functions might be calling old code
                 return True
 
@@ -1002,6 +984,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             pass
 
         return False
+
+    def get_function_signature(self, node: ast.FunctionDef, class_name: str = None) -> str:
+        """Generate unique signature for function node"""
+        args = [arg.arg for arg in node.args.args]
+        signature = f"{node.name}({', '.join(args)})"
+        if class_name:
+            signature = f"{class_name}.{signature}"
+        return signature
 
     def is_legitimate_duplicate_vs_legacy(self, func1_info: dict, func2_info: dict) -> bool:
         """
@@ -1131,11 +1121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
             if len(found_files) > 1:
                 competing.append(
-        output_dir: Path = None,
                     {
-        session_id: str = None,
                         "pattern": pattern,
-        quick_check: bool = False
                         "description": pattern_info["description"],
                         "files": found_files,
                         "recommendation": f"Consolidate {len(found_files)} implementations into single module",
@@ -1147,11 +1134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     def run_claude_integrated_linting(
         self, output_dir: Path = None, session_id: str = None, quick_check: bool = False
     ) -> Dict[str, Any]:
-            self.protocol.update_phase("linting", {
         """Enhanced comprehensive linting with protocol integration"""
-                "lint_type": "quick" if quick_check else "comprehensive",
         self.lint_start_time = time.time()
-                "started_at": datetime.now().isoformat()
 
         print(
             f"🔍 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting..."
@@ -1159,17 +1143,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         # Update protocol if available
         if self.protocol:
-            self.protocol.update_phase(
-                "linting",
-                {
-                    "lint_type": "quick" if quick_check else "comprehensive",
-                    "started_at": datetime.now().isoformat(),
-                },
-            )
+            self.protocol.update_phase("linting", {
+                "lint_type": "quick" if quick_check else "comprehensive",
+                "started_at": datetime.now().isoformat()
+            })
 
         lint_report = {
             "version": self.current_version,
-            "performance": {}
+            "performance": {},
             "branch": self.git_branch,
             "timestamp": datetime.now().isoformat(),
             "session_id": session_id,
@@ -1269,9 +1250,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         lint_report["total_issues"] = total_issues
         lint_report["files_analyzed"] = self.files_scanned
-                "issues_per_second": total_issues / lint_duration if lint_duration > 0 else 0,
-
-                "files_per_second": self.files_scanned / lint_duration if lint_duration > 0 else 0
         # Performance metrics
         if self.lint_start_time:
             lint_duration = time.time() - self.lint_start_time
@@ -1291,24 +1269,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")  # ISO-8601 compatible
-            self.protocol.update_phase("linting_complete", {
             report_file = output_dir / f"claude-lint-report-{timestamp}.json"
-                "issues_remaining": total_issues,
-
-                "lint_report": lint_report.get("report_file", ""),
+            
+            if self.protocol:
+                self.protocol.update_phase("linting_complete", {
+                    "issues_remaining": total_issues,
+                    "lint_report": str(report_file),
+                })
             with open(report_file, "w") as f:
-                "performance": lint_report["performance"]
                 json.dump(lint_report, f, indent=2)
-
-                        critical_fixes.append({
+            
             print(f"📊 Lint report saved to: {report_file}")
-                            "tool": tool,
             lint_report["report_file"] = str(report_file)
-                            "command": fix["command"],
-
-                            "description": fix["description"],
+            
         # Protocol integration - update state and create tasks
-                            "severity": "error"
         if self.protocol:
             self.protocol.update_phase(
                 "linting_complete",
@@ -1324,31 +1298,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             for tool, data in lint_report["quality_issues"].items():
                 for fix in data.get("fixes", []):
                     if fix.get("type") == "auto_fix":
-                    success_criteria={"fix_applied": True}
-                        critical_fixes.append(
-            print(f"📋 Created {len(critical_fixes[:5])} priority fixing tasks in protocol")
-                            {
-    def run_quality_check_with_details(
-                                "tool": tool,
-                                "command": fix["command"],
-    ) -> Tuple[bool, str, str]:
-                                "description": fix["description"],
-                                "severity": "error",
-                            }
-                        )
+                        critical_fixes.append({
+                            "tool": tool,
+                            "command": fix.get("command", ""),
+                            "description": fix.get("description", ""),
+                            "severity": "error"
+                        })
 
             # Create tasks for the most critical fixes
             for fix in critical_fixes[:5]:
                 self.protocol.create_task(
-                    TaskType.LINT_FIX,
-                    context=fix,
-                    priority=1,
-                    success_criteria={"fix_applied": True},
+                    task_type="fix_quality_issue",
+                    description=fix["description"],
+                    priority="high",
+                    success_criteria={"fix_applied": True}
                 )
-
-            print(
-                f"📋 Created {len(critical_fixes[:5])} priority fixing tasks in protocol"
-            )
+            
+            print(f"📋 Created {len(critical_fixes[:5])} priority fixing tasks in protocol")
 
         return lint_report
 
@@ -1385,10 +1351,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 "--format=%(path)s:%(row)d:%(col)d: %(code)s %(text)s",
             ],
             "pylint": [
-    def run_security_check_with_details(
                 "pylint",
                 "scripts/",
-    ) -> Tuple[bool, str, str]:
                 "core/",
                 "--output-format=text",
             ],
@@ -1521,9 +1485,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         """Generate security fix recommendations"""
         fixes = []
 
-                                "confidence": result.get(
         if tool == "bandit":
-                                    "issue_confidence"
             try:
                 if stdout:
                     bandit_data = json.loads(stdout)
@@ -1537,19 +1499,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 "line": result.get("line_number"),
                                 "severity": result.get("issue_severity"),
                                 "confidence": result.get("issue_confidence"),
-                    for vuln in safety_data[
                                 "issue": result.get("issue_text"),
                                 "claude_prompt": f"Please review and fix the security issue in {result.get('filename')}:{result.get('line_number')}: {result.get('issue_text')}",
-                    ]:  # Limit to 3 vulnerabilities
                             }
-                                "vulnerability": vuln.get(
                         )
-                                    "vulnerability_id"
             except json.JSONDecodeError:
                 pass
-                                "recommendation": vuln.get(
-
-                                    "more_info_url"
+                
         elif tool == "safety":
             try:
                 if stdout:
@@ -1565,12 +1521,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 "claude_prompt": f"Please update {vuln.get('package_name')} from {vuln.get('installed_version')} to fix vulnerability {vuln.get('vulnerability_id')}",
                             }
                         )
-    def generate_claude_recommendations(
             except json.JSONDecodeError:
-        self, lint_report: Dict[str, Any]
                 pass
-    ) -> List[str]:
-
+                
         return fixes
 
     def generate_claude_recommendations(self, lint_report: Dict[str, Any]) -> List[str]:
@@ -1591,12 +1544,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         # Security issues
         security_count = sum(
             len(result.get("fixes", []))
-            recommendations.append(
             for result in lint_report["security_issues"].values()
-                f"🔒 Address {security_count} security issues found"
         )
         if security_count > 0:
-            recommendations.append(f"🔒 Address {security_count} security issues found")
+            recommendations.append(
+                f"🔒 Address {security_count} security issues found"
+            )
 
         # Duplicate issues
         duplicates = lint_report["duplicate_issues"]
@@ -1621,33 +1574,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             )
 
         return recommendations
-    def generate_fix_commands(
-
-        self, lint_report: Dict[str, Any]
+        
     def generate_fix_commands(self, lint_report: Dict[str, Any]) -> List[str]:
-    ) -> List[str]:
         """Generate automated fix commands"""
         commands = []
-            not lint_report["quality_issues"]
-
-            .get("black", {})
+        
         # Auto-fixable quality issues
-            .get("passed", True)
+        quality_issues = lint_report.get("quality_issues", {})
         if not lint_report["quality_issues"].get("black", {}).get("passed", True):
             commands.append("black scripts/ core/ guardrails/")
         if not lint_report["quality_issues"].get("isort", {}).get("passed", True):
-            not lint_report["quality_issues"]
             commands.append("isort scripts/ core/ guardrails/")
-            .get("isort", {})
-
-            .get("passed", True)
         return commands
 
-    def prioritize_fixes(
     def prioritize_fixes(self, lint_report: Dict[str, Any]) -> List[Dict[str, Any]]:
-        self, lint_report: Dict[str, Any]
         """Prioritize fixes by importance"""
-    ) -> List[Dict[str, Any]]:
         priority_fixes = []
 
         # Priority 1: Security issues
@@ -1775,9 +1716,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                         for alias in node.names:
                             file_imports.append(alias.name)
                     elif isinstance(node, ast.ImportFrom):
-                                file_functions.append(
                         if node.module:
-                                    f"{node.name}.{item.name}"
                             for alias in node.names:
                                 file_imports.append(f"{node.module}.{alias.name}")
 
@@ -1792,9 +1731,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     }
                 )
 
-                                file_imports.append(
         # Second pass: check for broken connections
-                                    f"{node.module}.{alias.name}"
         for py_file in python_files:
             try:
                 content = py_file.read_text()
@@ -1879,9 +1816,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                         "type": "analysis_error",
                     }
                 )
-                                connections_report[
 
-                                    "broken_imports"
         # Generate recommendations
         if connections_report["undefined_functions"]:
             connections_report["recommendations"].append(
@@ -2194,9 +2129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         self,
         version: str,
         checks: Dict[str, bool],
-                    self.should_skip_file(py_file)
         tests: Dict[str, bool],
-                    or str(py_file) == file_path
         compatibility: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate comprehensive release report"""
@@ -2247,17 +2180,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         """Check if all validation passes"""
         return (
             all(checks.values()) and all(tests.values()) and compatibility["compatible"]
-            report["recommendations"].append(
         )
-                "Fix code quality issues before release"
 
     def save_report(
-            report["recommendations"].append(
         self,
-                "Fix failing tests before release"
         report: Dict[str, Any],
         output_path: Path = None,
-    ):
+    ) -> Path:
         """Save release report to file"""
         if output_path is None:
             output_path = self.repo_path / f"release-report-{report['version']}.json"
@@ -2266,6 +2195,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             json.dump(report, f, indent=2)
 
         print(f"📊 Release report saved: {output_path}")
+
+
+def generate_json_report(keeper, session_id=None, claude_lint_report=None, duplicates=None, connections=None):
+    """Generate structured JSON report for pipeline integration"""
+    
+    # Calculate total issues across all categories
+    total_issues = 0
+    
+    # Count Claude lint issues
+    if claude_lint_report:
+        total_issues += claude_lint_report.get("total_issues", 0)
+    
+    # Count duplicate issues
+    if duplicates:
+        total_issues += len(duplicates.get("duplicate_functions", []))
+        total_issues += len(duplicates.get("competing_implementations", [])) * 2  # Weight competing implementations higher
+    
+    # Count connection issues
+    if connections:
+        total_issues += len(connections.get("undefined_functions", []))
+        total_issues += len(connections.get("broken_imports", []))
+    
+    # Generate structured report
+    json_report = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id or f"version-keeper-{int(time.time())}",
+        "version": keeper.current_version,
+        "branch": keeper.git_branch,
+        "summary": {
+            "total_issues": total_issues,
+            "fixes_applied": 0,  # This will be updated by quality patcher
+            "remaining_issues": total_issues,  # Initially all issues remain
+            "success_rate": 0.0 if total_issues > 0 else 100.0
+        },
+        "details": {
+            "quality_issues": claude_lint_report.get("quality_issues", {}) if claude_lint_report else {},
+            "security_issues": claude_lint_report.get("security_issues", {}) if claude_lint_report else {},
+            "duplicate_issues": duplicates if duplicates else {},
+            "connection_issues": connections if connections else {}
+        },
+        "performance": {
+            "duration_seconds": claude_lint_report.get("performance", {}).get("duration_seconds", 0) if claude_lint_report else 0,
+            "files_analyzed": claude_lint_report.get("files_analyzed", 0) if claude_lint_report else 0,
+            "issues_per_second": claude_lint_report.get("performance", {}).get("issues_per_second", 0) if claude_lint_report else 0
+        },
+        "recommendations": []
+    }
+    
+    # Add recommendations from each component
+    if claude_lint_report and claude_lint_report.get("claude_recommendations"):
+        json_report["recommendations"].extend(claude_lint_report["claude_recommendations"])
+    
+    if duplicates and duplicates.get("recommendations"):
+        json_report["recommendations"].extend(duplicates["recommendations"])
+    
+    if connections and connections.get("recommendations"):
+        json_report["recommendations"].extend(connections["recommendations"])
+    
+    # Add priority fixes from Claude lint if available
+    if claude_lint_report and claude_lint_report.get("priority_fixes"):
+        json_report["priority_fixes"] = claude_lint_report["priority_fixes"][:10]  # Top 10 priority fixes
+    
+    return json_report
 
 
 @click.command()
@@ -2280,11 +2272,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     default="main",
     help="Base branch for compatibility check",
 )
-            all(checks.values())
 @click.option(
-            and all(tests.values())
     "--skip-tests",
-            and compatibility["compatible"]
     is_flag=True,
     help="Skip test execution",
 )
@@ -2295,9 +2284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 )
 @click.option(
     "--dry-run",
-            output_path = (
     is_flag=True,
-                self.repo_path / f"release-report-{report['version']}.json"
     help="Perform dry run without changes",
 )
 @click.option(
@@ -2359,6 +2346,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     is_flag=True,
     help="Filter out false positives and focus on genuine issues",
 )
+@click.option(
+    "--output-format",
+    type=click.Choice(["json", "text"]),
+    default="text",
+    help="Output format for results (json for pipeline integration)",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(),
+    help="Output file path for JSON reports (required for pipeline integration)",
+)
 def main(
     bump_type,
     base_branch,
@@ -2377,6 +2375,8 @@ def main(
     exclude_backups,
     exclude_duplicates,
     real_issues_only,
+    output_format,
+    output_file,
 ):
     """MCP System Version Keeper - Enhanced with Protocol Integration"""
 
@@ -2428,36 +2428,17 @@ def main(
             print("\n📊 DUPLICATE DETECTION RESULTS")
             print("=" * 50)
             print(f"🔄 Duplicate functions: {len(duplicates['duplicate_functions'])}")
-        check_connections = True   # Priority: undefined functions
-            print(
+            print(f"⚡ Competing implementations: {len(duplicates['competing_implementations'])}")
+            
         print("🎯 INTELLIGENT FILTERING: Focusing on real issues, excluding false positives")
-                f"⚡ Competing implementations: {len(duplicates['competing_implementations'])}"
-                "\n🔍 Running duplicate/competing implementation detection..."
-            )
-            print(f"🏗️ Similar classes: {len(duplicates['similar_classes'])}")
-            duplicates = keeper.detect_duplicate_implementations(exclude_backups, exclude_duplicates)
-            print(f"📁 Redundant files: {len(duplicates['redundant_files'])}")
-
+        
+        if real_issues_only:
             print("\n⏭️ Skipping duplicate detection (excluded by real-issues-only filter)")
-            if duplicates["duplicate_functions"]:
             duplicates = {"duplicate_functions": [], "competing_implementations": [], "similar_classes": [], "redundant_files": [], "recommendations": []}
-                print("\n🔄 DUPLICATE FUNCTIONS:")
-                for dup in duplicates["duplicate_functions"]:
-                f"🔄 Duplicate functions: {len(duplicates['duplicate_functions'])}"
-                    print(
-                        f"  • {dup['function']} in {dup['file1']}:{dup['line1']} and {dup['file2']}:{dup['line2']}"
-                    )
-                f"🏗️ Similar classes: {len(duplicates['similar_classes'])}"
 
-            if duplicates["competing_implementations"]:
-                print("\n⚡ COMPETING IMPLEMENTATIONS:")
-                f"📁 Redundant files: {len(duplicates['redundant_files'])}"
-                for comp in duplicates["competing_implementations"]:
-                    print(
-                        f"  • {comp['description']}: {len(comp['files'])} implementations"
-                    )
-                    for file in comp["files"]:
-                        print(f"    - {file}")
+        else:
+            # Run duplicate detection normally
+            duplicates = keeper.detect_duplicate_implementations(exclude_backups, exclude_duplicates)
 
             if duplicates["recommendations"]:
                 print("\n💡 RECOMMENDATIONS:")
@@ -2494,19 +2475,19 @@ def main(
                 if len(connections["broken_imports"]) > 10:
                     print(f"  ... and {len(connections['broken_imports']) - 10} more")
 
+        # Run connections check
+        if check_connections:
+            print("\n🔍 Running connection analysis...")
+            connections = keeper.run_connections_linter(exclude_backups, real_issues_only)
+            
             if connections["recommendations"]:
                 print("\n💡 CONNECTION RECOMMENDATIONS:")
-            connections = keeper.run_connections_linter(exclude_backups, real_issues_only)
                 for rec in connections["recommendations"]:
                     print(f"  • {rec}")
-                f"🔗 Undefined functions: {len(connections['undefined_functions'])}"
 
+        # Run Claude integrated linting
         if claude_lint:
-            print(
-                f"📦 Broken imports: {len(connections['broken_imports'])}"
-                f"\n🤖 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting..."
-            )
-            print(f"⚠️  Connection errors: {len(connections['connection_errors'])}")
+            print(f"\n🤖 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting...")
             lint_report = keeper.run_claude_integrated_linting(
                 output_dir=Path(output_dir) if output_dir else None,
                 session_id=session_id,
@@ -2515,6 +2496,7 @@ def main(
             
             # Process undefined functions
             for func in connections["undefined_functions"][:10]:  # Show first 10
+                print(f"  • {func['function']} in {func['file']}:{func['line']}")
 
             print("\n📊 CLAUDE LINT REPORT")
             print("=" * 50)
@@ -2554,15 +2536,11 @@ def main(
                 for cmd in lint_report["fix_commands"]:
                     print(f"  • {cmd}")
 
-            print(f"\n🤖 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting...")
             # Save detailed report
-                quick_check=quick_check
             if output_dir:
                 report_file = (
                     Path(output_dir)
                     / f"claude-lint-report-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
-                reports_dir = keeper.repo_path / "reports" / "lint"
-                reports_dir = keeper.repo_path / "configs"
                 )
             else:
                 # Save in reports directory for pipeline coordination
@@ -2588,6 +2566,26 @@ def main(
             print("Claude: New lint report generated and ready for quality patcher!")
 
         if lint_only:
+            # Generate JSON output for pipeline integration
+            if output_format == "json":
+                json_report = generate_json_report(
+                    keeper=keeper,
+                    session_id=session_id,
+                    claude_lint_report=lint_report if claude_lint else None,
+                    duplicates=duplicates if detect_duplicates and not exclude_duplicates else None,
+                    connections=connections if check_connections else None
+                )
+                
+                if output_file:
+                    output_path = Path(output_file)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(output_path, 'w') as f:
+                        json.dump(json_report, f, indent=2, default=str)
+                    print(f"\n📊 JSON report saved to: {output_path}")
+                else:
+                    print("\n📊 JSON OUTPUT:")
+                    print(json.dumps(json_report, indent=2, default=str))
+                    
             print("\n✅ Lint-only mode complete")
             return
 
@@ -2626,7 +2624,6 @@ def main(
         new_version,
         checks,
         tests,
-                "Claude: New lint report generated and ready for quality patcher!"
         compatibility,
     )
 
@@ -2646,7 +2643,6 @@ def main(
     status_icon = "✅" if report["overall_status"] == "PASS" else "❌"
     print(f"{status_icon} Overall Status: {report['overall_status']}")
 
-            quick_check=quick_check
     print("\n🔍 Quality Checks:")
     for check, result in checks.items():
         icon = "✅" if result else "❌"
@@ -2674,10 +2670,8 @@ def main(
         for rec in report["recommendations"]:
             print(f"  • {rec}")
 
-    # Apply changes if validation passes and not dry run
-        output_path = (
+    # Apply changes if validation passes and not dry run  
     if report["overall_status"] == "PASS" and not dry_run:
-            Path(output_dir) / f"release-report-{new_version}.json"
         print(f"\n🚀 Applying version update to {new_version}...")
 
         # Update version files
@@ -2710,7 +2704,6 @@ def main(
         sys.exit(1)
 
     elif dry_run:
-            f"  ⚠️  Breaking changes: {len(compatibility['breaking_changes'])}"
         print("\n🔍 Dry run complete - no changes applied")
 
 

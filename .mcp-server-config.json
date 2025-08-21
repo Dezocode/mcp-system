@@ -1,0 +1,72 @@
+{
+  "mcpServers": {
+    "pipeline-mcp-server": {
+      "command": "python",
+      "args": ["src/pipeline_mcp_server.py"],
+      "cwd": ".",
+      "env": {
+        "PYTHONPATH": "src:scripts:core",
+        "MCP_SERVER_NAME": "pipeline-mcp-server",
+        "MCP_SERVER_VERSION": "1.0.0",
+        "PIPELINE_SESSION_DIR": "pipeline-sessions",
+        "WORKSPACE_ROOT": "."
+      },
+      "capabilities": {
+        "tools": {
+          "enabled": true,
+          "toolNames": [
+            "version_keeper_scan",
+            "quality_patcher_fix", 
+            "pipeline_run_full",
+            "github_workflow_trigger",
+            "pipeline_status",
+            "mcp_compliance_check"
+          ]
+        },
+        "resources": {
+          "enabled": false
+        },
+        "prompts": {
+          "enabled": false
+        },
+        "logging": {
+          "enabled": true,
+          "level": "info"
+        }
+      },
+      "description": "MCP Server for Pipeline Integration - provides 6 tools for automated linting, fixing, and GitHub workflow management",
+      "version": "1.0.0",
+      "author": "Pipeline Integration Team",
+      "license": "MIT"
+    }
+  },
+  "globalSettings": {
+    "logLevel": "info",
+    "timeout": 300000,
+    "retryAttempts": 3,
+    "sessionManagement": {
+      "enabled": true,
+      "sessionTimeout": 1800,
+      "maxConcurrentSessions": 5
+    },
+    "security": {
+      "allowedPaths": [
+        ".",
+        "src",
+        "scripts", 
+        "core",
+        "tests",
+        "pipeline-sessions",
+        "reports"
+      ],
+      "restrictedPaths": [
+        "/etc",
+        "/usr", 
+        "/var",
+        "/home",
+        "/.ssh",
+        "/.aws"
+      ]
+    }
+  }
+}

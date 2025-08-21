@@ -3123,6 +3123,60 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
         return log_file
 
 
+def generate_quality_patcher_json_report(patcher, session_results, report):
+    """Generate structured JSON report for pipeline integration"""
+    from datetime import datetime, timezone
+    
+    # Calculate metrics
+    total_fixes_attempted = patcher.fixes_applied + patcher.fixes_failed + patcher.fixes_skipped
+    success_rate = (patcher.fixes_applied / total_fixes_attempted * 100) if total_fixes_attempted > 0 else 0
+    
+    # Extract remaining issues from session results
+    remaining_issues = 0
+    if hasattr(patcher, 'lint_report') and patcher.lint_report:
+        remaining_issues = max(0, patcher.lint_report.get("total_issues", 0) - patcher.fixes_applied)
+    
+    json_report = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": getattr(patcher, 'session_id', f"quality-patcher-{int(time.time())}"),
+        "summary": {
+            "total_issues": patcher.lint_report.get("total_issues", 0) if hasattr(patcher, 'lint_report') and patcher.lint_report else 0,
+            "fixes_applied": patcher.fixes_applied,
+            "fixes_failed": patcher.fixes_failed,
+            "fixes_skipped": patcher.fixes_skipped,
+            "remaining_issues": remaining_issues,
+            "success_rate": round(success_rate, 2)
+        },
+        "details": {
+            "fixes_attempted": total_fixes_attempted,
+            "max_fixes_limit": patcher.max_fixes,
+            "session_duration": round(time.time() - patcher.start_time, 2),
+            "performance_metrics": patcher.performance_metrics,
+            "fix_timings": patcher.fix_timings[-10:] if patcher.fix_timings else []  # Last 10 timings
+        },
+        "performance": {
+            "duration_seconds": round(time.time() - patcher.start_time, 2),
+            "fixes_per_minute": patcher.performance_metrics.get("fixes_per_minute", 0),
+            "average_fix_time": patcher.performance_metrics.get("average_fix_time", 0),
+            "success_rate": round(success_rate, 2)
+        },
+        "recommendations": [
+            f"Applied {patcher.fixes_applied} fixes successfully",
+            f"Remaining issues: {remaining_issues}" if remaining_issues > 0 else "All addressable issues resolved",
+        ]
+    }
+    
+    # Add session results if available
+    if session_results:
+        json_report["session_results"] = session_results
+    
+    # Add original lint report reference if available
+    if hasattr(patcher, 'lint_report_path') and patcher.lint_report_path:
+        json_report["source_lint_report"] = str(patcher.lint_report_path)
+    
+    return json_report
+
+
 @click.command()
 @click.option(
     "--lint-report",
@@ -3207,6 +3261,22 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
     is_flag=True,
     help="Use direct Claude CLI integration for automated fix application",
 )
+@click.option(
+    "--output-format",
+    type=click.Choice(["json", "text"]),
+    default="text",
+    help="Output format for results (json for pipeline integration)",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(),
+    help="Output file path for JSON reports (required for pipeline integration)",
+)
+@click.option(
+    "--auto-apply",
+    is_flag=True,
+    help="Automatically apply fixes without confirmation (for pipeline mode)",
+)
 def main(
     lint_report,
     max_fixes,
@@ -3224,6 +3294,9 @@ def main(
     background,
     monitor_lint,
     claude_cli,
+    output_format,
+    output_file,
+    auto_apply,
 ):
     """Enhanced Claude Quality Patcher v2.0 - Protocol Integrated"""
 
@@ -3240,6 +3313,12 @@ def main(
         interactive = False
         auto_mode = True
         print("🤖 Non-interactive mode enabled - automated execution")
+        
+    # Handle auto-apply mode (for pipeline integration)
+    if auto_apply:
+        interactive = False
+        auto_mode = True
+        print("🔄 Auto-apply mode enabled - fixing without confirmation")
 
     # Initialize enhanced patcher
     patcher = EnhancedClaudeQualityPatcher(
@@ -3374,6 +3453,24 @@ def main(
 
     # Save session log
     patcher.save_session_log()
+    
+    # Generate JSON output for pipeline integration
+    if output_format == "json":
+        json_report = generate_quality_patcher_json_report(
+            patcher=patcher,
+            session_results=session_results,
+            report=report
+        )
+        
+        if output_file:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w') as f:
+                json.dump(json_report, f, indent=2, default=str)
+            print(f"\\n📊 JSON report saved to: {output_path}")
+        else:
+            print("\\n📊 JSON OUTPUT:")
+            print(json.dumps(json_report, indent=2, default=str))
 
     print("\\n🎉 Claude Quality Patcher session complete!")
 
