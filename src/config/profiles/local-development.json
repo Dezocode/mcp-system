@@ -1,0 +1,29 @@
+{
+  "name": "local-development",
+  "description": "Optimized configuration for local development",
+  "settings": {
+    "workspace_root": "/home/runner/work/mcp-system/mcp-system",
+    "session_dir": "/home/runner/work/mcp-system/mcp-system/pipeline-sessions",
+    "log_level": "DEBUG",
+    "max_workers": 2,
+    "timeout": 600,
+    "enable_dashboard": false,
+    "database_path": "/home/runner/work/mcp-system/mcp-system/sessions.db",
+    "cache_dir": "/home/runner/work/mcp-system/mcp-system/.cache",
+    "temp_dir": "/home/runner/work/mcp-system/mcp-system/temp",
+    "security_settings": {
+      "allowed_paths": [
+        "/home/runner/work/mcp-system/mcp-system",
+        "/tmp"
+      ],
+      "restricted_paths": [],
+      "max_file_size_mb": 100
+    },
+    "performance_settings": {
+      "memory_limit_mb": 2048,
+      "cpu_limit_cores": 4.0,
+      "disk_quota_gb": 50
+    }
+  },
+  "enabled": true
+}

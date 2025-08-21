@@ -1,0 +1,124 @@
+# Enhanced Docker Compose with Environment Detection and Monitoring
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.enhanced
+    container_name: mcp-pipeline-server
+    restart: unless-stopped
+    environment:
+      # Environment Detection Configuration
+      - MCP_ENV=docker
+      - MCP_FORCE_ENVIRONMENT=docker
+      - MCP_AUTO_RELOAD_CONFIG=true
+      - MCP_ENABLE_PROFILING=true
+      - MCP_OPTIMIZE_FOR_PLATFORM=true
+      
+      # MCP Server Configuration
+      - MCP_LOG_LEVEL=INFO
+      - MCP_WORKSPACE_ROOT=/app
+      - MCP_SESSION_DIR=/app/pipeline-sessions
+      - MCP_DATABASE_PATH=/app/data/sessions.db
+      - MCP_CACHE_DIR=/app/cache
+      - MCP_TEMP_DIR=/tmp
+      - MCP_MAX_WORKERS=4
+      - MCP_TIMEOUT=300
+      - MCP_ENABLE_DASHBOARD=true
+      
+      # Performance and Resource Limits
+      - MCP_PROFILING_INTERVAL=2.0
+      - MCP_PROFILING_HISTORY_SIZE=3600
+      - MCP_ENV_CHECK_INTERVAL=300
+      - MCP_CONFIG_RELOAD_INTERVAL=3600
+      
+    volumes:
+      # Persistent data storage
+      - mcp-data:/app/data
+      - mcp-sessions:/app/pipeline-sessions
+      - mcp-cache:/app/cache
+      - mcp-logs:/app/logs
+      
+      # Configuration profiles
+      - ./config/profiles:/app/config/profiles:ro
+      
+    ports:
+      - "8080:8080"
+      
+    networks:
+      - mcp-network
+      
+    healthcheck:
+      test: ["CMD", "python", "scripts/docker-health-check.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+          
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        
+  # Optional: Monitoring dashboard
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: mcp-monitoring
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - mcp-network
+    profiles:
+      - monitoring
+      
+  # Optional: Metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mcp-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - mcp-network
+    profiles:
+      - monitoring
+
+volumes:
+  mcp-data:
+    driver: local
+  mcp-sessions:
+    driver: local
+  mcp-cache:
+    driver: local
+  mcp-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
