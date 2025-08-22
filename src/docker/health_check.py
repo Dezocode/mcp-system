@@ -7,6 +7,7 @@ import os
 import time
 import json
 import logging
+import tempfile
 from typing import Dict, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -89,7 +90,7 @@ class DockerHealthCheck:
             # Check key directories
             directories_to_check = [
                 "/app",
-                "/tmp",
+                tempfile.gettempdir(),
                 ("/app/pipeline-sessions"
                  if Path("/app/pipeline-sessions").exists() else None)
             ]

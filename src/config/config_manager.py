@@ -6,6 +6,7 @@ Provides adaptive configuration management based on environment detection.
 import os
 import json
 import logging
+import tempfile
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from dataclasses import dataclass, asdict
@@ -75,7 +76,7 @@ class ConfigManager:
                     "enable_dashboard": True,
                     "database_path": "/app/data/sessions.db",
                     "cache_dir": "/app/cache",
-                    "temp_dir": "/tmp",
+                    "temp_dir": tempfile.gettempdir(),
                     "security_settings": {
                         "allowed_paths": ["/app", "/tmp"],
                         "restricted_paths": ["/etc", "/usr", "/var"],
@@ -125,7 +126,7 @@ class ConfigManager:
                     "enable_dashboard": True,
                     "database_path": "/data/sessions.db",
                     "cache_dir": "/tmp/cache",
-                    "temp_dir": "/tmp",
+                    "temp_dir": tempfile.gettempdir(),
                     "security_settings": {
                         "allowed_paths": ["/app", "/data", "/tmp"],
                         "restricted_paths": ["/etc", "/usr", "/var", "/home"],

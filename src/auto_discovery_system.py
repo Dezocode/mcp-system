@@ -63,7 +63,8 @@ class MCPAutoDiscovery:
                         "from mcp", "import mcp", "fastmcp", "@mcp.tool"
                     ]):
                         return True
-            except Exception:
+            except (IOError, OSError, PermissionError) as e:
+                # Log specific file access errors but continue processing
                 continue
 
         return False

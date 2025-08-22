@@ -19,6 +19,7 @@ MCP Protocol: v1.0
 import asyncio
 import json
 import sys
+import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -1293,7 +1294,7 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
     elif action == "export":
         # Export detailed health report
         if not export_path:
-            export_path = f"/tmp/health_report_{int(time.time())}.json"
+            export_path = f"{tempfile.gettempdir()}/health_report_{int(time.time())}.json"
 
         try:
             pipeline_server.docker_health_check.export_health_report(export_path)

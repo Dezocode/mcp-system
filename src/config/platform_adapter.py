@@ -6,6 +6,7 @@ Handles platform-specific adaptations and optimizations.
 import os
 import platform
 import multiprocessing
+import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
@@ -79,10 +80,8 @@ class PlatformAdapter:
         # Platform-specific defaults
         if self.system == 'windows':
             default_temp = 'C:\\Temp'
-        elif self.system == 'darwin':  # macOS
-            default_temp = '/tmp'
-        else:  # Linux and others
-            default_temp = '/tmp'
+        else:  # macOS, Linux and others
+            default_temp = tempfile.gettempdir()
 
         # Ensure temp directory exists and is writable
         Path(default_temp).mkdir(parents=True, exist_ok=True)
