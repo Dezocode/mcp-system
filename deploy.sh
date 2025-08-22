@@ -48,6 +48,21 @@ check_prerequisites() {
         }
     fi
     
+    # Setup Docker secrets
+    log_info "Setting up Docker secrets..."
+    if [ -f "scripts/setup-secrets.sh" ]; then
+        ./scripts/setup-secrets.sh || {
+            log_error "Failed to setup secrets. Please configure secrets manually."
+            return 1
+        }
+    else
+        log_warn "Secret setup script not found, checking for manual secret configuration..."
+        if [ ! -f "secrets/db_password.txt" ] || [ ! -f "secrets/grafana_password.txt" ] || [ ! -f "secrets/jwt_secret.txt" ]; then
+            log_error "Docker secrets not configured. Please run: ./scripts/setup-secrets.sh"
+            return 1
+        fi
+    fi
+    
     # Check SSL certificates
     if [ ! -f "ssl/mcp.crt" ] || [ ! -f "ssl/mcp.key" ]; then
         log_warn "SSL certificates not found, generating self-signed certificates..."
@@ -86,12 +101,38 @@ security_scan() {
         log_warn "Trivy not found, skipping vulnerability scan"
     fi
     
-    # Check for secrets in environment file
+    # Check for secrets in environment file (legacy check)
     if grep -q "your_.*_here" "$ENV_FILE"; then
-        log_error "Default placeholder values found in $ENV_FILE"
-        log_error "Please update all configuration values before deployment"
+        log_warn "Default placeholder values found in $ENV_FILE"
+        log_warn "These should be migrated to Docker secrets for better security"
+    fi
+    
+    # Check Docker secrets configuration
+    local secrets_ok=true
+    for secret_file in secrets/db_password.txt secrets/grafana_password.txt secrets/jwt_secret.txt; do
+        if [ ! -f "$secret_file" ] || [ ! -s "$secret_file" ]; then
+            log_error "Missing or empty secret file: $secret_file"
+            secrets_ok=false
+        fi
+    done
+    
+    if [ "$secrets_ok" = false ]; then
+        log_error "Docker secrets are not properly configured"
+        log_error "Run: ./scripts/setup-secrets.sh"
         return 1
     fi
+    
+    # Check secret file permissions
+    for secret_file in secrets/*.txt; do
+        if [ -f "$secret_file" ]; then
+            perms=$(stat -c "%a" "$secret_file" 2>/dev/null || echo "777")
+            if [ "$perms" != "600" ]; then
+                log_warn "Insecure permissions on $secret_file (${perms}), should be 600"
+                chmod 600 "$secret_file"
+                log_info "Fixed permissions on $secret_file"
+            fi
+        fi
+    done
     
     log_info "✅ Security scan completed"
 }
@@ -138,25 +179,39 @@ verify_deployment() {
     log_debug "Waiting for services to be ready..."
     sleep 30
     
-    # Check service health
-    UNHEALTHY_SERVICES=()
-    
-    for service in mcp-system postgres redis nginx prometheus grafana; do
-        if ! docker-compose -f "$COMPOSE_FILE" ps "$service" | grep -q "healthy\|Up"; then
-            UNHEALTHY_SERVICES+=("$service")
+    # Run comprehensive connection validation
+    log_info "Running connection validation..."
+    if [ -f "scripts/validate-connections.sh" ]; then
+        if ./scripts/validate-connections.sh; then
+            log_info "✅ All service connections validated successfully"
+        else
+            log_error "❌ Connection validation failed"
+            log_error "Some services may not be properly connected"
+            return 1
         fi
-    done
-    
-    if [ ${#UNHEALTHY_SERVICES[@]} -gt 0 ]; then
-        log_error "Unhealthy services: ${UNHEALTHY_SERVICES[*]}"
-        log_error "Check logs: docker-compose -f $COMPOSE_FILE logs <service>"
-        return 1
-    fi
-    
-    # Test API endpoints
-    log_debug "Testing API endpoints..."
-    if ! curl -k -f https://localhost/health &>/dev/null; then
-        log_warn "Health check endpoint not responding"
+    else
+        log_warn "Connection validation script not found, running basic checks..."
+        
+        # Basic service health check (fallback)
+        UNHEALTHY_SERVICES=()
+        
+        for service in mcp-system postgres redis nginx prometheus grafana; do
+            if ! docker-compose -f "$COMPOSE_FILE" ps "$service" | grep -q "healthy\|Up"; then
+                UNHEALTHY_SERVICES+=("$service")
+            fi
+        done
+        
+        if [ ${#UNHEALTHY_SERVICES[@]} -gt 0 ]; then
+            log_error "Unhealthy services: ${UNHEALTHY_SERVICES[*]}"
+            log_error "Check logs: docker-compose -f $COMPOSE_FILE logs <service>"
+            return 1
+        fi
+        
+        # Test API endpoints
+        log_debug "Testing API endpoints..."
+        if ! curl -k -f https://localhost/health &>/dev/null; then
+            log_warn "Health check endpoint not responding"
+        fi
     fi
     
     log_info "✅ Deployment verification completed"
@@ -238,8 +293,31 @@ case "${1:-deploy}" in
     "backup")
         docker-compose -f "$COMPOSE_FILE" run --rm backup
         ;;
+    "validate")
+        if [ -f "scripts/validate-connections.sh" ]; then
+            ./scripts/validate-connections.sh
+        else
+            log_error "Connection validation script not found"
+            exit 1
+        fi
+        ;;
+    "setup-secrets")
+        if [ -f "scripts/setup-secrets.sh" ]; then
+            ./scripts/setup-secrets.sh
+        else
+            log_error "Secrets setup script not found"
+            exit 1
+        fi
+        ;;
     *)
-        echo "Usage: $0 {deploy|status|logs|stop|backup}"
+        echo "Usage: $0 {deploy|status|logs|stop|backup|validate|setup-secrets}"
+        echo "  deploy:       Full deployment (default)"
+        echo "  status:       Show service status"
+        echo "  logs:         View service logs"
+        echo "  stop:         Stop all services"
+        echo "  backup:       Create database backup"
+        echo "  validate:     Validate all service connections"
+        echo "  setup-secrets: Setup Docker secrets"
         exit 1
         ;;
 esac

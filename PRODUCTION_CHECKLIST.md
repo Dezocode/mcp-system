@@ -13,11 +13,18 @@
 ### Configuration
 - [ ] `.env.prod` file created with all required values
 - [ ] No placeholder values (your_*_here) in environment files
+- [ ] Docker secrets configured for sensitive data
+  - [ ] `secrets/db_password.txt` created with secure database password
+  - [ ] `secrets/grafana_password.txt` created with secure Grafana password
+  - [ ] `secrets/jwt_secret.txt` created with cryptographically secure JWT key
+- [ ] Secret files have secure permissions (600)
+- [ ] Secrets directory added to .gitignore
 - [ ] SSL certificates generated or obtained
 - [ ] Database passwords generated (strong, unique)
 - [ ] JWT secret keys generated (cryptographically secure)
 - [ ] Grafana admin password set
 - [ ] Backup storage configured
+- [ ] Port configurations reviewed and customized for environment
 
 ### Security
 - [ ] SSL certificates valid and not expired
@@ -103,7 +110,12 @@
 
 ### Data Security
 - [ ] Database connections encrypted
-- [ ] Secrets not in environment variables
+- [ ] Secrets stored using Docker secrets (not environment variables)
+- [ ] Secret files have restricted permissions (600)
+- [ ] Secrets directory excluded from version control
+- [ ] No sensitive data in Docker images or logs
+- [ ] JWT secrets are cryptographically secure (32+ bytes)
+- [ ] Database passwords are strong and unique
 - [ ] File permissions secure
 - [ ] Backup encryption enabled
 - [ ] Access logging configured

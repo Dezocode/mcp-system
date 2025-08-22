@@ -177,3 +177,27 @@ bandit-report.json
 
 # Temporary test files
 test-agent-123.json
+
+# ============================================================================
+# Production Security Files (Critical - Never Commit!)
+# ============================================================================
+
+# Docker secrets directory - contains sensitive passwords and keys
+/secrets/
+secrets/
+
+# SSL certificates and private keys
+/ssl/
+ssl/
+*.key
+*.crt
+*.pem
+
+# Environment files with real credentials
+.env.prod
+.env.production
+.env.local
+
+# Production configuration overrides
+docker-compose.override.yml
+docker-compose.local.yml
