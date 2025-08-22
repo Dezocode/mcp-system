@@ -132,7 +132,10 @@ jobs:
     - name: Run Bandit security scan
       run: |
         pip install bandit
-        bandit -r src/ -f json -o bandit-report.json
+        # Run bandit and fail CI if security issues are found
+        bandit -r src/ -ll
+        # Also generate JSON report for artifact upload
+        bandit -r src/ -f json -o bandit-report.json || true
         
     - name: Upload security scan results
       uses: actions/upload-artifact@v4

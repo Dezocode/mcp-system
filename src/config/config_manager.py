@@ -78,7 +78,7 @@ class ConfigManager:
                     "cache_dir": "/app/cache",
                     "temp_dir": tempfile.gettempdir(),
                     "security_settings": {
-                        "allowed_paths": ["/app", "/tmp"],
+                        "allowed_paths": ["/app", tempfile.gettempdir()],
                         "restricted_paths": ["/etc", "/usr", "/var"],
                         "max_file_size_mb": 10
                     },
@@ -103,7 +103,7 @@ class ConfigManager:
                     "cache_dir": str(Path.cwd() / ".cache"),
                     "temp_dir": str(Path.cwd() / "temp"),
                     "security_settings": {
-                        "allowed_paths": [str(Path.cwd()), "/tmp"],
+                        "allowed_paths": [str(Path.cwd()), tempfile.gettempdir()],
                         "restricted_paths": [],
                         "max_file_size_mb": 100
                     },
@@ -125,10 +125,10 @@ class ConfigManager:
                     "timeout": 180,
                     "enable_dashboard": True,
                     "database_path": "/data/sessions.db",
-                    "cache_dir": "/tmp/cache",
+                    "cache_dir": os.path.join(tempfile.gettempdir(), "cache"),
                     "temp_dir": tempfile.gettempdir(),
                     "security_settings": {
-                        "allowed_paths": ["/app", "/data", "/tmp"],
+                        "allowed_paths": ["/app", "/data", tempfile.gettempdir()],
                         "restricted_paths": ["/etc", "/usr", "/var", "/home"],
                         "max_file_size_mb": 5
                     },
@@ -198,7 +198,7 @@ class ConfigManager:
                 "database_path", str(Path.cwd() / "sessions.db")
             ),
             cache_dir=base_settings.get("cache_dir", str(Path.cwd() / ".cache")),
-            temp_dir=base_settings.get("temp_dir", "/tmp"),
+            temp_dir=base_settings.get("temp_dir", tempfile.gettempdir()),
             security_settings=base_settings.get("security_settings", {}),
             performance_settings=base_settings.get("performance_settings", {}),
             docker_specific=(
