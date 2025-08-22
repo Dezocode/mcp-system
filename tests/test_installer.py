@@ -36,7 +36,7 @@ def test_directory_creation(temp_home):
     installer.install_dir = temp_home / ".mcp-system"
     installer.bin_dir = temp_home / "bin"
     installer.claude_dir = temp_home / ".claude"
-    
+
     installer.create_directories()
 
     # Check that directories were created
