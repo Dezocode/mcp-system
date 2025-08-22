@@ -63,8 +63,10 @@ jobs:
     - name: Detect version bump requirements
       id: check
       run: |
+        set -e  # Exit on any error
+        
         # Get current version from pyproject.toml
-        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])" 2>/dev/null || echo "1.0.0")
         echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         
         # Check if this is a manual trigger
@@ -201,19 +203,24 @@ jobs:
         # Update pyproject.toml version (in-place, no local files added to user's workspace)
         python3 << 'EOF'
         import toml
+        import sys
         
-        # Load pyproject.toml
-        with open('pyproject.toml', 'r') as f:
-            data = toml.load(f)
-        
-        # Update version
-        data['project']['version'] = '$NEW_VERSION'
-        
-        # Save back to file
-        with open('pyproject.toml', 'w') as f:
-            toml.dump(data, f)
-        
-        print(f"✅ Updated pyproject.toml version to $NEW_VERSION")
+        try:
+            # Load pyproject.toml
+            with open('pyproject.toml', 'r') as f:
+                data = toml.load(f)
+            
+            # Update version
+            data['project']['version'] = '$NEW_VERSION'
+            
+            # Save back to file
+            with open('pyproject.toml', 'w') as f:
+                toml.dump(data, f)
+            
+            print(f"✅ Updated pyproject.toml version to $NEW_VERSION")
+        except Exception as e:
+            print(f"❌ Failed to update pyproject.toml: {e}")
+            sys.exit(1)
         EOF
         
         # Update __init__.py version if it exists
