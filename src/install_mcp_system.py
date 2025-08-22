@@ -4,9 +4,9 @@ MCP System Installer
 Port of the main installer to the src/ module structure
 """
 
-import sys
 import json
 import shutil
+import sys
 from pathlib import Path
 
 
@@ -15,8 +15,9 @@ class MCPSystemInstaller:
 
     def __init__(self, install_dir: str = None):
         self.home = Path.home()
-        self.install_dir = (Path(install_dir) if install_dir
-                            else self.home / ".mcp-system")
+        self.install_dir = (
+            Path(install_dir) if install_dir else self.home / ".mcp-system"
+        )
         self.bin_dir = self.home / "bin"
         self.claude_dir = self.home / ".claude"
 
@@ -24,8 +25,10 @@ class MCPSystemInstaller:
         """Check system prerequisites"""
         # Check Python version
         if sys.version_info < (3, 8):
-            print(f"❌ Python 3.8+ required, found "
-                  f"{sys.version_info.major}.{sys.version_info.minor}")
+            print(
+                f"❌ Python 3.8+ required, found "
+                f"{sys.version_info.major}.{sys.version_info.minor}"
+            )
             return False
 
         # Check if git is available
@@ -45,7 +48,7 @@ class MCPSystemInstaller:
                 self.install_dir / "backups",
                 self.install_dir / "logs",
                 self.bin_dir,
-                self.claude_dir
+                self.claude_dir,
             ]
 
             for directory in directories:
@@ -88,27 +91,28 @@ class MCPSystemInstaller:
                         "args": ["router"],
                         "env": {
                             "MCP_SYSTEM_PATH": str(self.install_dir),
-                            "MCP_AUTO_DISCOVERY": "true"
-                        }
+                            "MCP_AUTO_DISCOVERY": "true",
+                        },
                     }
                 }
             }
 
             # Merge with existing config if it exists
             if config_file.exists():
-                with open(config_file, 'r') as f:
+                with open(config_file, "r") as f:
                     existing = json.load(f)
 
                 if "mcpServers" not in existing:
                     existing["mcpServers"] = {}
 
-                existing["mcpServers"]["mcp-system"] = (
-                    mcp_config["mcpServers"]["mcp-system"])
+                existing["mcpServers"]["mcp-system"] = mcp_config["mcpServers"][
+                    "mcp-system"
+                ]
 
-                with open(config_file, 'w') as f:
+                with open(config_file, "w") as f:
                     json.dump(existing, f, indent=2)
             else:
-                with open(config_file, 'w') as f:
+                with open(config_file, "w") as f:
                     json.dump(mcp_config, f, indent=2)
 
             return True

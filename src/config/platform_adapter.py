@@ -3,13 +3,13 @@ Platform Adapter for MCP System
 Handles platform-specific adaptations and optimizations.
 """
 
+import logging
+import multiprocessing
 import os
 import platform
-import multiprocessing
 import tempfile
 from pathlib import Path
-from typing import Dict, Any, Optional
-import logging
+from typing import Any, Dict, Optional
 
 
 class PlatformAdapter:
@@ -44,7 +44,7 @@ class PlatformAdapter:
         if self._is_running_in_docker():
             # Try to get Docker memory limit
             try:
-                with open('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'r') as f:
+                with open("/sys/fs/cgroup/memory/memory.limit_in_bytes", "r") as f:
                     limit_bytes = int(f.read().strip())
                     # Less than ~8EB (unlimited marker)
                     if limit_bytes < 9223372036854771712:
@@ -54,7 +54,7 @@ class PlatformAdapter:
 
             # Try cgroup v2
             try:
-                with open('/sys/fs/cgroup/memory.max', 'r') as f:
+                with open("/sys/fs/cgroup/memory.max", "r") as f:
                     content = f.read().strip()
                     if content != "max":
                         limit_bytes = int(content)
@@ -68,9 +68,9 @@ class PlatformAdapter:
         """Get appropriate temporary directory for current platform"""
         # Check environment variables first
         temp_dirs = [
-            os.getenv('TMPDIR'),
-            os.getenv('TEMP'),
-            os.getenv('TMP'),
+            os.getenv("TMPDIR"),
+            os.getenv("TEMP"),
+            os.getenv("TMP"),
         ]
 
         for temp_dir in temp_dirs:
@@ -78,8 +78,8 @@ class PlatformAdapter:
                 return temp_dir
 
         # Platform-specific defaults
-        if self.system == 'windows':
-            default_temp = 'C:\\Temp'
+        if self.system == "windows":
+            default_temp = "C:\\Temp"
         else:  # macOS, Linux and others
             default_temp = tempfile.gettempdir()
 
@@ -90,7 +90,7 @@ class PlatformAdapter:
             return default_temp
         else:
             # Fallback to current directory
-            fallback_temp = str(Path.cwd() / 'temp')
+            fallback_temp = str(Path.cwd() / "temp")
             Path(fallback_temp).mkdir(parents=True, exist_ok=True)
             return fallback_temp
 
@@ -98,20 +98,20 @@ class PlatformAdapter:
         """Get optimal buffer sizes based on platform and available memory"""
         # Base buffer sizes
         buffer_sizes = {
-            "file_read_buffer": 8192,    # 8KB
-            "network_buffer": 16384,     # 16KB
+            "file_read_buffer": 8192,  # 8KB
+            "network_buffer": 16384,  # 16KB
             "compression_buffer": 32768,  # 32KB
-            "log_buffer": 4096,          # 4KB
+            "log_buffer": 4096,  # 4KB
         }
 
         # Adjust based on available memory
         try:
             # Try to get memory info via /proc/meminfo on Linux
-            if self.system == 'linux':
-                with open('/proc/meminfo', 'r') as f:
+            if self.system == "linux":
+                with open("/proc/meminfo", "r") as f:
                     meminfo = f.read()
-                    for line in meminfo.split('\n'):
-                        if line.startswith('MemAvailable:'):
+                    for line in meminfo.split("\n"):
+                        if line.startswith("MemAvailable:"):
                             available_kb = int(line.split()[1])
                             available_mb = available_kb / 1024
 
@@ -135,7 +135,7 @@ class PlatformAdapter:
 
     def get_platform_specific_commands(self) -> Dict[str, str]:
         """Get platform-specific commands for common operations"""
-        if self.system == 'windows':
+        if self.system == "windows":
             return {
                 "shell": "cmd",
                 "list_files": "dir",
@@ -174,15 +174,15 @@ class PlatformAdapter:
             system_info["cpu_count"] = 1
 
         # Add memory information (Linux only for now)
-        if self.system == 'linux':
+        if self.system == "linux":
             try:
-                with open('/proc/meminfo', 'r') as f:
+                with open("/proc/meminfo", "r") as f:
                     meminfo = f.read()
-                    for line in meminfo.split('\n'):
-                        if line.startswith('MemTotal:'):
+                    for line in meminfo.split("\n"):
+                        if line.startswith("MemTotal:"):
                             total_kb = int(line.split()[1])
                             system_info["total_memory_mb"] = total_kb / 1024
-                        elif line.startswith('MemAvailable:'):
+                        elif line.startswith("MemAvailable:"):
                             available_kb = int(line.split()[1])
                             system_info["available_memory_mb"] = available_kb / 1024
 
@@ -214,14 +214,14 @@ class PlatformAdapter:
     def _is_running_in_docker(self) -> bool:
         """Check if running in Docker container"""
         # Check for .dockerenv file
-        if Path('/.dockerenv').exists():
+        if Path("/.dockerenv").exists():
             return True
 
         # Check cgroup info (Linux only)
-        if self.system == 'linux':
+        if self.system == "linux":
             try:
-                with open('/proc/self/cgroup', 'r') as f:
-                    if 'docker' in f.read().lower():
+                with open("/proc/self/cgroup", "r") as f:
+                    if "docker" in f.read().lower():
                         return True
             except (FileNotFoundError, PermissionError):
                 pass
@@ -232,9 +232,9 @@ class PlatformAdapter:
         """Get Docker CPU limit if running in container"""
         # Try cgroup v1
         try:
-            with open('/sys/fs/cgroup/cpu/cpu.cfs_quota_us', 'r') as f:
+            with open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "r") as f:
                 quota = int(f.read().strip())
-            with open('/sys/fs/cgroup/cpu/cpu.cfs_period_us', 'r') as f:
+            with open("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "r") as f:
                 period = int(f.read().strip())
 
             if quota > 0 and period > 0:
@@ -244,7 +244,7 @@ class PlatformAdapter:
 
         # Try cgroup v2
         try:
-            with open('/sys/fs/cgroup/cpu.max', 'r') as f:
+            with open("/sys/fs/cgroup/cpu.max", "r") as f:
                 content = f.read().strip().split()
                 if len(content) == 2 and content[0] != "max":
                     quota = int(content[0])
@@ -265,9 +265,9 @@ class PlatformAdapter:
 
     def get_case_sensitive_filesystem(self) -> bool:
         """Check if filesystem is case-sensitive"""
-        if self.system == 'windows':
+        if self.system == "windows":
             return False
-        elif self.system == 'darwin':  # macOS
+        elif self.system == "darwin":  # macOS
             # HFS+ is typically case-insensitive, APFS can be either
             return False
         else:  # Linux and other Unix-like
@@ -277,16 +277,16 @@ class PlatformAdapter:
         """Get preferred text encoding for current platform"""
         # Try to detect from environment
         preferred_encodings = [
-            'utf-8',  # Default fallback
+            "utf-8",  # Default fallback
         ]
 
         # Check locale environment variables
-        locale_vars = ['LC_ALL', 'LC_CTYPE', 'LANG']
+        locale_vars = ["LC_ALL", "LC_CTYPE", "LANG"]
         for var in locale_vars:
-            locale_value = os.getenv(var, '')
-            if '.' in locale_value:
-                encoding = locale_value.split('.')[-1]
-                if encoding.lower() not in ['utf-8', 'utf8']:
+            locale_value = os.getenv(var, "")
+            if "." in locale_value:
+                encoding = locale_value.split(".")[-1]
+                if encoding.lower() not in ["utf-8", "utf8"]:
                     preferred_encodings.insert(0, encoding)
 
         return preferred_encodings[0]

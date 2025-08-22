@@ -4,22 +4,25 @@ Comprehensive tests for environment detection, configuration management,
 and platform adaptation.
 """
 
-import unittest
-import tempfile
+import asyncio
+import json
 import os
 import sys
+import tempfile
 import time
-import asyncio
+import unittest
 from pathlib import Path
-import json
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from config.environment_detector import EnvironmentDetector, EnvironmentInfo
-from config.config_manager import ConfigManager, AdaptiveConfig
-from config.platform_adapter import PlatformAdapter
-from config.runtime_profiler import RuntimeProfiler
+from config.config_manager import AdaptiveConfig, ConfigManager  # noqa: E402
+from config.environment_detector import (  # noqa: E402
+    EnvironmentDetector,
+    EnvironmentInfo,
+)
+from config.platform_adapter import PlatformAdapter  # noqa: E402
+from config.runtime_profiler import RuntimeProfiler  # noqa: E402
 
 
 class TestEnvironmentDetection(unittest.TestCase):
@@ -35,6 +38,7 @@ class TestEnvironmentDetection(unittest.TestCase):
     def tearDown(self):
         self.runtime_profiler.stop_profiling()
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_environment_detection(self):
@@ -153,7 +157,7 @@ class TestEnvironmentDetection(unittest.TestCase):
         self.assertTrue(os.path.exists(export_path))
 
         # Check that file contains valid JSON
-        with open(export_path, 'r') as f:
+        with open(export_path, "r") as f:
             data = json.load(f)
         self.assertIsInstance(data, dict)
 
@@ -166,7 +170,7 @@ class TestEnvironmentDetection(unittest.TestCase):
         self.assertTrue(os.path.exists(export_path))
 
         # Check that file contains valid JSON
-        with open(export_path, 'r') as f:
+        with open(export_path, "r") as f:
             data = json.load(f)
         self.assertIsInstance(data, dict)
 
@@ -195,12 +199,10 @@ class TestEnvironmentDetection(unittest.TestCase):
         config_summary = self.config_manager.get_config_summary()
 
         self.assertEqual(
-            env_summary["platform"],
-            config_summary["environment"]["platform"]
+            env_summary["platform"], config_summary["environment"]["platform"]
         )
         self.assertEqual(
-            env_summary["is_docker"],
-            config_summary["environment"]["is_docker"]
+            env_summary["is_docker"], config_summary["environment"]["is_docker"]
         )
 
         # 6. Verify platform optimizations are reasonable
@@ -257,5 +259,5 @@ class TestMCPServerIntegration(unittest.TestCase):
             self.assertIn("timestamp", content)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

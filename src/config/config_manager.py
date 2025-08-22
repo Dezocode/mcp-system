@@ -3,19 +3,21 @@ Configuration Manager for MCP System
 Provides adaptive configuration management based on environment detection.
 """
 
-import os
 import json
 import logging
+import os
 import tempfile
-from typing import Dict, Any, Optional, List
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
+
 from .environment_detector import EnvironmentDetector
 
 
 @dataclass
 class ConfigProfile:
     """Configuration profile for specific environments"""
+
     name: str
     description: str
     settings: Dict[str, Any]
@@ -25,6 +27,7 @@ class ConfigProfile:
 @dataclass
 class AdaptiveConfig:
     """Adaptive configuration based on environment"""
+
     workspace_root: str
     session_dir: str
     log_level: str
@@ -42,10 +45,10 @@ class AdaptiveConfig:
 
 class ConfigManager:
     """Manages adaptive configuration based on environment"""
+
     def __init__(self, config_dir: str = None):
         self.config_dir = (
-            Path(config_dir) if config_dir
-            else Path(__file__).parent.parent / "config"
+            Path(config_dir) if config_dir else Path(__file__).parent.parent / "config"
         )
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -80,14 +83,14 @@ class ConfigManager:
                     "security_settings": {
                         "allowed_paths": ["/app", "/tmp"],
                         "restricted_paths": ["/etc", "/usr", "/var"],
-                        "max_file_size_mb": 10
+                        "max_file_size_mb": 10,
                     },
                     "performance_settings": {
                         "memory_limit_mb": 1024,
                         "cpu_limit_cores": 2.0,
-                        "disk_quota_gb": 5
-                    }
-                }
+                        "disk_quota_gb": 5,
+                    },
+                },
             ),
             ConfigProfile(
                 name="local-development",
@@ -105,14 +108,14 @@ class ConfigManager:
                     "security_settings": {
                         "allowed_paths": [str(Path.cwd()), "/tmp"],
                         "restricted_paths": [],
-                        "max_file_size_mb": 100
+                        "max_file_size_mb": 100,
                     },
                     "performance_settings": {
                         "memory_limit_mb": 2048,
                         "cpu_limit_cores": 4.0,
-                        "disk_quota_gb": 50
-                    }
-                }
+                        "disk_quota_gb": 50,
+                    },
+                },
             ),
             ConfigProfile(
                 name="kubernetes-production",
@@ -130,15 +133,15 @@ class ConfigManager:
                     "security_settings": {
                         "allowed_paths": ["/app", "/data", "/tmp"],
                         "restricted_paths": ["/etc", "/usr", "/var", "/home"],
-                        "max_file_size_mb": 5
+                        "max_file_size_mb": 5,
                     },
                     "performance_settings": {
                         "memory_limit_mb": 2048,
                         "cpu_limit_cores": 4.0,
-                        "disk_quota_gb": 10
-                    }
-                }
-            )
+                        "disk_quota_gb": 10,
+                    },
+                },
+            ),
         ]
 
         # Save built-in profiles
@@ -146,14 +149,14 @@ class ConfigManager:
             self.config_profiles[profile.name] = profile
             profile_file = profiles_dir / f"{profile.name}.json"
             if not profile_file.exists():
-                with open(profile_file, 'w') as f:
+                with open(profile_file, "w") as f:
                     json.dump(asdict(profile), f, indent=2)
 
         # Load custom profiles
         for profile_file in profiles_dir.glob("*.json"):
             if profile_file.name not in [f"{p.name}.json" for p in builtin_profiles]:
                 try:
-                    with open(profile_file, 'r') as f:
+                    with open(profile_file, "r") as f:
                         profile_data = json.load(f)
                     profile = ConfigProfile(**profile_data)
                     self.config_profiles[profile.name] = profile
@@ -202,13 +205,13 @@ class ConfigManager:
             security_settings=base_settings.get("security_settings", {}),
             performance_settings=base_settings.get("performance_settings", {}),
             docker_specific=(
-                base_settings.get("docker_specific", {})
-                if env_info.is_docker else {}
+                base_settings.get("docker_specific", {}) if env_info.is_docker else {}
             ),
             local_specific=(
                 base_settings.get("local_specific", {})
-                if not env_info.is_docker else {}
-            )
+                if not env_info.is_docker
+                else {}
+            ),
         )
 
         # Ensure directories exist
@@ -238,7 +241,7 @@ class ConfigManager:
             "MCP_ENABLE_DASHBOARD": "enable_dashboard",
             "MCP_DATABASE_PATH": "database_path",
             "MCP_CACHE_DIR": "cache_dir",
-            "MCP_TEMP_DIR": "temp_dir"
+            "MCP_TEMP_DIR": "temp_dir",
         }
 
         for env_var, config_key in env_mapping.items():
@@ -336,9 +339,7 @@ class ConfigManager:
                 "restricted_paths_count": len(
                     config.security_settings.get("restricted_paths", [])
                 ),
-                "max_file_size_mb": config.security_settings.get(
-                    "max_file_size_mb", 0
-                )
+                "max_file_size_mb": config.security_settings.get("max_file_size_mb", 0),
             },
             "performance_settings": {
                 "memory_limit_mb": config.performance_settings.get(
@@ -347,20 +348,14 @@ class ConfigManager:
                 "cpu_limit_cores": config.performance_settings.get(
                     "cpu_limit_cores", 0.0
                 ),
-                "disk_quota_gb": config.performance_settings.get(
-                    "disk_quota_gb", 0
-                )
-            }
+                "disk_quota_gb": config.performance_settings.get("disk_quota_gb", 0),
+            },
         }
 
     def validate_configuration(self) -> Dict[str, Any]:
         """Validate current configuration"""
         config = self.get_config()
-        validation_results = {
-            "valid": True,
-            "issues": [],
-            "warnings": []
-        }
+        validation_results = {"valid": True, "issues": [], "warnings": []}
 
         # Validate paths
         paths_to_check = [
@@ -368,7 +363,7 @@ class ConfigManager:
             ("session_dir", config.session_dir),
             ("cache_dir", config.cache_dir),
             ("temp_dir", config.temp_dir),
-            ("database_path", config.database_path)
+            ("database_path", config.database_path),
         ]
 
         for path_name, path_value in paths_to_check:
@@ -388,8 +383,7 @@ class ConfigManager:
                         f"Cannot create directory {path_name}: {e}"
                     )
             elif not os.access(
-                path_obj.parent if path_name == "database_path" else path_obj,
-                os.W_OK
+                path_obj.parent if path_name == "database_path" else path_obj, os.W_OK
             ):
                 validation_results["valid"] = False
                 validation_results["issues"].append(
@@ -415,6 +409,7 @@ class ConfigManager:
                 self.logger.warning(f"  - {warning}")
 
         return validation_results
+
 
 # Global config manager instance
 
