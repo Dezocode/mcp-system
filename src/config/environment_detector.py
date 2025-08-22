@@ -3,20 +3,21 @@ Environment Detector for MCP System
 Detects runtime environment (Docker vs local) and provides environment information.
 """
 
+import json
+import logging
 import os
 import platform
-import sys
 import shutil
+import sys
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, asdict
-import logging
-import json
+from typing import Any, Dict, Optional
 
 
 @dataclass
 class EnvironmentInfo:
     """Comprehensive environment information"""
+
     platform: str
     architecture: str
     is_docker: bool
@@ -41,16 +42,16 @@ class EnvironmentDetector:
     def is_running_in_docker(self) -> bool:
         """Detect if running inside Docker container"""
         # Method 1: Check for .dockerenv file
-        if Path('/.dockerenv').exists():
+        if Path("/.dockerenv").exists():
             self.logger.debug("Detected Docker via /.dockerenv file")
             return True
 
         # Method 2: Check cgroup info (Linux only)
-        if self.platform_info.system.lower() == 'linux':
+        if self.platform_info.system.lower() == "linux":
             try:
-                with open('/proc/self/cgroup', 'r') as f:
+                with open("/proc/self/cgroup", "r") as f:
                     content = f.read().lower()
-                    if 'docker' in content or 'containerd' in content:
+                    if "docker" in content or "containerd" in content:
                         self.logger.debug("Detected Docker via cgroup")
                         return True
             except (FileNotFoundError, PermissionError, OSError):
@@ -58,8 +59,8 @@ class EnvironmentDetector:
 
         # Method 3: Check environment variables
         docker_env_vars = [
-            'DOCKER_CONTAINER',
-            'container',  # Used by some container runtimes
+            "DOCKER_CONTAINER",
+            "container",  # Used by some container runtimes
         ]
 
         for env_var in docker_env_vars:
@@ -80,35 +81,35 @@ class EnvironmentDetector:
         # Check for specific container technologies
         try:
             # Check cgroup for container type
-            with open('/proc/self/cgroup', 'r') as f:
+            with open("/proc/self/cgroup", "r") as f:
                 content = f.read().lower()
 
-                if 'docker' in content:
-                    return 'docker'
-                elif 'containerd' in content:
-                    return 'containerd'
-                elif 'podman' in content:
-                    return 'podman'
-                elif 'lxc' in content:
-                    return 'lxc'
+                if "docker" in content:
+                    return "docker"
+                elif "containerd" in content:
+                    return "containerd"
+                elif "podman" in content:
+                    return "podman"
+                elif "lxc" in content:
+                    return "lxc"
 
         except (FileNotFoundError, PermissionError, OSError):
             pass
 
         # Check environment variables
-        container_env = os.getenv('container')
+        container_env = os.getenv("container")
         if container_env:
             return container_env
 
-        return 'unknown-container'
+        return "unknown-container"
 
     def is_running_in_kubernetes(self) -> bool:
         """Detect if running in Kubernetes"""
         # Check for Kubernetes-specific environment variables
         k8s_env_vars = [
-            'KUBERNETES_SERVICE_HOST',
-            'KUBERNETES_SERVICE_PORT',
-            'KUBECONFIG',
+            "KUBERNETES_SERVICE_HOST",
+            "KUBERNETES_SERVICE_PORT",
+            "KUBECONFIG",
         ]
 
         for env_var in k8s_env_vars:
@@ -116,7 +117,7 @@ class EnvironmentDetector:
                 return True
 
         # Check for Kubernetes service account
-        if Path('/var/run/secrets/kubernetes.io/serviceaccount').exists():
+        if Path("/var/run/secrets/kubernetes.io/serviceaccount").exists():
             return True
 
         return False
@@ -139,43 +140,36 @@ class EnvironmentDetector:
             }
         except Exception as e:
             self.logger.warning(f"Failed to get disk usage: {e}")
-            return {
-                "current_directory": str(Path.cwd()),
-                "error": str(e)
-            }
+            return {"current_directory": str(Path.cwd()), "error": str(e)}
 
     def get_relevant_environment_variables(self) -> Dict[str, str]:
         """Get relevant environment variables for environment detection"""
         relevant_vars = [
             # Docker/Container variables
-            'DOCKER_CONTAINER',
-            'container',
-            'HOSTNAME',
-
+            "DOCKER_CONTAINER",
+            "container",
+            "HOSTNAME",
             # Kubernetes variables
-            'KUBERNETES_SERVICE_HOST',
-            'KUBERNETES_SERVICE_PORT',
-            'KUBECONFIG',
-            'POD_NAME',
-            'NAMESPACE',
-
+            "KUBERNETES_SERVICE_HOST",
+            "KUBERNETES_SERVICE_PORT",
+            "KUBECONFIG",
+            "POD_NAME",
+            "NAMESPACE",
             # System variables
-            'PATH',
-            'HOME',
-            'USER',
-            'SHELL',
-            'LANG',
-            'PWD',
-
+            "PATH",
+            "HOME",
+            "USER",
+            "SHELL",
+            "LANG",
+            "PWD",
             # Python variables
-            'PYTHONPATH',
-            'VIRTUAL_ENV',
-            'CONDA_DEFAULT_ENV',
-
+            "PYTHONPATH",
+            "VIRTUAL_ENV",
+            "CONDA_DEFAULT_ENV",
             # MCP-specific variables
-            'MCP_ENV',
-            'MCP_DEBUG',
-            'MCP_LOG_LEVEL',
+            "MCP_ENV",
+            "MCP_DEBUG",
+            "MCP_LOG_LEVEL",
         ]
 
         env_vars = {}
@@ -185,7 +179,7 @@ class EnvironmentDetector:
                 # Mask sensitive values
                 if any(
                     sensitive in var.upper()
-                    for sensitive in ['KEY', 'SECRET', 'PASSWORD', 'TOKEN']
+                    for sensitive in ["KEY", "SECRET", "PASSWORD", "TOKEN"]
                 ):
                     env_vars[var] = "***MASKED***"
                 else:
@@ -211,7 +205,7 @@ class EnvironmentDetector:
             user=os.getenv("USER", os.getenv("USERNAME", "unknown")),
             hostname=self.platform_info.node,
             environment_variables=self.get_relevant_environment_variables(),
-            file_system_info=self.get_file_system_info()
+            file_system_info=self.get_file_system_info(),
         )
 
         self.logger.info(
@@ -234,7 +228,7 @@ class EnvironmentDetector:
             "python_version": env_info.python_version,
             "is_kubernetes": self.is_running_in_kubernetes(),
             "hostname": env_info.hostname,
-            "user": env_info.user
+            "user": env_info.user,
         }
 
     def export_environment_info(self, output_path: str, format: str = "json"):
@@ -242,16 +236,17 @@ class EnvironmentDetector:
         env_info = self.detect_environment()
 
         if format.lower() == "json":
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(asdict(env_info), f, indent=2, default=str)
         elif format.lower() == "txt":
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 for key, value in asdict(env_info).items():
                     f.write(f"{key}: {value}\n")
         else:
             raise ValueError(f"Unsupported format: {format}")
 
         self.logger.info(f"Environment info exported to {output_path}")
+
 
 # Global environment detector instance
 

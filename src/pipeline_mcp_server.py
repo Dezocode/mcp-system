@@ -18,32 +18,33 @@ MCP Protocol: v1.0
 
 import asyncio
 import json
+import logging
 import sys
 import tempfile
 import time
 import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import asdict
-import logging
+from typing import Any, Dict, List, Optional, Tuple
 
-from src.mcp_local_types import ErrorCode
+from src.config.config_manager import config_manager
 
 # Environment Detection System
 from src.config.environment_detector import environment_detector
-from src.config.config_manager import config_manager
 from src.config.platform_adapter import platform_adapter
 from src.config.runtime_profiler import runtime_profiler
 
 # Docker Integration System
 from src.docker.health_check import docker_health_check
+from src.mcp_local_types import ErrorCode
 
 # MCP Error compatibility layer
 
 
 class McpError(Exception):
     """MCP Error compatibility wrapper"""
+
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
@@ -52,13 +53,10 @@ class McpError(Exception):
 
 # MCP Protocol Imports (MCP v1.0)
 try:
-    from mcp.server.models import InitializationOptions
     from mcp.server import Server
+    from mcp.server.models import InitializationOptions
     from mcp.server.stdio import stdio_server
-    from mcp.types import (
-        Tool,
-        TextContent
-    )
+    from mcp.types import TextContent, Tool
 except ImportError as e:
     print(f"ERROR: MCP dependencies not installed: {e}", file=sys.stderr)
     print("Install with: pip install mcp", file=sys.stderr)
@@ -66,8 +64,7 @@ except ImportError as e:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -85,7 +82,7 @@ class PipelineSession:
             "fixes_applied": 0,
             "remaining_issues": 0,
             "execution_time": 0,
-            "stages_completed": []
+            "stages_completed": [],
         }
         self.artifacts = []
         self.error_count = 0
@@ -102,11 +99,13 @@ class PipelineSession:
 
     def add_artifact(self, path: str, artifact_type: str):
         """Add artifact to session tracking."""
-        self.artifacts.append({
-            "path": path,
-            "type": artifact_type,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
+        self.artifacts.append(
+            {
+                "path": path,
+                "type": artifact_type,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     def get_status_dict(self) -> Dict[str, Any]:
         """Get complete session status as dictionary."""
@@ -119,7 +118,7 @@ class PipelineSession:
             "metrics": self.metrics,
             "artifacts": self.artifacts,
             "error_count": self.error_count,
-            "execution_time": (self.last_updated - self.created_at).total_seconds()
+            "execution_time": (self.last_updated - self.created_at).total_seconds(),
         }
 
 
@@ -162,7 +161,7 @@ class PipelineMCPServer:
             "logging": {},
             "prompts": {},
             "resources": {},
-            "tools": {}
+            "tools": {},
         }
 
         logger.info(
@@ -223,21 +222,21 @@ class PipelineMCPServer:
         """Get pipeline session by ID."""
         return self.sessions.get(session_id)
 
-    async def run_command(self, command: List[str], cwd: Optional[Path] = None,
-                          timeout: int = 300) -> Tuple[int, str, str]:
+    async def run_command(
+        self, command: List[str], cwd: Optional[Path] = None, timeout: int = 300
+    ) -> Tuple[int, str, str]:
         """Run shell command with timeout and error handling."""
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=cwd or self.workspace_root
+                cwd=cwd or self.workspace_root,
             )
 
             try:
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
+                    process.communicate(), timeout=timeout
                 )
                 return process.returncode, stdout.decode(), stderr.decode()
             except asyncio.TimeoutError:
@@ -253,7 +252,7 @@ class PipelineMCPServer:
         required_files = [
             "scripts/version_keeper.py",
             "scripts/claude_quality_patcher.py",
-            "requirements.txt"
+            "requirements.txt",
         ]
 
         for file_path in required_files:
@@ -287,29 +286,29 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "description": (
                             "Optional session ID (will create new if not provided)"
-                        )
+                        ),
                     },
                     "comprehensive": {
                         "type": "boolean",
                         "description": "Enable comprehensive linting mode",
-                        "default": True
+                        "default": True,
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "target_files": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": (
                             "Specific files to scan (optional, defaults to all)"
-                        )
-                    }
+                        ),
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="quality_patcher_fix",
@@ -322,32 +321,32 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID (required for tracking fixes)"
+                        "description": "Session ID (required for tracking fixes)",
                     },
                     "lint_report_path": {
                         "type": "string",
-                        "description": "Path to lint report JSON file"
+                        "description": "Path to lint report JSON file",
                     },
                     "max_fixes": {
                         "type": "integer",
                         "description": "Maximum number of fixes to apply",
                         "minimum": 1,
                         "maximum": 50,
-                        "default": 10
+                        "default": 10,
                     },
                     "auto_apply": {
                         "type": "boolean",
                         "description": "Automatically apply fixes without confirmation",
-                        "default": True
+                        "default": True,
                     },
                     "claude_agent": {
                         "type": "boolean",
                         "description": "Use Claude agent for intelligent fixes",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["session_id"]
-            }
+                "required": ["session_id"],
+            },
         ),
         Tool(
             name="pipeline_run_full",
@@ -362,30 +361,30 @@ async def handle_list_tools() -> List[Tool]:
                         "description": "Maximum number of pipeline cycles",
                         "minimum": 1,
                         "maximum": 10,
-                        "default": 3
+                        "default": 3,
                     },
                     "max_fixes_per_cycle": {
                         "type": "integer",
                         "description": "Maximum fixes per cycle",
                         "minimum": 1,
                         "maximum": 20,
-                        "default": 10
+                        "default": 10,
                     },
                     "target_quality_score": {
                         "type": "number",
                         "description": "Target quality score (0-100)",
                         "minimum": 0,
                         "maximum": 100,
-                        "default": 95.0
+                        "default": 95.0,
                     },
                     "break_on_no_issues": {
                         "type": "boolean",
                         "description": "Stop pipeline when no issues found",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="github_workflow_trigger",
@@ -396,12 +395,12 @@ async def handle_list_tools() -> List[Tool]:
                     "workflow_name": {
                         "type": "string",
                         "description": "Name of GitHub workflow to trigger",
-                        "default": "pipeline-integration.yml"
+                        "default": "pipeline-integration.yml",
                     },
                     "ref": {
                         "type": "string",
                         "description": "Git ref to run workflow on",
-                        "default": "main"
+                        "default": "main",
                     },
                     "inputs": {
                         "type": "object",
@@ -410,23 +409,23 @@ async def handle_list_tools() -> List[Tool]:
                             "max_fixes": {
                                 "type": "string",
                                 "description": "Maximum number of fixes",
-                                "default": "10"
+                                "default": "10",
                             },
                             "force_fresh_report": {
                                 "type": "string",
                                 "description": "Force fresh lint report",
-                                "default": "false"
-                            }
-                        }
+                                "default": "false",
+                            },
+                        },
                     },
                     "wait_for_completion": {
                         "type": "boolean",
                         "description": "Wait for workflow completion",
-                        "default": False
-                    }
+                        "default": False,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="pipeline_status",
@@ -438,21 +437,21 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "description": (
                             "Specific session ID (optional, returns all if none)"
-                        )
+                        ),
                     },
                     "include_artifacts": {
                         "type": "boolean",
                         "description": "Include artifact information",
-                        "default": True
+                        "default": True,
                     },
                     "include_metrics": {
                         "type": "boolean",
                         "description": "Include performance metrics",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="environment_detection",
@@ -463,31 +462,36 @@ async def handle_list_tools() -> List[Tool]:
                     "action": {
                         "type": "string",
                         "enum": [
-                            "detect", "summary", "config", "validate",
-                            "reload", "profile", "optimize"
+                            "detect",
+                            "summary",
+                            "config",
+                            "validate",
+                            "reload",
+                            "profile",
+                            "optimize",
                         ],
                         "description": "Action to perform",
-                        "default": "detect"
+                        "default": "detect",
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "include_performance": {
                         "type": "boolean",
                         "description": "Include performance metrics in output",
-                        "default": True
+                        "default": True,
                     },
                     "include_system_health": {
                         "type": "boolean",
                         "description": "Include system health metrics",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="health_monitoring",
@@ -499,28 +503,28 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "enum": ["health_check", "comprehensive", "export"],
                         "description": "Type of health monitoring to perform",
-                        "default": "health_check"
+                        "default": "health_check",
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "export_path": {
                         "type": "string",
                         "description": (
                             "Path to export detailed health report (for export action)"
-                        )
+                        ),
                     },
                     "include_details": {
                         "type": "boolean",
                         "description": "Include detailed component information",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="mcp_compliance_check",
@@ -531,29 +535,30 @@ async def handle_list_tools() -> List[Tool]:
                     "check_tools": {
                         "type": "boolean",
                         "description": "Validate tool definitions",
-                        "default": True
+                        "default": True,
                     },
                     "check_schemas": {
                         "type": "boolean",
                         "description": "Validate input schemas",
-                        "default": True
+                        "default": True,
                     },
                     "check_error_handling": {
                         "type": "boolean",
                         "description": "Validate error handling",
-                        "default": True
+                        "default": True,
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for compliance report",
-                        "default": "json"
-                    }
+                        "default": "json",
+                    },
                 },
-                "required": []
-            }
-        )
+                "required": [],
+            },
+        ),
     ]
+
 
 # Tool Implementation Functions
 
@@ -580,19 +585,13 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
         elif name == "mcp_compliance_check":
             return await handle_mcp_compliance_check(arguments)
         else:
-            raise McpError(
-                ErrorCode.METHOD_NOT_FOUND,
-                f"Unknown tool: {name}"
-            )
+            raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown tool: {name}")
 
     except McpError:
         raise
     except Exception as e:
         logger.error(f"Tool {name} failed: {str(e)}")
-        raise McpError(
-            ErrorCode.INTERNAL_ERROR,
-            f"Tool execution failed: {str(e)}"
-        )
+        raise McpError(ErrorCode.INTERNAL_ERROR, f"Tool execution failed: {str(e)}")
 
 
 async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -614,7 +613,7 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
         sys.executable,
         str(pipeline_server.workspace_root / "scripts" / "version_keeper.py"),
         "--comprehensive-lint",
-        "--lint-only"
+        "--lint-only",
     ]
 
     # Add format and output options
@@ -649,8 +648,7 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
         session.update_status("failed", "version_keeper_scan")
         session.error_count += 1
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
-            f"Version Keeper scan failed: {stderr}"
+            ErrorCode.INTERNAL_ERROR, f"Version Keeper scan failed: {stderr}"
         )
 
     # Parse results
@@ -660,7 +658,7 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     if True:  # output_format == "json":
         output_file = pipeline_server.session_dir / session_id / "lint-report.json"
         if output_file.exists():
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 result_data = json.load(f)
                 total_issues = result_data.get("summary", {}).get("total_issues", 0)
                 session.metrics["total_issues_found"] = total_issues
@@ -668,16 +666,21 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
 
     session.update_status("completed", "version_keeper_scan")
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "version_keeper_scan",
-            "session_id": session_id,
-            "status": "success",
-            "execution_time": execution_time,
-            "results": result_data
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "version_keeper_scan",
+                    "session_id": session_id,
+                    "status": "success",
+                    "execution_time": execution_time,
+                    "results": result_data,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -696,7 +699,7 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     # Prepare command
     cmd = [
         sys.executable,
-        str(pipeline_server.workspace_root / "scripts" / "claude_quality_patcher.py")
+        str(pipeline_server.workspace_root / "scripts" / "claude_quality_patcher.py"),
     ]
 
     # Add options
@@ -741,35 +744,39 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     if returncode != 0:
         session.update_status("failed", "quality_patcher_fix")
         session.error_count += 1
-        raise McpError(
-            ErrorCode.INTERNAL_ERROR,
-            f"Quality Patcher failed: {stderr}"
-        )
+        raise McpError(ErrorCode.INTERNAL_ERROR, f"Quality Patcher failed: {stderr}")
 
     # Parse results
     result_data = {"stdout": stdout, "stderr": stderr}
 
     if output_file.exists():
-        with open(output_file, 'r') as f:
+        with open(output_file, "r") as f:
             result_data = json.load(f)
-            session.metrics["fixes_applied"] = result_data.get(
-                "summary", {}).get("fixes_applied", 0)
-            session.metrics["remaining_issues"] = result_data.get(
-                "summary", {}).get("remaining_issues", 0)
+            session.metrics["fixes_applied"] = result_data.get("summary", {}).get(
+                "fixes_applied", 0
+            )
+            session.metrics["remaining_issues"] = result_data.get("summary", {}).get(
+                "remaining_issues", 0
+            )
             session.add_artifact(str(output_file), "fixes_report")
 
     session.update_status("completed", "quality_patcher_fix")
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "quality_patcher_fix",
-            "session_id": session_id,
-            "status": "success",
-            "execution_time": execution_time,
-            "results": result_data
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "quality_patcher_fix",
+                    "session_id": session_id,
+                    "status": "success",
+                    "execution_time": execution_time,
+                    "results": result_data,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -788,7 +795,7 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         "session_id": session_id,
         "cycles": [],
         "final_metrics": {},
-        "success": False
+        "success": False,
     }
 
     for cycle in range(1, max_cycles + 1):
@@ -798,18 +805,22 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         try:
             # Stage 1: Version Keeper Scan
             logger.info(f"Cycle {cycle}: Running Version Keeper scan")
-            scan_result = await handle_version_keeper_scan({
-                "session_id": session_id,
-                "comprehensive": True,
-                "output_format": "json"
-            })
+            scan_result = await handle_version_keeper_scan(
+                {
+                    "session_id": session_id,
+                    "comprehensive": True,
+                    "output_format": "json",
+                }
+            )
 
             scan_data = json.loads(scan_result[0].text)
-            cycle_result["stages"].append({
-                "stage": "version_keeper_scan",
-                "status": "completed",
-                "execution_time": scan_data.get("execution_time", 0)
-            })
+            cycle_result["stages"].append(
+                {
+                    "stage": "version_keeper_scan",
+                    "status": "completed",
+                    "execution_time": scan_data.get("execution_time", 0),
+                }
+            )
 
             # Check if no issues found
             issues_found = session.metrics["total_issues_found"]
@@ -821,36 +832,44 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
             # Stage 2: Quality Patcher (only if issues found)
             if issues_found > 0:
                 logger.info(f"Cycle {cycle}: Applying fixes for {issues_found} issues")
-                fix_result = await handle_quality_patcher_fix({
-                    "session_id": session_id,
-                    "max_fixes": max_fixes_per_cycle,
-                    "auto_apply": True,
-                    "claude_agent": True
-                })
+                fix_result = await handle_quality_patcher_fix(
+                    {
+                        "session_id": session_id,
+                        "max_fixes": max_fixes_per_cycle,
+                        "auto_apply": True,
+                        "claude_agent": True,
+                    }
+                )
 
                 fix_data = json.loads(fix_result[0].text)
-                cycle_result["stages"].append({
-                    "stage": "quality_patcher_fix",
-                    "status": "completed",
-                    "execution_time": fix_data.get("execution_time", 0),
-                    "fixes_applied": session.metrics["fixes_applied"]
-                })
+                cycle_result["stages"].append(
+                    {
+                        "stage": "quality_patcher_fix",
+                        "status": "completed",
+                        "execution_time": fix_data.get("execution_time", 0),
+                        "fixes_applied": session.metrics["fixes_applied"],
+                    }
+                )
 
                 # Stage 3: Validation Scan
                 logger.info(f"Cycle {cycle}: Running validation scan")
-                validation_result = await handle_version_keeper_scan({
-                    "session_id": session_id,
-                    "comprehensive": True,
-                    "output_format": "json"
-                })
+                validation_result = await handle_version_keeper_scan(
+                    {
+                        "session_id": session_id,
+                        "comprehensive": True,
+                        "output_format": "json",
+                    }
+                )
 
                 validation_data = json.loads(validation_result[0].text)
-                cycle_result["stages"].append({
-                    "stage": "validation_scan",
-                    "status": "completed",
-                    "execution_time": validation_data.get("execution_time", 0),
-                    "remaining_issues": session.metrics["remaining_issues"]
-                })
+                cycle_result["stages"].append(
+                    {
+                        "stage": "validation_scan",
+                        "status": "completed",
+                        "execution_time": validation_data.get("execution_time", 0),
+                        "remaining_issues": session.metrics["remaining_issues"],
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Cycle {cycle} failed: {str(e)}")
@@ -868,25 +887,32 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         if quality_score >= target_quality:
             logger.info(
                 f"Target quality score {target_quality}% achieved: "
-                f"{quality_score:.1f}%")
+                f"{quality_score:.1f}%"
+            )
             results["success"] = True
             break
 
     session.update_status("completed", "pipeline_full_cycle")
     results["final_metrics"] = session.get_status_dict()
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "pipeline_run_full",
-            "status": "success" if results["success"] else "partial",
-            "results": results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "pipeline_run_full",
+                    "status": "success" if results["success"] else "partial",
+                    "results": results,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_github_workflow_trigger(
-        arguments: Dict[str, Any]) -> List[TextContent]:
+    arguments: Dict[str, Any],
+) -> List[TextContent]:
     """Trigger GitHub Actions workflow."""
 
     workflow = arguments.get("workflow_name", "pipeline-integration.yml")
@@ -908,8 +934,7 @@ async def handle_github_workflow_trigger(
 
     if returncode != 0:
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
-            f"GitHub workflow trigger failed: {stderr}"
+            ErrorCode.INTERNAL_ERROR, f"GitHub workflow trigger failed: {stderr}"
         )
 
     result = {
@@ -917,7 +942,7 @@ async def handle_github_workflow_trigger(
         "ref": ref,
         "inputs": inputs,
         "status": "triggered",
-        "output": stdout
+        "output": stdout,
     }
 
     # If waiting for completion, monitor the workflow
@@ -925,16 +950,22 @@ async def handle_github_workflow_trigger(
         # This would require additional GitHub API calls
         result["note"] = (
             "Workflow triggered successfully. "
-            "Use GitHub web interface to monitor progress.")
+            "Use GitHub web interface to monitor progress."
+        )
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "github_workflow_trigger",
-            "status": "success",
-            "results": result
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "github_workflow_trigger",
+                    "status": "success",
+                    "results": result,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -959,10 +990,7 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
         results = {"session": status_data}
     else:
         # Get all sessions
-        results = {
-            "total_sessions": len(pipeline_server.sessions),
-            "sessions": []
-        }
+        results = {"total_sessions": len(pipeline_server.sessions), "sessions": []}
 
         for sess_id, session in pipeline_server.sessions.items():
             status_data = session.get_status_dict()
@@ -972,14 +1000,15 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
                 status_data.pop("metrics", None)
             results["sessions"].append(status_data)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "pipeline_status",
-            "status": "success",
-            "results": results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {"tool": "pipeline_status", "status": "success", "results": results},
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -996,7 +1025,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
         "compliance_score": 0,
         "checks": [],
         "issues": [],
-        "recommendations": []
+        "recommendations": [],
     }
 
     total_checks = 0
@@ -1010,7 +1039,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
             "category": "tools",
             "total_tools": len(tools),
             "valid_tools": 0,
-            "issues": []
+            "issues": [],
         }
 
         for tool in tools:
@@ -1025,11 +1054,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
 
     if check_schemas:
         # Check input schema completeness
-        schema_check = {
-            "category": "schemas",
-            "valid_schemas": 0,
-            "issues": []
-        }
+        schema_check = {"category": "schemas", "valid_schemas": 0, "issues": []}
 
         tools = await handle_list_tools()
         for tool in tools:
@@ -1040,7 +1065,8 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
                 schema_check["valid_schemas"] += 1
             else:
                 schema_check["issues"].append(
-                    f"Tool {tool.name} has incomplete inputSchema")
+                    f"Tool {tool.name} has incomplete inputSchema"
+                )
 
         compliance_results["checks"].append(schema_check)
 
@@ -1050,7 +1076,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
             "category": "error_handling",
             "mcp_errors_used": True,
             "proper_error_codes": True,
-            "issues": []
+            "issues": [],
         }
 
         total_checks += 2
@@ -1084,14 +1110,19 @@ Passed Tests: {passed_checks}
 
         return [TextContent(type="text", text=text_output)]
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "mcp_compliance_check",
-            "status": "success",
-            "results": compliance_results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "mcp_compliance_check",
+                    "status": "success",
+                    "results": compliance_results,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 # Server initialization and main function
@@ -1109,57 +1140,78 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
         # Get comprehensive environment information
         env_info = pipeline_server.environment_detector.detect_environment()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "detect",
-                "environment_info": asdict(env_info),
-                "timestamp": time.time()
-            }, indent=2, default=str)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "detect",
+                        "environment_info": asdict(env_info),
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
 
     elif action == "summary":
         # Get environment summary
         summary = pipeline_server.environment_detector.get_environment_summary()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "summary",
-                "summary": summary,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "summary",
+                        "summary": summary,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     elif action == "config":
         # Get current configuration
         config_summary = pipeline_server.config_manager.get_config_summary()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "config",
-                "configuration": config_summary,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "config",
+                        "configuration": config_summary,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     elif action == "validate":
         # Validate current configuration
         validation_results = pipeline_server.config_manager.validate_configuration()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "validate",
-                "validation": validation_results,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "validate",
+                        "validation": validation_results,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     elif action == "reload":
         # Reload configuration
@@ -1167,27 +1219,37 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
             pipeline_server.config_manager.reload_configuration()
             pipeline_server._apply_adaptive_configuration()
 
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "environment_detection",
-                    "action": "reload",
-                    "status": "success",
-                    "message": "Configuration reloaded successfully",
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "environment_detection",
+                            "action": "reload",
+                            "status": "success",
+                            "message": "Configuration reloaded successfully",
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
         except Exception as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "environment_detection",
-                    "action": "reload",
-                    "status": "error",
-                    "error": str(e),
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "environment_detection",
+                            "action": "reload",
+                            "status": "error",
+                            "error": str(e),
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
 
     elif action == "profile":
         # Get runtime performance profile
@@ -1198,38 +1260,51 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
             resource_summary = (
                 pipeline_server.runtime_profiler.get_resource_usage_summary()
             )
-            performance_data.update({
-                "performance_profile": asdict(profile),
-                "resource_summary": resource_summary
-            })
+            performance_data.update(
+                {
+                    "performance_profile": asdict(profile),
+                    "resource_summary": resource_summary,
+                }
+            )
 
         if include_system_health:
             system_health = pipeline_server.runtime_profiler.get_system_health()
             performance_data["system_health"] = system_health
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "profile",
-                **performance_data,
-                "timestamp": time.time()
-            }, indent=2, default=str)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "profile",
+                        **performance_data,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
 
     elif action == "optimize":
         # Get platform optimizations
         optimizations = pipeline_server.platform_adapter.optimize_for_current_platform()
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "optimize",
-                "optimizations": optimizations,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "optimize",
+                        "optimizations": optimizations,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     else:
         raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown action: {action}")
@@ -1253,15 +1328,20 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
             # Remove detailed issue information for simple response
             response["issues"] = len(response["issues"])
 
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "health_monitoring",
-                "action": "health_check",
-                "health_status": response,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "health_monitoring",
+                        "action": "health_check",
+                        "health_status": response,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     elif action == "comprehensive":
         # Perform comprehensive health check
@@ -1273,60 +1353,71 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
             "tool": "health_monitoring",
             "action": "comprehensive",
             "health_result": asdict(result),
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         if not include_details:
             # Remove detailed check information
             if "details" in response_data["health_result"]:
                 details_summary = {}
-                for component, data in (
-                    response_data["health_result"]["details"].items()
-                ):
+                for component, data in response_data["health_result"][
+                    "details"
+                ].items():
                     details_summary[component] = data.get("status", "unknown")
                 response_data["health_result"]["details"] = details_summary
 
-        return [TextContent(
-            type="text",
-            text=json.dumps(response_data, indent=2, default=str)
-        )]
+        return [
+            TextContent(
+                type="text", text=json.dumps(response_data, indent=2, default=str)
+            )
+        ]
 
     elif action == "export":
         # Export detailed health report
         if not export_path:
-            export_path = f"{tempfile.gettempdir()}/health_report_{int(time.time())}.json"
+            timestamp = int(time.time())
+            export_path = f"{tempfile.gettempdir()}/health_report_{timestamp}.json"
 
         try:
             pipeline_server.docker_health_check.export_health_report(export_path)
 
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "health_monitoring",
-                    "action": "export",
-                    "status": "success",
-                    "export_path": export_path,
-                    "message": "Health report exported successfully",
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "health_monitoring",
+                            "action": "export",
+                            "status": "success",
+                            "export_path": export_path,
+                            "message": "Health report exported successfully",
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
 
         except Exception as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "health_monitoring",
-                    "action": "export",
-                    "status": "error",
-                    "error": str(e),
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "health_monitoring",
+                            "action": "export",
+                            "status": "error",
+                            "error": str(e),
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
 
     else:
         raise McpError(
-            ErrorCode.METHOD_NOT_FOUND,
-            f"Unknown health monitoring action: {action}"
+            ErrorCode.METHOD_NOT_FOUND, f"Unknown health monitoring action: {action}"
         )
 
 
@@ -1351,9 +1442,10 @@ async def main():
             InitializationOptions(
                 server_name="pipeline-mcp-server",
                 server_version="1.0.0",
-                capabilities=pipeline_server.server_capabilities
-            )
+                capabilities=pipeline_server.server_capabilities,
+            ),
         )
+
 
 if __name__ == "__main__":
     try:

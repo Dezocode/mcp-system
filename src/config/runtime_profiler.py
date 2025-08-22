@@ -3,19 +3,20 @@ Runtime Profiler for MCP System
 Provides runtime performance profiling and resource monitoring.
 """
 
-import time
-import threading
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-import logging
-from collections import deque
 import json
+import logging
 import os
+import threading
+import time
+from collections import deque
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class PerformanceSnapshot:
     """Snapshot of runtime performance metrics"""
+
     timestamp: float
     cpu_percent: float
     memory_mb: float
@@ -26,6 +27,7 @@ class PerformanceSnapshot:
 @dataclass
 class PerformanceProfile:
     """Aggregated performance profile"""
+
     start_time: float
     duration: float
     avg_cpu_percent: float
@@ -102,7 +104,7 @@ class RuntimeProfiler:
 
             # CPU usage - simplified estimation based on load average (Linux)
             cpu_percent = 0.0
-            if os.name == 'posix':
+            if os.name == "posix":
                 try:
                     load_avg = os.getloadavg()[0]  # 1-minute load average
                     cpu_count = os.cpu_count() or 1
@@ -113,21 +115,21 @@ class RuntimeProfiler:
             # Memory usage - simplified estimation
             memory_mb = 0.0
             memory_percent = 0.0
-            if os.name == 'posix':
+            if os.name == "posix":
                 try:
                     # Very basic memory estimation from /proc/self/status
-                    with open('/proc/self/status', 'r') as f:
+                    with open("/proc/self/status", "r") as f:
                         for line in f:
-                            if line.startswith('VmRSS:'):
+                            if line.startswith("VmRSS:"):
                                 # RSS memory in kB
                                 memory_kb = int(line.split()[1])
                                 memory_mb = memory_kb / 1024
                                 break
 
                     # Get system memory from /proc/meminfo for percentage
-                    with open('/proc/meminfo', 'r') as f:
+                    with open("/proc/meminfo", "r") as f:
                         for line in f:
-                            if line.startswith('MemTotal:'):
+                            if line.startswith("MemTotal:"):
                                 total_kb = int(line.split()[1])
                                 if memory_kb > 0:
                                     memory_percent = (memory_kb / total_kb) * 100
@@ -143,7 +145,7 @@ class RuntimeProfiler:
                 cpu_percent=cpu_percent,
                 memory_mb=memory_mb,
                 memory_percent=memory_percent,
-                thread_count=thread_count
+                thread_count=thread_count,
             )
 
         except Exception as e:
@@ -161,7 +163,7 @@ class RuntimeProfiler:
                 avg_memory_mb=0.0,
                 max_memory_mb=0.0,
                 peak_thread_count=0,
-                snapshots=list(self.snapshots)
+                snapshots=list(self.snapshots),
             )
 
         duration = time.time() - self.start_time
@@ -175,7 +177,7 @@ class RuntimeProfiler:
                 avg_memory_mb=0.0,
                 max_memory_mb=0.0,
                 peak_thread_count=0,
-                snapshots=[]
+                snapshots=[],
             )
 
         # Calculate aggregates
@@ -197,7 +199,7 @@ class RuntimeProfiler:
             avg_memory_mb=avg_memory,
             max_memory_mb=max_memory,
             peak_thread_count=peak_threads,
-            snapshots=list(self.snapshots)
+            snapshots=list(self.snapshots),
         )
 
     def get_real_time_metrics(self) -> Dict[str, Any]:
@@ -210,7 +212,7 @@ class RuntimeProfiler:
                     "memory_mb": snapshot.memory_mb,
                     "memory_percent": snapshot.memory_percent,
                     "thread_count": snapshot.thread_count,
-                    "timestamp": snapshot.timestamp
+                    "timestamp": snapshot.timestamp,
                 }
         except Exception as e:
             self.logger.error(f"Failed to get real-time metrics: {e}")
@@ -221,7 +223,7 @@ class RuntimeProfiler:
             "memory_percent": 0.0,
             "thread_count": 0,
             "timestamp": time.time(),
-            "error": "Failed to collect metrics"
+            "error": "Failed to collect metrics",
         }
 
     def export_profile(self, output_path: str, format: str = "json"):
@@ -229,7 +231,7 @@ class RuntimeProfiler:
         profile = self.get_current_profile()
 
         if format.lower() == "json":
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(asdict(profile), f, indent=2, default=str)
         else:
             raise ValueError(f"Unsupported format: {format}")
@@ -247,16 +249,12 @@ class RuntimeProfiler:
             "average_memory_mb": round(profile.avg_memory_mb, 2),
             "peak_memory_mb": round(profile.max_memory_mb, 2),
             "peak_thread_count": profile.peak_thread_count,
-            "snapshot_count": len(profile.snapshots)
+            "snapshot_count": len(profile.snapshots),
         }
 
     def check_resource_limits(self, config_manager) -> Dict[str, Any]:
         """Check if current resource usage exceeds configured limits"""
-        violations = {
-            "exceeded": False,
-            "violations": [],
-            "warnings": []
-        }
+        violations = {"exceeded": False, "violations": [], "warnings": []}
 
         try:
             # Get current metrics
@@ -271,37 +269,44 @@ class RuntimeProfiler:
             # Check memory limit
             if memory_limit_mb and current_metrics["memory_mb"] > memory_limit_mb:
                 violations["exceeded"] = True
-                violations["violations"].append({
-                    "type": "memory",
-                    "current": current_metrics["memory_mb"],
-                    "limit": memory_limit_mb,
-                    "unit": "MB"
-                })
+                violations["violations"].append(
+                    {
+                        "type": "memory",
+                        "current": current_metrics["memory_mb"],
+                        "limit": memory_limit_mb,
+                        "unit": "MB",
+                    }
+                )
 
             # Check CPU limit (approximate)
-            if (cpu_limit_cores and
-                    current_metrics["cpu_percent"] > (cpu_limit_cores * 100)):
+            if cpu_limit_cores and current_metrics["cpu_percent"] > (
+                cpu_limit_cores * 100
+            ):
                 violations["exceeded"] = True
-                violations["violations"].append({
-                    "type": "cpu",
-                    "current": current_metrics["cpu_percent"],
-                    "limit": cpu_limit_cores * 100,
-                    "unit": "%"
-                })
+                violations["violations"].append(
+                    {
+                        "type": "cpu",
+                        "current": current_metrics["cpu_percent"],
+                        "limit": cpu_limit_cores * 100,
+                        "unit": "%",
+                    }
+                )
 
             # Issue warnings for approaching limits
             warning_threshold = 0.8  # 80% of limit
 
-            if (memory_limit_mb and
-                    current_metrics["memory_mb"] >
-                    (memory_limit_mb * warning_threshold)):
-                violations["warnings"].append({
-                    "type": "memory",
-                    "current": current_metrics["memory_mb"],
-                    "threshold": memory_limit_mb * warning_threshold,
-                    "limit": memory_limit_mb,
-                    "unit": "MB"
-                })
+            if memory_limit_mb and current_metrics["memory_mb"] > (
+                memory_limit_mb * warning_threshold
+            ):
+                violations["warnings"].append(
+                    {
+                        "type": "memory",
+                        "current": current_metrics["memory_mb"],
+                        "threshold": memory_limit_mb * warning_threshold,
+                        "limit": memory_limit_mb,
+                        "unit": "MB",
+                    }
+                )
 
         except Exception as e:
             self.logger.error(f"Failed to check resource limits: {e}")
@@ -312,12 +317,10 @@ class RuntimeProfiler:
         """Get overall system health metrics"""
         try:
             # Basic system health from what we can easily get
-            health = {
-                "timestamp": time.time()
-            }
+            health = {"timestamp": time.time()}
 
             # Load average (Linux/Unix)
-            if os.name == 'posix':
+            if os.name == "posix":
                 try:
                     load_avg = os.getloadavg()
                     health["load_average_1m"] = load_avg[0]
@@ -331,28 +334,26 @@ class RuntimeProfiler:
                     pass
 
             # Basic memory info (Linux)
-            if os.path.exists('/proc/meminfo'):
+            if os.path.exists("/proc/meminfo"):
                 try:
-                    with open('/proc/meminfo', 'r') as f:
+                    with open("/proc/meminfo", "r") as f:
                         meminfo = f.read()
-                        for line in meminfo.split('\n'):
-                            if line.startswith('MemTotal:'):
+                        for line in meminfo.split("\n"):
+                            if line.startswith("MemTotal:"):
                                 total_kb = int(line.split()[1])
                                 health["system_memory_total_mb"] = total_kb / 1024
-                            elif line.startswith('MemAvailable:'):
+                            elif line.startswith("MemAvailable:"):
                                 available_kb = int(line.split()[1])
                                 health["system_memory_available_mb"] = (
                                     available_kb / 1024
                                 )
-                                if 'system_memory_total_mb' in health:
-                                    used_mb = (
-                                        health["system_memory_total_mb"] -
-                                        (available_kb / 1024)
+                                if "system_memory_total_mb" in health:
+                                    used_mb = health["system_memory_total_mb"] - (
+                                        available_kb / 1024
                                     )
                                     health["system_memory_used_percent"] = (
-                                        (used_mb /
-                                         health["system_memory_total_mb"]) * 100
-                                    )
+                                        used_mb / health["system_memory_total_mb"]
+                                    ) * 100
                 except (FileNotFoundError, ValueError):
                     pass
 
@@ -360,10 +361,7 @@ class RuntimeProfiler:
 
         except Exception as e:
             self.logger.error(f"Failed to get system health metrics: {e}")
-            return {
-                "error": str(e),
-                "timestamp": time.time()
-            }
+            return {"error": str(e), "timestamp": time.time()}
 
 
 # Global runtime profiler instance

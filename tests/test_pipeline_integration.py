@@ -49,6 +49,7 @@ class TestPipelineIntegration(unittest.TestCase):
         """Clean up test environment"""
         os.chdir(self.original_cwd)
         import shutil
+
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def copy_project_files(self):
@@ -70,7 +71,7 @@ class TestPipelineIntegration(unittest.TestCase):
                 shutil.copy2(src_file, self.test_dir / "src" / src_file.name)
 
         # Create basic pyproject.toml
-        pyproject_content = '''
+        pyproject_content = """
 [project]
 name = "test-project"
 version = "1.0.0"
@@ -79,7 +80,7 @@ description = "Test project for pipeline integration"
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-'''
+"""
         (self.test_dir / "pyproject.toml").write_text(pyproject_content.strip())
 
     def test_version_keeper_json_output(self):
@@ -92,9 +93,12 @@ build-backend = "setuptools.build_meta"
         if not script_path.exists():
             self.skipTest("simple_version_keeper.py not found")
 
-        result = subprocess.run([
-            sys.executable, str(script_path)
-        ], capture_output=True, text=True, cwd=self.test_dir)
+        result = subprocess.run(
+            [sys.executable, str(script_path)],
+            capture_output=True,
+            text=True,
+            cwd=self.test_dir,
+        )
 
         self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
 
@@ -103,29 +107,41 @@ build-backend = "setuptools.build_meta"
         self.assertTrue(json_report_path.exists(), "JSON report file not created")
 
         # Load and validate JSON structure
-        with open(json_report_path, 'r') as f:
+        with open(json_report_path, "r") as f:
             report = json.load(f)
 
         # Validate required fields
         required_fields = [
-            "timestamp", "session_id", "version", "branch",
-            "summary", "details", "performance", "recommendations"
+            "timestamp",
+            "session_id",
+            "version",
+            "branch",
+            "summary",
+            "details",
+            "performance",
+            "recommendations",
         ]
 
         for field in required_fields:
             self.assertIn(
-                field, report, f"Required field '{field}' missing from JSON report")
+                field, report, f"Required field '{field}' missing from JSON report"
+            )
 
         # Validate summary structure
         summary = report["summary"]
         summary_fields = [
-            "total_issues", "fixes_applied", "remaining_issues", "success_rate"]
+            "total_issues",
+            "fixes_applied",
+            "remaining_issues",
+            "success_rate",
+        ]
         for field in summary_fields:
             self.assertIn(field, summary, f"Summary field '{field}' missing")
 
         print(
             f"  ✅ JSON report created with "
-            f"{report['summary']['total_issues']} test issues")
+            f"{report['summary']['total_issues']} test issues"
+        )
         print(f"  ✅ All required fields present: {', '.join(required_fields)}")
 
     def test_quality_patcher_json_output(self):
@@ -140,36 +156,50 @@ build-backend = "setuptools.build_meta"
         if not script_path.exists():
             self.skipTest("simple_quality_patcher.py not found")
 
-        result = subprocess.run([
-            sys.executable, str(script_path)
-        ], capture_output=True, text=True, cwd=self.test_dir)
+        result = subprocess.run(
+            [sys.executable, str(script_path)],
+            capture_output=True,
+            text=True,
+            cwd=self.test_dir,
+        )
 
         self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
 
         # Check that fixes JSON report was created
         fixes_report_path = self.test_dir / "test-output" / "test-fixes.json"
         self.assertTrue(
-            fixes_report_path.exists(), "Fixes JSON report file not created")
+            fixes_report_path.exists(), "Fixes JSON report file not created"
+        )
 
         # Load and validate JSON structure
-        with open(fixes_report_path, 'r') as f:
+        with open(fixes_report_path, "r") as f:
             report = json.load(f)
 
         # Validate required fields for fixes report
         required_fields = [
-            "timestamp", "session_id", "summary", "details",
-            "performance", "recommendations", "source_lint_report"
+            "timestamp",
+            "session_id",
+            "summary",
+            "details",
+            "performance",
+            "recommendations",
+            "source_lint_report",
         ]
 
         for field in required_fields:
             self.assertIn(
-                field, report, f"Required field '{field}' missing from fixes report")
+                field, report, f"Required field '{field}' missing from fixes report"
+            )
 
         # Validate summary structure
         summary = report["summary"]
         summary_fields = [
-            "total_issues", "fixes_applied", "fixes_failed",
-            "fixes_skipped", "remaining_issues", "success_rate"
+            "total_issues",
+            "fixes_applied",
+            "fixes_failed",
+            "fixes_skipped",
+            "remaining_issues",
+            "success_rate",
         ]
         for field in summary_fields:
             self.assertIn(field, summary, f"Summary field '{field}' missing")
@@ -177,13 +207,18 @@ build-backend = "setuptools.build_meta"
         # Validate performance metrics
         performance = report["performance"]
         perf_fields = [
-            "duration_seconds", "fixes_per_minute", "average_fix_time", "success_rate"]
+            "duration_seconds",
+            "fixes_per_minute",
+            "average_fix_time",
+            "success_rate",
+        ]
         for field in perf_fields:
             self.assertIn(field, performance, f"Performance field '{field}' missing")
 
         print(
             f"  ✅ Fixes report created with "
-            f"{report['summary']['fixes_applied']} fixes applied")
+            f"{report['summary']['fixes_applied']} fixes applied"
+        )
         print(f"  ✅ Success rate: {report['summary']['success_rate']}%")
         print("  ✅ All required fields present")
 
@@ -202,13 +237,16 @@ build-backend = "setuptools.build_meta"
         try:
             # Import server components
             spec = importlib.util.spec_from_file_location(
-                "pipeline_mcp_server", server_path)
+                "pipeline_mcp_server", server_path
+            )
             server_module = importlib.util.module_from_spec(spec)
 
             # Mock MCP dependencies for testing
-            with patch('mcp.server.models.InitializationOptions'), \
-                 patch('mcp.server.Server'), \
-                 patch('mcp.server.stdio.stdio_server'):
+            with (
+                patch("mcp.server.models.InitializationOptions"),
+                patch("mcp.server.Server"),
+                patch("mcp.server.stdio.stdio_server"),
+            ):
 
                 spec.loader.exec_module(server_module)
 
@@ -220,7 +258,8 @@ build-backend = "setuptools.build_meta"
                 session_id = server.create_session()
                 self.assertIsNotNone(session_id, "Session creation failed")
                 self.assertTrue(
-                    session_id.startswith("pipeline-"), "Invalid session ID format")
+                    session_id.startswith("pipeline-"), "Invalid session ID format"
+                )
 
                 # Test session retrieval
                 session = server.get_session(session_id)
@@ -239,8 +278,9 @@ build-backend = "setuptools.build_meta"
         """Test 4: GitHub Workflow Syntax - Valid YAML structure"""
         print("\n🧪 Test 4: GitHub Workflow Syntax")
 
-        workflow_path = project_root / ".github" / "workflows" / \
-            "pipeline-integration.yml"
+        workflow_path = (
+            project_root / ".github" / "workflows" / "pipeline-integration.yml"
+        )
         if not workflow_path.exists():
             self.skipTest("GitHub workflow file not found")
 
@@ -251,13 +291,15 @@ build-backend = "setuptools.build_meta"
             try:
                 subprocess.check_call(
                     [sys.executable, "-m", "pip", "install", "pyyaml"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 import yaml
             except Exception:
                 self.skipTest("PyYAML not available for workflow validation")
 
         # Load and validate YAML syntax
-        with open(workflow_path, 'r') as f:
+        with open(workflow_path, "r") as f:
             workflow_content = f.read()
 
         try:
@@ -273,8 +315,11 @@ build-backend = "setuptools.build_meta"
         # Validate jobs structure
         jobs = workflow["jobs"]
         required_jobs = [
-            "version-keeper-scan", "quality-patcher",
-            "version-keeper-validate", "github-integration", "cleanup"
+            "version-keeper-scan",
+            "quality-patcher",
+            "version-keeper-validate",
+            "github-integration",
+            "cleanup",
         ]
 
         for job in required_jobs:
@@ -283,12 +328,16 @@ build-backend = "setuptools.build_meta"
         # Check for fixed GitHub Actions versions (not snapshot paths)
         workflow_text = workflow_content
         self.assertNotIn(
-            "bin/snapshot", workflow_text, "Workflow still contains snapshot paths")
+            "bin/snapshot", workflow_text, "Workflow still contains snapshot paths"
+        )
         self.assertIn(
-            "actions/checkout@v4", workflow_text, "Missing updated checkout action")
+            "actions/checkout@v4", workflow_text, "Missing updated checkout action"
+        )
         self.assertIn(
-            "actions/setup-python@v5", workflow_text,
-            "Missing updated python setup action")
+            "actions/setup-python@v5",
+            workflow_text,
+            "Missing updated python setup action",
+        )
 
         print("  ✅ GitHub workflow YAML syntax is valid")
         print(f"  ✅ All {len(required_jobs)} required jobs present")
@@ -303,7 +352,7 @@ build-backend = "setuptools.build_meta"
         if not server_path.exists():
             self.skipTest("pipeline_mcp_server.py not found")
         # Read server source code for compliance checks
-        with open(server_path, 'r') as f:
+        with open(server_path, "r") as f:
             server_code = f.read()
         # Check for MCP v1.0 compliance indicators
         mcp_indicators = [
@@ -316,7 +365,7 @@ build-backend = "setuptools.build_meta"
             "@pipeline_server.server.list_tools()",
             "@pipeline_server.server.call_tool()",
             "inputSchema",
-            "async def handle_call_tool"
+            "async def handle_call_tool",
         ]
         compliance_score = 0
         total_checks = len(mcp_indicators)
@@ -328,8 +377,12 @@ build-backend = "setuptools.build_meta"
         compliance_percentage = (compliance_score / total_checks) * 100
         # Validate tool definitions structure
         tool_names = [
-            "version_keeper_scan", "quality_patcher_fix", "pipeline_run_full",
-            "github_workflow_trigger", "pipeline_status", "mcp_compliance_check"
+            "version_keeper_scan",
+            "quality_patcher_fix",
+            "pipeline_run_full",
+            "github_workflow_trigger",
+            "pipeline_status",
+            "mcp_compliance_check",
         ]
         tools_found = 0
         for tool_name in tool_names:
@@ -341,11 +394,13 @@ build-backend = "setuptools.build_meta"
         print("  ✅ Error handling with McpError implemented")
         # Minimum compliance threshold
         self.assertGreaterEqual(
-            compliance_percentage, 80,
-            f"MCP compliance too low: {compliance_percentage}%")
+            compliance_percentage,
+            80,
+            f"MCP compliance too low: {compliance_percentage}%",
+        )
         self.assertGreaterEqual(
-            tools_found, 5,
-            f"Not enough tools found: {tools_found}/6")
+            tools_found, 5, f"Not enough tools found: {tools_found}/6"
+        )
 
 
 def run_comprehensive_tests():
@@ -366,7 +421,7 @@ def run_comprehensive_tests():
     total_tests = result.testsRun
     failures = len(result.failures)
     errors = len(result.errors)
-    skipped = len(result.skipped) if hasattr(result, 'skipped') else 0
+    skipped = len(result.skipped) if hasattr(result, "skipped") else 0
     passed = total_tests - failures - errors - skipped
     print(f"✅ Passed: {passed}")
     print(f"❌ Failed: {failures}")
