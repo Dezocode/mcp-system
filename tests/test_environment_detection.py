@@ -13,13 +13,13 @@ import asyncio
 from pathlib import Path
 import json
 
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from config.environment_detector import EnvironmentDetector, EnvironmentInfo
 from config.config_manager import ConfigManager, AdaptiveConfig
 from config.platform_adapter import PlatformAdapter
 from config.runtime_profiler import RuntimeProfiler
-
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
 class TestEnvironmentDetection(unittest.TestCase):

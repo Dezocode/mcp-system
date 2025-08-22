@@ -127,7 +127,7 @@ jobs:
         mcp-init-project
 
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
@@ -215,7 +215,7 @@ jobs:
           --report-file=breaking-changes-report.json
 
     - name: Upload compatibility report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: compatibility-report
         path: breaking-changes-report.json
@@ -294,7 +294,7 @@ jobs:
         pytest tests/performance/ --benchmark-json=benchmark-results.json
 
     - name: Upload performance results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-results
         path: benchmark-results.json
@@ -338,7 +338,7 @@ jobs:
           --output-dir=dev-release/
 
     - name: Upload development package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: development-package
         path: |
