@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements and build wheels with all dependencies
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
 # Production stage
 FROM python:3.12-slim as production
@@ -45,7 +45,8 @@ WORKDIR /app
 # Copy wheels from builder stage and install
 COPY --from=builder /build/wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-cache-dir --no-index --find-links /wheels -r requirements.txt \
+# Install from wheels but allow fetching missing dependencies from PyPI
+RUN pip install --no-cache-dir --find-links /wheels -r requirements.txt \
     && rm -rf /wheels
 
 # Copy application code
