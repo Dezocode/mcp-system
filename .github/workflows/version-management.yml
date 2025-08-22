@@ -80,12 +80,13 @@ jobs:
             echo "version_type=${{ inputs.version_type }}" >> $GITHUB_OUTPUT
             
             # Calculate new version based on type
-            NEW_VERSION=$(python3 << 'EOF'
+            NEW_VERSION=$(CURRENT_VERSION="$CURRENT_VERSION" BUMP_TYPE="${{ inputs.version_type }}" python3 << 'EOF'
+        import os
         import sys
         from packaging.version import Version
         
-        current = Version("$CURRENT_VERSION")
-        bump_type = "${{ inputs.version_type }}"
+        current = Version(os.environ['CURRENT_VERSION'])
+        bump_type = os.environ['BUMP_TYPE']
         
         if bump_type == "major":
             new = Version(f"{current.major + 1}.0.0")
@@ -140,12 +141,13 @@ jobs:
           # Calculate new version if bump needed
           if [ "$(cat $GITHUB_OUTPUT | grep should_bump=true)" ]; then
             VERSION_TYPE=$(cat $GITHUB_OUTPUT | grep version_type | cut -d'=' -f2)
-            NEW_VERSION=$(python3 << 'EOF'
+            NEW_VERSION=$(CURRENT_VERSION="$CURRENT_VERSION" VERSION_TYPE="$VERSION_TYPE" python3 << 'EOF'
+        import os
         import sys
         from packaging.version import Version
         
-        current = Version("$CURRENT_VERSION")
-        bump_type = "$VERSION_TYPE"
+        current = Version(os.environ['CURRENT_VERSION'])
+        bump_type = os.environ['VERSION_TYPE']
         
         if bump_type == "major":
             new = Version(f"{current.major + 1}.0.0")
@@ -201,23 +203,26 @@ jobs:
         git checkout -b "$BRANCH_NAME"
         
         # Update pyproject.toml version (in-place, no local files added to user's workspace)
-        python3 << 'EOF'
+        NEW_VERSION="$NEW_VERSION" python3 << 'EOF'
         import toml
         import sys
+        import os
         
         try:
+            new_version = os.environ['NEW_VERSION']
+            
             # Load pyproject.toml
             with open('pyproject.toml', 'r') as f:
                 data = toml.load(f)
             
             # Update version
-            data['project']['version'] = '$NEW_VERSION'
+            data['project']['version'] = new_version
             
             # Save back to file
             with open('pyproject.toml', 'w') as f:
                 toml.dump(data, f)
             
-            print(f"✅ Updated pyproject.toml version to $NEW_VERSION")
+            print(f"✅ Updated pyproject.toml version to {new_version}")
         except Exception as e:
             print(f"❌ Failed to update pyproject.toml: {e}")
             sys.exit(1)
