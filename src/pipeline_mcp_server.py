@@ -21,7 +21,6 @@ import json
 import sys
 import time
 import uuid
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
@@ -31,21 +30,24 @@ import logging
 from src.mcp_local_types import ErrorCode
 
 # Environment Detection System
-from src.config.environment_detector import EnvironmentDetector, environment_detector
-from src.config.config_manager import ConfigManager, config_manager
-from src.config.platform_adapter import PlatformAdapter, platform_adapter
-from src.config.runtime_profiler import RuntimeProfiler, runtime_profiler
+from src.config.environment_detector import environment_detector
+from src.config.config_manager import config_manager
+from src.config.platform_adapter import platform_adapter
+from src.config.runtime_profiler import runtime_profiler
 
-# Docker Integration System  
-from src.docker.health_check import DockerHealthCheck, docker_health_check
+# Docker Integration System
+from src.docker.health_check import docker_health_check
 
 # MCP Error compatibility layer
+
+
 class McpError(Exception):
     """MCP Error compatibility wrapper"""
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
         super().__init__(message)
+
 
 # MCP Protocol Imports (MCP v1.0)
 try:
@@ -54,12 +56,7 @@ try:
     from mcp.server.stdio import stdio_server
     from mcp.types import (
         Tool,
-        TextContent,
-        JSONRPCError,
-        ErrorData,
-        INVALID_PARAMS,
-        METHOD_NOT_FOUND,
-        INTERNAL_ERROR
+        TextContent
     )
 except ImportError as e:
     print(f"ERROR: MCP dependencies not installed: {e}", file=sys.stderr)
@@ -126,33 +123,38 @@ class PipelineSession:
 
 
 class PipelineMCPServer:
-    """Enhanced Pipeline Integration MCP Server with full v1.0 compliance and environment detection."""
+    """
+    Enhanced Pipeline Integration MCP Server with
+    full v1.0 compliance and environment detection.
+    """
 
     def __init__(self):
         self.server = Server("pipeline-mcp-server")
         self.sessions: Dict[str, PipelineSession] = {}
-        
+
         # Initialize environment detection and adaptive configuration
         self.environment_detector = environment_detector
         self.config_manager = config_manager
         self.platform_adapter = platform_adapter
         self.runtime_profiler = runtime_profiler
-        
+
         # Initialize Docker health check system
         self.docker_health_check = docker_health_check
         self.docker_health_check.config_manager = self.config_manager
-        
+
         # Detect environment and apply adaptive configuration
         self.environment_info = self.environment_detector.detect_environment()
         self.adaptive_config = self.config_manager.get_config()
-        self.platform_optimizations = self.platform_adapter.optimize_for_current_platform()
-        
+        self.platform_optimizations = (
+            self.platform_adapter.optimize_for_current_platform()
+        )
+
         # Apply adaptive configuration
         self._apply_adaptive_configuration()
-        
+
         # Start runtime profiling
         self.runtime_profiler.start_profiling()
-        
+
         # Server capabilities
         self.server_capabilities = {
             "experimental": {},
@@ -162,33 +164,45 @@ class PipelineMCPServer:
             "tools": {}
         }
 
-        logger.info(f"Environment detection initialized: {'Docker' if self.environment_info.is_docker else 'Local'}")
-        logger.info(f"Platform: {self.environment_info.platform} {self.environment_info.architecture}")
+        logger.info(
+            f"Environment detection initialized: "
+            f"{'Docker' if self.environment_info.is_docker else 'Local'}"
+        )
+        logger.info(
+            f"Platform: {self.environment_info.platform} "
+            f"{self.environment_info.architecture}"
+        )
         logger.info(f"Pipeline MCP Server initialized at {self.workspace_root}")
         logger.info(f"Session directory: {self.session_dir}")
-        
+
     def _apply_adaptive_configuration(self):
         """Apply adaptive configuration based on environment"""
         # Update workspace settings
         self.workspace_root = Path(self.adaptive_config.workspace_root)
         self.session_dir = Path(self.adaptive_config.session_dir)
         self.database_path = Path(self.adaptive_config.database_path)
-        
+
         # Update performance settings
         self.max_workers = self.adaptive_config.max_workers
         self.default_timeout = self.adaptive_config.timeout
-        
+
         # Update logging
-        logging.getLogger().setLevel(getattr(logging, self.adaptive_config.log_level.upper()))
-        
+        logging.getLogger().setLevel(
+            getattr(logging, self.adaptive_config.log_level.upper())
+        )
+
         # Update security settings
-        self.allowed_paths = self.adaptive_config.security_settings.get("allowed_paths", [str(Path.cwd())])
-        self.restricted_paths = self.adaptive_config.security_settings.get("restricted_paths", [])
-        
+        self.allowed_paths = self.adaptive_config.security_settings.get(
+            "allowed_paths", [str(Path.cwd())]
+        )
+        self.restricted_paths = self.adaptive_config.security_settings.get(
+            "restricted_paths", []
+        )
+
         # Ensure directories exist with proper permissions
         for directory in [self.session_dir, self.database_path.parent]:
             directory.mkdir(parents=True, exist_ok=True)
-            
+
         logger.info("Adaptive configuration applied successfully")
 
     def create_session(self) -> str:
@@ -447,7 +461,10 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["detect", "summary", "config", "validate", "reload", "profile", "optimize"],
+                        "enum": [
+                            "detect", "summary", "config", "validate",
+                            "reload", "profile", "optimize"
+                        ],
                         "description": "Action to perform",
                         "default": "detect"
                     },
@@ -491,7 +508,9 @@ async def handle_list_tools() -> List[Tool]:
                     },
                     "export_path": {
                         "type": "string",
-                        "description": "Path to export detailed health report (for export action)"
+                        "description": (
+                            "Path to export detailed health report (for export action)"
+                        )
                     },
                     "include_details": {
                         "type": "boolean",
@@ -598,8 +617,8 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     ]
 
     # Add format and output options
-    output_format = arguments.get("output_format", "json")
-    if output_format == "json":
+    # Always use JSON format
+    if True:
         cmd.extend(["--output-format", "json"])
 
         # Create output file path
@@ -636,7 +655,8 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     # Parse results
     result_data = {"stdout": stdout, "stderr": stderr}
 
-    if output_format == "json":
+    # Always use JSON format
+    if True:  # output_format == "json":
         output_file = pipeline_server.session_dir / session_id / "lint-report.json"
         if output_file.exists():
             with open(output_file, 'r') as f:
@@ -1078,16 +1098,16 @@ Passed Tests: {passed_checks}
 
 async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle environment detection requests"""
-    
+
     action = arguments.get("action", "detect")
-    output_format = arguments.get("output_format", "json")
+    # output_format = arguments.get("output_format", "json")  # Not used
     include_performance = arguments.get("include_performance", True)
     include_system_health = arguments.get("include_system_health", True)
-    
+
     if action == "detect":
         # Get comprehensive environment information
         env_info = pipeline_server.environment_detector.detect_environment()
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1097,11 +1117,11 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2, default=str)
         )]
-        
+
     elif action == "summary":
         # Get environment summary
         summary = pipeline_server.environment_detector.get_environment_summary()
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1111,11 +1131,11 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2)
         )]
-        
+
     elif action == "config":
         # Get current configuration
         config_summary = pipeline_server.config_manager.get_config_summary()
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1125,11 +1145,11 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2)
         )]
-        
+
     elif action == "validate":
         # Validate current configuration
         validation_results = pipeline_server.config_manager.validate_configuration()
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1139,13 +1159,13 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2)
         )]
-        
+
     elif action == "reload":
         # Reload configuration
         try:
             pipeline_server.config_manager.reload_configuration()
             pipeline_server._apply_adaptive_configuration()
-            
+
             return [TextContent(
                 type="text",
                 text=json.dumps({
@@ -1167,23 +1187,25 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                     "timestamp": time.time()
                 }, indent=2)
             )]
-            
+
     elif action == "profile":
         # Get runtime performance profile
         performance_data = {}
-        
+
         if include_performance:
             profile = pipeline_server.runtime_profiler.get_current_profile()
-            resource_summary = pipeline_server.runtime_profiler.get_resource_usage_summary()
+            resource_summary = (
+                pipeline_server.runtime_profiler.get_resource_usage_summary()
+            )
             performance_data.update({
                 "performance_profile": asdict(profile),
                 "resource_summary": resource_summary
             })
-            
+
         if include_system_health:
             system_health = pipeline_server.runtime_profiler.get_system_health()
             performance_data["system_health"] = system_health
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1193,11 +1215,11 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2, default=str)
         )]
-        
+
     elif action == "optimize":
         # Get platform optimizations
         optimizations = pipeline_server.platform_adapter.optimize_for_current_platform()
-        
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1207,27 +1229,29 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
                 "timestamp": time.time()
             }, indent=2)
         )]
-        
+
     else:
         raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown action: {action}")
 
 
 async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle health monitoring requests"""
-    
+
     action = arguments.get("action", "health_check")
-    output_format = arguments.get("output_format", "json")
+    # output_format = arguments.get("output_format", "json")  # Not used
     include_details = arguments.get("include_details", True)
     export_path = arguments.get("export_path")
-    
+
     if action == "health_check":
         # Perform basic health check
-        response = pipeline_server.docker_health_check.get_health_check_endpoint_response()
-        
+        response = (
+            pipeline_server.docker_health_check.get_health_check_endpoint_response()
+        )
+
         if not include_details and "issues" in response:
             # Remove detailed issue information for simple response
             response["issues"] = len(response["issues"])
-            
+
         return [TextContent(
             type="text",
             text=json.dumps({
@@ -1237,39 +1261,43 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
                 "timestamp": time.time()
             }, indent=2)
         )]
-        
+
     elif action == "comprehensive":
         # Perform comprehensive health check
-        result = pipeline_server.docker_health_check.perform_comprehensive_health_check()
-        
+        result = (
+            pipeline_server.docker_health_check.perform_comprehensive_health_check()
+        )
+
         response_data = {
             "tool": "health_monitoring",
             "action": "comprehensive",
             "health_result": asdict(result),
             "timestamp": time.time()
         }
-        
+
         if not include_details:
             # Remove detailed check information
             if "details" in response_data["health_result"]:
                 details_summary = {}
-                for component, data in response_data["health_result"]["details"].items():
+                for component, data in (
+                    response_data["health_result"]["details"].items()
+                ):
                     details_summary[component] = data.get("status", "unknown")
                 response_data["health_result"]["details"] = details_summary
-                
+
         return [TextContent(
             type="text",
             text=json.dumps(response_data, indent=2, default=str)
         )]
-        
+
     elif action == "export":
         # Export detailed health report
         if not export_path:
             export_path = f"/tmp/health_report_{int(time.time())}.json"
-            
+
         try:
             pipeline_server.docker_health_check.export_health_report(export_path)
-            
+
             return [TextContent(
                 type="text",
                 text=json.dumps({
@@ -1281,7 +1309,7 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
                     "timestamp": time.time()
                 }, indent=2)
             )]
-            
+
         except Exception as e:
             return [TextContent(
                 type="text",
@@ -1293,9 +1321,12 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
                     "timestamp": time.time()
                 }, indent=2)
             )]
-            
+
     else:
-        raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown health monitoring action: {action}")
+        raise McpError(
+            ErrorCode.METHOD_NOT_FOUND,
+            f"Unknown health monitoring action: {action}"
+        )
 
 
 async def main():
