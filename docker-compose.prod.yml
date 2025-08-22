@@ -53,7 +53,7 @@ services:
       - pipeline_sessions:/home/mcpuser/.mcp-system/pipeline-sessions
       - pipeline_reports:/home/mcpuser/.mcp-system/reports
       - ./scripts/setup-database-url.sh:/usr/local/bin/setup-database-url.sh:ro
-    entrypoint: ["/usr/local/bin/setup-database-url.sh"]
+    # Removed setup-database-url.sh volume and entrypoint override
     command: ["mcp-universal", "serve"]
     depends_on:
       - postgres
