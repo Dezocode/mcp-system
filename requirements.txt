@@ -1,11 +1,9 @@
 # MCP System Requirements
 # Core Python dependencies for MCP System
 
-# FastMCP for Python MCP servers
-fastmcp>=0.1.0
-
-# MCP SDK for TypeScript compatibility  
+# MCP Official SDK - Anthropic Model Context Protocol v1.0
 mcp>=1.0.0
+fastmcp>=2.0.0
 
 # HTTP server capabilities
 uvicorn>=0.24.0
