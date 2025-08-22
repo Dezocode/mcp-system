@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # Official MCP imports
 import mcp.types
 from mcp import McpError
-from mcp.types import INVALID_PARAMS, METHOD_NOT_FOUND, INTERNAL_ERROR, TextContent
+from mcp.types import INVALID_PARAMS, METHOD_NOT_FOUND, INTERNAL_ERROR, TextContent, ErrorData
 
 from src.config.config_manager import config_manager
 
@@ -578,13 +578,13 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
         elif name == "mcp_compliance_check":
             return await handle_mcp_compliance_check(arguments)
         else:
-            raise McpError(METHOD_NOT_FOUND, f"Unknown tool: {name}")
+            raise McpError(ErrorData(code=METHOD_NOT_FOUND, message=f"Unknown tool: {name}"))
 
     except McpError:
         raise
     except Exception as e:
         logger.error(f"Tool {name} failed: {str(e)}")
-        raise McpError(INTERNAL_ERROR, f"Tool execution failed: {str(e)}")
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Tool execution failed: {str(e)}"))
 
 
 async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -597,7 +597,7 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
 
     session = pipeline_server.get_session(session_id)
     if not session:
-        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
+        raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Invalid session ID: {session_id}"))
 
     session.update_status("scanning", "version_keeper_scan")
 
@@ -681,11 +681,11 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
 
     session_id = arguments.get("session_id")
     if not session_id:
-        raise McpError(INVALID_PARAMS, "session_id is required")
+        raise McpError(ErrorData(code=INVALID_PARAMS, message="session_id is required"))
 
     session = pipeline_server.get_session(session_id)
     if not session:
-        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
+        raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Invalid session ID: {session_id}"))
 
     session.update_status("fixing", "quality_patcher_fix")
 
@@ -737,7 +737,7 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     if returncode != 0:
         session.update_status("failed", "quality_patcher_fix")
         session.error_count += 1
-        raise McpError(INTERNAL_ERROR, f"Quality Patcher failed: {stderr}")
+        raise McpError(ErrorData(code=INTERNAL_ERROR, message=f"Quality Patcher failed: {stderr}"))
 
     # Parse results
     result_data = {"stdout": stdout, "stderr": stderr}
@@ -972,7 +972,7 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
         # Get specific session
         session = pipeline_server.get_session(session_id)
         if not session:
-            raise McpError(INVALID_PARAMS, f"Session not found: {session_id}")
+            raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Session not found: {session_id}"))
 
         status_data = session.get_status_dict()
         if not include_artifacts:
@@ -1300,7 +1300,7 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
         ]
 
     else:
-        raise McpError(METHOD_NOT_FOUND, f"Unknown action: {action}")
+        raise McpError(ErrorData(code=METHOD_NOT_FOUND, message=f"Unknown action: {action}"))
 
 
 async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextContent]:
