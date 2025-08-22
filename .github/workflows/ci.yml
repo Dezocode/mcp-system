@@ -49,8 +49,11 @@ jobs:
           fi
         fi
         
+        # Install development dependencies separately for better control
+        pip install pytest pytest-asyncio black isort mypy bandit
+        
         if [ -f pyproject.toml ]; then 
-          pip install -e ".[dev]" || echo "Development dependencies installed with warnings"
+          pip install -e . || echo "Package installed with warnings"
         fi
 
     - name: Lint with black and isort
