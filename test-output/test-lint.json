@@ -1,0 +1,60 @@
+{
+  "timestamp": "2025-08-22T05:49:17.148638+00:00",
+  "session_id": "d2ca5776",
+  "version": "1.0.0",
+  "branch": "main",
+  "summary": {
+    "total_issues": 15,
+    "fixes_applied": 0,
+    "remaining_issues": 15,
+    "success_rate": 0.0
+  },
+  "details": {
+    "issues": [
+      {
+        "file": "src/example.py",
+        "line": 42,
+        "severity": "warning",
+        "code": "E302",
+        "message": "expected 2 blank lines, found 1",
+        "rule": "pep8"
+      },
+      {
+        "file": "src/main.py",
+        "line": 15,
+        "severity": "error",
+        "code": "F401",
+        "message": "unused import",
+        "rule": "pyflakes"
+      },
+      {
+        "file": "tests/test_example.py",
+        "line": 23,
+        "severity": "info",
+        "code": "I001",
+        "message": "import order suggestion",
+        "rule": "isort"
+      }
+    ],
+    "files_scanned": 25,
+    "rules_applied": [
+      "pep8",
+      "pyflakes",
+      "isort",
+      "mypy"
+    ],
+    "scan_duration": 2.34
+  },
+  "performance": {
+    "duration_seconds": 2.34,
+    "files_per_second": 10.68,
+    "issues_per_file": 0.6,
+    "memory_usage_mb": 45.2
+  },
+  "recommendations": [
+    "Fix PEP8 formatting issues",
+    "Remove unused imports",
+    "Organize import statements",
+    "Add type annotations where missing"
+  ]
+}

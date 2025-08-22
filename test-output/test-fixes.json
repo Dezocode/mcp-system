@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-08-22T05:49:17.177297+00:00",
+  "session_id": "17a70cd6",
+  "summary": {
+    "total_issues": 15,
+    "fixes_applied": 8,
+    "fixes_failed": 2,
+    "fixes_skipped": 5,
+    "remaining_issues": 7,
+    "success_rate": 0.53
+  },
+  "details": {
+    "applied_fixes": [
+      {
+        "file": "src/example.py",
+        "line": 42,
+        "issue": "E302",
+        "fix": "Added blank line",
+        "method": "automatic",
+        "confidence": 0.95
+      },
+      {
+        "file": "src/main.py",
+        "line": 15,
+        "issue": "F401",
+        "fix": "Removed unused import",
+        "method": "automatic",
+        "confidence": 0.98
+      },
+      {
+        "file": "tests/test_example.py",
+        "line": 23,
+        "issue": "I001",
+        "fix": "Reordered imports",
+        "method": "automatic",
+        "confidence": 0.9
+      }
+    ],
+    "failed_fixes": [
+      {
+        "file": "src/complex.py",
+        "line": 100,
+        "issue": "C901",
+        "reason": "Complex refactoring required",
+        "method": "manual_required"
+      }
+    ],
+    "skipped_fixes": [
+      {
+        "file": "src/legacy.py",
+        "line": 50,
+        "issue": "W292",
+        "reason": "Legacy code preservation",
+        "method": "policy_skip"
+      }
+    ]
+  },
+  "performance": {
+    "duration_seconds": 0.1,
+    "fixes_per_minute": 4796.5,
+    "average_fix_time": 0.013,
+    "success_rate": 0.53
+  },
+  "recommendations": [
+    "Review failed fixes for manual intervention",
+    "Consider automated formatting tools",
+    "Update coding standards documentation",
+    "Schedule comprehensive code review"
+  ],
+  "source_lint_report": "test-output/test-lint.json"
+}
