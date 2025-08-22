@@ -30,7 +30,13 @@ def test_directory_creation(temp_home):
     """Test that installer creates necessary directories"""
     from src.install_mcp_system import MCPSystemInstaller
 
+    # Create installer with temp_home as base
     installer = MCPSystemInstaller()
+    installer.home = temp_home  # Override home directory for testing
+    installer.install_dir = temp_home / ".mcp-system"
+    installer.bin_dir = temp_home / "bin"
+    installer.claude_dir = temp_home / ".claude"
+    
     installer.create_directories()
 
     # Check that directories were created
@@ -56,8 +62,8 @@ def test_claude_config_merging(temp_home):
     with open(claude_config, "w") as f:
         json.dump(existing_config, f)
 
-    # Test merging
-    bridge = ClaudeCodeMCPBridge()
+    # Test merging - pass the test config path to the bridge
+    bridge = ClaudeCodeMCPBridge(config_path=str(claude_config))
     new_config = bridge.create_safe_mcp_integration()
     success = bridge.merge_claude_config(new_config)
 

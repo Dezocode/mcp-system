@@ -298,8 +298,8 @@ build-backend = "setuptools.build_meta"
             except Exception:
                 self.skipTest("PyYAML not available for workflow validation")
 
-        # Load and validate YAML syntax
-        with open(workflow_path, "r") as f:
+        # Load and validate YAML syntax with proper encoding handling
+        with open(workflow_path, "r", encoding="utf-8", errors="replace") as f:
             workflow_content = f.read()
 
         try:
