@@ -7,7 +7,10 @@ services:
       dockerfile: Dockerfile.production
     restart: unless-stopped
     ports:
-      - "8050-8060:8050-8060"
+      - "8050:8050"  # Main MCP Server HTTP port
+      - "8051:8051"  # MCP WebSocket transport port
+      - "8052:8052"  # Pipeline MCP Server port
+      - "9000:9000"  # Health check and metrics port
     environment:
       - MCP_ENV=production
       - DATABASE_URL=postgresql://mcpuser:${DB_PASSWORD}@postgres:5432/mcpsystem
@@ -18,14 +21,32 @@ services:
       - MCP_DEBUG=false
       - MCP_LOG_LEVEL=warning
       - PROMETHEUS_ENABLED=true
+      # MCP Protocol specific settings
+      - MCP_SERVER_NAME=pipeline-mcp-server
+      - MCP_SERVER_VERSION=1.0.0
+      - MCP_PROTOCOL_VERSION=2024-11-05
+      - MCP_TRANSPORT_STDIO=true
+      - MCP_TRANSPORT_HTTP=true
+      - MCP_TRANSPORT_WEBSOCKET=true
+      - MCP_HTTP_PORT=8050
+      - MCP_WEBSOCKET_PORT=8051
+      - MCP_PIPELINE_PORT=8052
+      - MCP_HEALTH_PORT=9000
+      # Pipeline session configuration
+      - PIPELINE_SESSION_DIR=/home/mcpuser/.mcp-system/pipeline-sessions
+      - PIPELINE_REPORTS_DIR=/home/mcpuser/.mcp-system/reports
+      - PIPELINE_MAX_SESSIONS=50
+      - PIPELINE_SESSION_TIMEOUT=3600
     volumes:
       - mcp_data:/home/mcpuser/.mcp-system
       - mcp_logs:/var/log/mcp-system
+      - pipeline_sessions:/home/mcpuser/.mcp-system/pipeline-sessions
+      - pipeline_reports:/home/mcpuser/.mcp-system/reports
     depends_on:
       - postgres
       - redis
     healthcheck:
-      test: ["CMD", "mcp-universal", "status"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health", "||", "mcp-universal", "status"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -152,6 +173,11 @@ volumes:
   grafana_data:
     driver: local
   mcp_backups:
+    driver: local
+  # MCP-specific volumes for pipeline data
+  pipeline_sessions:
+    driver: local
+  pipeline_reports:
     driver: local
 
 networks:
