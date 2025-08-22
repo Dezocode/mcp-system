@@ -51,7 +51,7 @@ jobs:
         fi
         
         # Install development dependencies separately for better control
-        pip install pytest pytest-asyncio black isort mypy bandit
+        pip install pytest pytest-asyncio pytest-cov black isort mypy bandit
         
         if [ -f pyproject.toml ]; then 
           pip install -e . || echo "Package installed with warnings"
