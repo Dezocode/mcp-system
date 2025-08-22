@@ -1,4 +1,11 @@
-version: '3.8'
+# Docker secrets for sensitive data
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
 
 services:
   mcp-system:
@@ -7,14 +14,17 @@ services:
       dockerfile: Dockerfile.production
     restart: unless-stopped
     ports:
-      - "8050:8050"  # Main MCP Server HTTP port
-      - "8051:8051"  # MCP WebSocket transport port
-      - "8052:8052"  # Pipeline MCP Server port
-      - "9000:9000"  # Health check and metrics port
+      - "${MCP_HTTP_PORT:-8050}:${MCP_HTTP_PORT:-8050}"  # Main MCP Server HTTP port
+      - "${MCP_WEBSOCKET_PORT:-8051}:${MCP_WEBSOCKET_PORT:-8051}"  # MCP WebSocket transport port
+      - "${MCP_PIPELINE_PORT:-8052}:${MCP_PIPELINE_PORT:-8052}"  # Pipeline MCP Server port
+      - "${MCP_HEALTH_PORT:-9000}:${MCP_HEALTH_PORT:-9000}"  # Health check and metrics port
     environment:
       - MCP_ENV=production
-      - DATABASE_URL=postgresql://mcpuser:${DB_PASSWORD}@postgres:5432/mcpsystem
-      - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-mcpuser}
+      - POSTGRES_DB=${POSTGRES_DB:-mcpsystem}
+      - REDIS_URL=redis://redis:${REDIS_PORT:-6379}/0
       - MCP_SYSTEM_PATH=/home/mcpuser/.mcp-system
       - MCP_AUTO_DISCOVERY=true
       - MCP_SAFE_MODE=true
@@ -28,46 +38,54 @@ services:
       - MCP_TRANSPORT_STDIO=true
       - MCP_TRANSPORT_HTTP=true
       - MCP_TRANSPORT_WEBSOCKET=true
-      - MCP_HTTP_PORT=8050
-      - MCP_WEBSOCKET_PORT=8051
-      - MCP_PIPELINE_PORT=8052
-      - MCP_HEALTH_PORT=9000
+      - MCP_HTTP_PORT=${MCP_HTTP_PORT:-8050}
+      - MCP_WEBSOCKET_PORT=${MCP_WEBSOCKET_PORT:-8051}
+      - MCP_PIPELINE_PORT=${MCP_PIPELINE_PORT:-8052}
+      - MCP_HEALTH_PORT=${MCP_HEALTH_PORT:-9000}
       # Pipeline session configuration
       - PIPELINE_SESSION_DIR=/home/mcpuser/.mcp-system/pipeline-sessions
       - PIPELINE_REPORTS_DIR=/home/mcpuser/.mcp-system/reports
-      - PIPELINE_MAX_SESSIONS=50
-      - PIPELINE_SESSION_TIMEOUT=3600
+      - PIPELINE_MAX_SESSIONS=${PIPELINE_MAX_SESSIONS:-50}
+      - PIPELINE_SESSION_TIMEOUT=${PIPELINE_SESSION_TIMEOUT:-3600}
     volumes:
       - mcp_data:/home/mcpuser/.mcp-system
       - mcp_logs:/var/log/mcp-system
       - pipeline_sessions:/home/mcpuser/.mcp-system/pipeline-sessions
       - pipeline_reports:/home/mcpuser/.mcp-system/reports
+      - ./scripts/setup-database-url.sh:/usr/local/bin/setup-database-url.sh:ro
+    # Removed setup-database-url.sh volume and entrypoint override
+    command: ["mcp-universal", "serve"]
     depends_on:
       - postgres
       - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health", "||", "mcp-universal", "status"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MCP_HEALTH_PORT:-9000}/health", "||", "mcp-universal", "status"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    secrets:
+      - db_password
+      - jwt_secret
 
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=mcpsystem
-      - POSTGRES_USER=mcpuser
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-mcpsystem}
+      - POSTGRES_USER=${POSTGRES_USER:-mcpuser}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mcpuser"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mcpuser}"]
       interval: 30s
       timeout: 10s
       retries: 3
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
+    secrets:
+      - db_password
 
   redis:
     image: redis:7-alpine
@@ -79,16 +97,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-512mb} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
 
   nginx:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/ssl/certs:ro
@@ -105,7 +123,7 @@ services:
     image: prom/prometheus:latest
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -114,7 +132,7 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
       - '--web.enable-lifecycle'
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
@@ -126,10 +144,10 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_INSTALL_PLUGINS=${GRAFANA_PLUGINS:-grafana-clock-panel,grafana-simple-json-datasource}
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -139,14 +157,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    secrets:
+      - grafana_password
 
   backup:
     image: postgres:15-alpine
     restart: "no"
     environment:
-      - POSTGRES_DB=mcpsystem
-      - POSTGRES_USER=mcpuser  
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-mcpsystem}
+      - POSTGRES_USER=${POSTGRES_USER:-mcpuser}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - mcp_backups:/backups
@@ -156,6 +176,8 @@ services:
       - postgres
     profiles:
       - backup
+    secrets:
+      - db_password
 
 volumes:
   mcp_data:

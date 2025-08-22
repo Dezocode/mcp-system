@@ -125,6 +125,65 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 ## 🛡️ Security Best Practices
 
+### Docker Secrets for Sensitive Data
+
+**⚠️ Important**: Use Docker secrets instead of environment variables for sensitive data in production.
+
+#### Quick Setup
+
+```bash
+# Automated setup (recommended)
+./scripts/setup-secrets.sh
+
+# Or manual setup:
+mkdir -p ./secrets
+echo "your_secure_database_password" > ./secrets/db_password.txt
+echo "your_secure_grafana_password" > ./secrets/grafana_password.txt
+openssl rand -base64 32 > ./secrets/jwt_secret.txt
+chmod 600 ./secrets/*.txt
+```
+
+#### Why Docker Secrets?
+- ✅ **Not in environment variables** - Invisible to `docker inspect`
+- ✅ **Not in Docker images** - Never committed to layers
+- ✅ **Encrypted storage** - Protected in Docker's secret store
+- ✅ **Secure mounting** - Available at `/run/secrets/` only
+- ✅ **Process isolation** - Only accessible to authorized containers
+
+#### Migration from Environment Variables
+
+```yaml
+# ❌ Old way (insecure)
+environment:
+  - DATABASE_URL=postgresql://user:password@postgres:5432/db
+
+# ✅ New way (secure)
+secrets:
+  - db_password
+environment:
+  - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+```
+
+### Port Configuration
+
+All ports are now configurable through environment variables:
+
+```bash
+# MCP System Ports
+MCP_HTTP_PORT=8050          # Main HTTP API
+MCP_WEBSOCKET_PORT=8051     # WebSocket transport  
+MCP_PIPELINE_PORT=8052      # Pipeline MCP server
+MCP_HEALTH_PORT=9000        # Health checks
+
+# Infrastructure Ports
+POSTGRES_PORT=5432          # Database
+REDIS_PORT=6379             # Cache
+NGINX_HTTP_PORT=80          # Web proxy
+NGINX_HTTPS_PORT=443        # Secure web proxy
+PROMETHEUS_PORT=9090        # Metrics
+GRAFANA_PORT=3000           # Monitoring dashboard
+```
+
 ### Network Security
 - All services run in isolated Docker network
 - Only necessary ports exposed
@@ -348,17 +407,29 @@ RESTful API available at:
 
 ### Essential Commands
 ```bash
+# Setup secrets (first time)
+./deploy.sh setup-secrets
+
 # Start production stack
 ./deploy.sh
 
+# Validate all connections
+./deploy.sh validate
+
+# View service status
+./deploy.sh status
+
 # View logs
-docker-compose -f docker-compose.prod.yml logs -f
+./deploy.sh logs [service-name]
+
+# Create backup
+./deploy.sh backup
+
+# Stop services
+./deploy.sh stop
 
 # Scale services
 docker-compose -f docker-compose.prod.yml up -d --scale mcp-system=3
-
-# Backup data
-docker-compose -f docker-compose.prod.yml run --rm backup
 
 # Update services
 docker-compose -f docker-compose.prod.yml pull && \
