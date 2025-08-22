@@ -70,7 +70,11 @@ check_http_endpoint() {
     
     if command -v curl &> /dev/null; then
         local status_code
-        status_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$timeout" --insecure "$url" 2>/dev/null || echo "000")
+        local curl_opts=(-s -o /dev/null -w "%{http_code}" --max-time "$timeout")
+        if [ "$ALLOW_INSECURE_SSL" = "true" ]; then
+            curl_opts+=(--insecure)
+        fi
+        status_code=$(curl "${curl_opts[@]}" "$url" 2>/dev/null || echo "000")
         
         if [ "$status_code" = "$expected_status" ] || ([ "$expected_status" = "2xx" ] && [[ "$status_code" =~ ^2[0-9][0-9]$ ]]); then
             log_info "✅ $service_name HTTP ($url) - Status: $status_code"
