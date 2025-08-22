@@ -91,8 +91,12 @@ check_service_health() {
     
     log_debug "Checking Docker service health: $service_name"
     
-    local health_status
-    health_status=$(docker-compose -f "$COMPOSE_FILE" ps --format json "$service_name" 2>/dev/null | jq -r '.Health // "unknown"' 2>/dev/null || echo "unknown")
+    local health_status="unknown"
+    if command -v docker-compose &> /dev/null; then
+        health_status=$(docker-compose -f "$COMPOSE_FILE" ps --format json "$service_name" 2>/dev/null | jq -r '.Health // "unknown"' 2>/dev/null || echo "unknown")
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        health_status=$(docker compose -f "$COMPOSE_FILE" ps --format json "$service_name" 2>/dev/null | jq -r '.Health // "unknown"' 2>/dev/null || echo "unknown")
+    fi
     
     case "$health_status" in
         "healthy"|"")
@@ -285,7 +289,13 @@ generate_report() {
     echo ""
     
     echo "🐳 DOCKER SERVICES:"
-    docker-compose -f "$COMPOSE_FILE" ps --format table
+    if command -v docker-compose &> /dev/null; then
+        docker-compose -f "$COMPOSE_FILE" ps --format table
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        docker compose -f "$COMPOSE_FILE" ps --format table
+    else
+        echo "  Docker Compose not available for service status"
+    fi
     echo ""
     
     echo "🔗 SERVICE URLS:"
