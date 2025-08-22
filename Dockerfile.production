@@ -55,8 +55,10 @@ COPY scripts/ ./scripts/
 COPY bin/ ./bin/
 COPY pyproject.toml .
 
-# Install the package
-RUN pip install --no-cache-dir -e .
+# Install the package with updated build system
+RUN pip install --upgrade pip && \
+    pip install --upgrade "hatchling>=1.18.0" && \
+    pip install --no-cache-dir -e .
 
 # Set ownership and switch to non-root user
 RUN chown -R mcpuser:mcpuser /app

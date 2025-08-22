@@ -24,8 +24,10 @@ COPY scripts/ ./scripts/
 COPY bin/ ./bin/
 COPY pyproject.toml .
 
-# Install the package
-RUN pip install -e .
+# Install the package with updated build system
+RUN pip install --upgrade pip && \
+    pip install --upgrade "hatchling>=1.18.0" && \
+    pip install -e .
 
 # Create non-root user
 RUN useradd -m -u 1000 mcpuser && \
