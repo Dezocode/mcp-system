@@ -17,7 +17,7 @@ if [ -f /run/secrets/db_password ]; then
     DB_PASSWORD=$(cat /run/secrets/db_password)
 elif [ -n "$DB_PASSWORD" ]; then
     # Fallback to environment variable for compatibility
-    echo "Warning: Using environment variable for database password. Consider using Docker secrets."
+    echo "Warning: Fallback authentication method in use."
 else
     echo "Error: No database password found in secrets or environment"
     exit 1
