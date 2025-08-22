@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js for TypeScript templates
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+RUN apt-get update && apt-get install -y nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -21,8 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 COPY scripts/ ./scripts/
-COPY templates/ ./templates/
-COPY install.sh .
+COPY bin/ ./bin/
 COPY pyproject.toml .
 
 # Install the package
@@ -44,7 +43,7 @@ ENV MCP_AUTO_DISCOVERY=true
 ENV MCP_SAFE_MODE=true
 
 # Install MCP system
-RUN ./install.sh
+RUN chmod +x bin/install.sh && ./bin/install.sh
 
 # Default command
 CMD ["mcp-universal", "--help"]

@@ -36,6 +36,7 @@ env:
 jobs:
   detect-version-bump:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       should_bump: ${{ steps.check.outputs.should_bump }}
       version_type: ${{ steps.check.outputs.version_type }}
@@ -56,6 +57,7 @@ jobs:
 
     - name: Install version management tools
       run: |
+        python -m pip install --upgrade pip
         pip install packaging toml
 
     - name: Detect version bump requirements
@@ -167,6 +169,7 @@ jobs:
 
   create-version-branch:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: detect-version-bump
     if: needs.detect-version-bump.outputs.should_bump == 'true'
     outputs:
@@ -243,6 +246,7 @@ jobs:
 
   create-tag-and-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [detect-version-bump, create-version-branch]
     if: needs.detect-version-bump.outputs.should_bump == 'true'
     
@@ -338,6 +342,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [detect-version-bump, create-version-branch, create-tag-and-release]
     if: always() && needs.detect-version-bump.outputs.should_bump == 'true'
     
