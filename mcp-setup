@@ -1,0 +1,2435 @@
+#!/usr/bin/env bash
+#
+# MCP Setup - Universal Cross-Platform CLI Tool
+# Handles installation, uninstallation, and management of MCP system
+# Supports Linux, Windows (WSL/Native), macOS, and Docker environments
+#
+
+# Strict error handling
+set -euo pipefail
+IFS=$'\n\t'
+
+# Version and metadata
+readonly VERSION="1.0.0"
+readonly SCRIPT_NAME="$(basename "$0")"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Default debug mode ON - helps users fix issues immediately
+DEBUG_MODE=${DEBUG_MODE:-true}
+VERBOSE=${VERBOSE:-true}
+
+# Debugging and troubleshooting system
+debug_print() {
+    [[ "$DEBUG_MODE" == "true" ]] && echo "[DEBUG] $*" >&2
+}
+
+debug_trace() {
+    [[ "$DEBUG_MODE" == "true" ]] && echo "[TRACE] $*" >&2
+}
+
+show_fix_instructions() {
+    local error_type="$1"
+    local error_details="${2:-}"
+    
+    echo "🔧 AUTO-FIX INSTRUCTIONS:" >&2
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    
+    case "$error_type" in
+        "analyze_failed")
+            echo "❌ Function analysis failed" >&2
+            echo "💡 Quick fixes to try:" >&2
+            echo "   1. Run: python3 analyze_functions.py" >&2
+            echo "   2. Check Python dependencies: pip3 install --user ast" >&2
+            echo "   3. Run version keeper: python3 scripts/version_keeper.py --claude-lint" >&2
+            echo "   4. Or run integrated fix: ./mcp-setup doctor --fix-all" >&2
+            ;;
+        "missing_file")
+            echo "❌ Missing file: $error_details" >&2
+            echo "💡 Quick fixes:" >&2
+            echo "   1. Run: ./mcp-setup install --check-only" >&2
+            echo "   2. Restore from backup: ./mcp-setup repair --fix-all" >&2
+            echo "   3. Reinstall: ./mcp-setup uninstall && ./mcp-setup install" >&2
+            ;;
+        "permission_error")
+            echo "❌ Permission denied: $error_details" >&2
+            echo "💡 Quick fixes:" >&2
+            echo "   1. Fix permissions: ./mcp-setup repair --fix-permissions" >&2
+            echo "   2. Or manual: chmod +x '$error_details'" >&2
+            ;;
+        "argument_parsing")
+            echo "❌ Argument parsing failed" >&2
+            echo "💡 Usage examples:" >&2
+            echo "   ./mcp-setup analyze" >&2
+            echo "   ./mcp-setup --verbose analyze" >&2
+            echo "   ./mcp-setup analyze --output custom.md" >&2
+            ;;
+        *)
+            echo "❌ Unknown error: $error_type" >&2
+            echo "💡 General troubleshooting:" >&2
+            echo "   1. Run diagnostics: ./mcp-setup doctor" >&2
+            echo "   2. Check logs: ./mcp-setup status --detailed" >&2
+            echo "   3. Reset: ./mcp-setup repair --fix-all" >&2
+            ;;
+    esac
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+    echo "🤖 For auto-fixes, add --fix-issues to any command" >&2
+}
+
+# Exit codes following POSIX conventions
+readonly EXIT_SUCCESS=0
+readonly EXIT_GENERAL_ERROR=1
+readonly EXIT_INVALID_ARGS=2
+readonly EXIT_PREREQUISITES_FAILED=3
+readonly EXIT_INSTALL_FAILED=4
+readonly EXIT_UNINSTALL_FAILED=5
+readonly EXIT_NOT_FOUND=6
+readonly EXIT_PERMISSION_DENIED=7
+readonly EXIT_NETWORK_ERROR=8
+readonly EXIT_CONFIG_ERROR=9
+
+# Colors for output (disabled if not TTY or NO_COLOR is set)
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]]; then
+    readonly GREEN='\033[0;32m'
+    readonly YELLOW='\033[1;33m'
+    readonly RED='\033[0;31m'
+    readonly BLUE='\033[0;34m'
+    readonly CYAN='\033[0;36m'
+    readonly BOLD='\033[1m'
+    readonly DIM='\033[2m'
+    readonly NC='\033[0m'
+else
+    readonly GREEN='' YELLOW='' RED='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
+fi
+
+# Logging functions with proper stderr handling
+log_info() { 
+    [[ "${QUIET:-false}" != "true" ]] && echo -e "${GREEN}[INFO]${NC} $1" >&2
+}
+log_warn() { 
+    echo -e "${YELLOW}[WARN]${NC} $1" >&2
+}
+log_error() { 
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+log_debug() { 
+    [[ "${VERBOSE:-false}" == "true" ]] && echo -e "${BLUE}[DEBUG]${NC} $1" >&2
+}
+log_header() { 
+    [[ "${QUIET:-false}" != "true" ]] && echo -e "${CYAN}${BOLD}$1${NC}" >&2
+}
+log_success() { 
+    [[ "${QUIET:-false}" != "true" ]] && echo -e "${GREEN}[SUCCESS]${NC} $1" >&2
+}
+
+# Global options with defaults
+DRY_RUN="${MCP_SETUP_DRY_RUN:-false}"
+VERBOSE="${MCP_SETUP_VERBOSE:-false}"
+FORCE="${MCP_SETUP_FORCE:-false}"
+KEEP_DATA="${MCP_SETUP_KEEP_DATA:-false}"
+QUIET="${MCP_SETUP_QUIET:-false}"
+NO_INPUT="${MCP_SETUP_NO_INPUT:-false}"
+CONFIG_FILE="${MCP_SETUP_CONFIG:-}"
+
+# Trap for cleanup on exit
+cleanup() {
+    local exit_code=$?
+    if [[ $exit_code -ne 0 ]]; then
+        log_debug "Script exited with code $exit_code"
+    fi
+    return $exit_code
+}
+trap cleanup EXIT
+
+# Signal handlers
+handle_interrupt() {
+    log_warn "Operation interrupted by user"
+    exit 130
+}
+trap handle_interrupt INT TERM
+
+# Robust timestamping functions
+get_timestamp() {
+    local format="${1:-iso}"
+    case "$format" in
+        iso|default)
+            date -Iseconds 2>/dev/null || date "+%Y-%m-%dT%H:%M:%S%z"
+            ;;
+        utc)
+            date -u -Iseconds 2>/dev/null || date -u "+%Y-%m-%dT%H:%M:%SZ"
+            ;;
+        epoch)
+            date +%s
+            ;;
+        human)
+            date "+%Y-%m-%d %H:%M:%S %Z"
+            ;;
+        filename)
+            date "+%Y%m%d_%H%M%S"
+            ;;
+        *)
+            date "+$format"
+            ;;
+    esac
+}
+
+# Enhanced logging with timestamps
+log_with_timestamp() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(get_timestamp human)
+    
+    case "$level" in
+        info)
+            [[ "${QUIET:-false}" != "true" ]] && echo -e "${GREEN}[INFO ${timestamp}]${NC} $message" >&2
+            ;;
+        warn)
+            echo -e "${YELLOW}[WARN ${timestamp}]${NC} $message" >&2
+            ;;
+        error)
+            echo -e "${RED}[ERROR ${timestamp}]${NC} $message" >&2
+            ;;
+        debug)
+            [[ "${VERBOSE:-false}" == "true" ]] && echo -e "${BLUE}[DEBUG ${timestamp}]${NC} $message" >&2
+            ;;
+        success)
+            [[ "${QUIET:-false}" != "true" ]] && echo -e "${GREEN}[SUCCESS ${timestamp}]${NC} $message" >&2
+            ;;
+    esac
+}
+
+# Display version information
+show_version() {
+    cat << EOF
+${SCRIPT_NAME} version ${VERSION}
+
+MCP System Universal Setup Tool
+Cross-platform installer, uninstaller, and manager for the MCP system.
+
+Copyright (c) 2025 DezoCode
+This software is distributed under the MIT License.
+EOF
+}
+
+# Display comprehensive help
+show_help() {
+    cat << EOF
+${BOLD}MCP Setup - Universal Cross-Platform CLI Tool${NC}
+
+${BOLD}USAGE:${NC}
+    ${SCRIPT_NAME} [GLOBAL OPTIONS] <COMMAND> [COMMAND OPTIONS]
+
+${BOLD}GLOBAL OPTIONS:${NC}
+    -h, --help          Show this help message
+    -V, --version       Show version information
+    -v, --verbose       Enable verbose output
+    -q, --quiet         Suppress non-essential output
+    --dry-run           Show what would be done without executing
+    --force             Skip confirmation prompts (use with caution)
+
+${BOLD}COMMANDS:${NC}
+
+  ${CYAN}${BOLD}install [OPTIONS]${NC}
+    Install the MCP system with cross-platform compatibility.
+    
+    Options:
+      --check-only        Only check prerequisites, don't install
+      --skip-deps         Skip dependency installation
+      --skip-templates    Skip template creation
+      --no-env            Don't modify shell environment
+      --user              Install in user directory (default)
+      --system            Install system-wide (requires sudo)
+    
+    Examples:
+      ${SCRIPT_NAME} install                    # Full installation
+      ${SCRIPT_NAME} install --check-only      # Check prerequisites only
+      ${SCRIPT_NAME} install --dry-run         # See what would be installed
+
+  ${CYAN}${BOLD}uninstall [OPTIONS]${NC}
+    Remove the MCP system cleanly without leaving traces.
+    
+    Options:
+      --keep-data         Preserve data directories and backups
+      --remove-all        Remove everything including user data (use with --force)
+    
+    Examples:
+      ${SCRIPT_NAME} uninstall                 # Interactive uninstall
+      ${SCRIPT_NAME} uninstall --dry-run       # See what would be removed
+      ${SCRIPT_NAME} uninstall --keep-data     # Keep data, remove software
+
+  ${CYAN}${BOLD}status [OPTIONS]${NC}
+    Check the current installation status and health.
+    
+    Options:
+      --detailed          Show detailed component information
+      --json              Output in JSON format
+      --check-health      Run system health checks
+    
+    Examples:
+      ${SCRIPT_NAME} status                    # Basic status check
+      ${SCRIPT_NAME} status --detailed         # Comprehensive status
+      ${SCRIPT_NAME} status --json             # Machine-readable output
+
+  ${CYAN}${BOLD}repair [OPTIONS]${NC}
+    Detect and fix common installation issues.
+    
+    Options:
+      --fix-paths         Fix cross-platform path issues
+      --fix-permissions   Fix file and directory permissions
+      --fix-env           Repair environment variables
+      --fix-all           Attempt to fix all detected issues
+    
+    Examples:
+      ${SCRIPT_NAME} repair --fix-paths        # Fix path resolution
+      ${SCRIPT_NAME} repair --fix-all --dry-run # See what would be fixed
+
+  ${CYAN}${BOLD}create [OPTIONS] <TYPE> <NAME>${NC}
+    Create new MCP servers, clients, and components with official Anthropic standards.
+    
+    Types: server, client, tool, resource, prompt
+    Complexity: simple, standard, advanced, enterprise
+    
+    Examples:
+      ${SCRIPT_NAME} create server weather-api --language python
+      ${SCRIPT_NAME} create server db-tool --complexity enterprise
+      ${SCRIPT_NAME} create tool file-search --output ./my-server/
+
+  ${CYAN}${BOLD}docs [OPTIONS] [SECTION]${NC}
+    Browse official Anthropic MCP documentation and specifications.
+    
+    Sections: overview, specification, server, client, examples
+    
+    Examples:
+      ${SCRIPT_NAME} docs overview             # Protocol overview
+      ${SCRIPT_NAME} docs server --format markdown
+      ${SCRIPT_NAME} docs --search "JSON-RPC" # Search docs
+
+  ${CYAN}${BOLD}agent [OPTIONS] <COMMAND>${NC}
+    Agent-steerable interface for programmatic control and automation.
+    
+    Commands: status, install, validate, generate, deploy, test
+    
+    Examples:
+      ${SCRIPT_NAME} agent status --json       # Machine-readable status
+      ${SCRIPT_NAME} agent install --non-interactive
+      ${SCRIPT_NAME} agent generate --config-file server.yaml
+
+  ${CYAN}${BOLD}update [OPTIONS]${NC}
+    Update the MCP system to the latest version.
+    
+    Options:
+      --check-only        Check for updates without installing
+      --backup            Create backup before updating
+      --from-source       Update from source repository
+    
+    Examples:
+      ${SCRIPT_NAME} update --check-only       # Check for updates
+      ${SCRIPT_NAME} update --backup           # Update with backup
+
+  ${CYAN}${BOLD}config [OPTIONS] [KEY] [VALUE]${NC}
+    Manage MCP system configuration.
+    
+    Options:
+      --list              List all configuration options
+      --reset             Reset to default configuration
+      --export FILE       Export configuration to file
+      --import FILE       Import configuration from file
+    
+    Examples:
+      ${SCRIPT_NAME} config --list             # Show all settings
+      ${SCRIPT_NAME} config debug true         # Set debug mode
+      ${SCRIPT_NAME} config --export backup.json # Export config
+
+  ${CYAN}${BOLD}doctor${NC}
+    Run comprehensive system diagnostics and provide recommendations.
+    
+    Examples:
+      ${SCRIPT_NAME} doctor                    # Full diagnostic
+      ${SCRIPT_NAME} doctor --json             # Machine-readable report
+
+  ${CYAN}${BOLD}analyze [OPTIONS]${NC}
+    Run comprehensive function analysis using the MCP function analyzer.
+    
+    Examples:
+      ${SCRIPT_NAME} analyze                   # Full analysis to mcp-state.md
+      ${SCRIPT_NAME} analyze --duplicates-only # Focus on duplicates
+      ${SCRIPT_NAME} analyze --fix-issues      # Auto-fix detected problems
+
+  ${CYAN}${BOLD}mcp [OPTIONS] <ACTION>${NC}
+    Manage MCP tools and servers with Docker integration.
+    
+    Actions: list, status, enable, disable, save, remove, restart
+    
+    Examples:
+      ${SCRIPT_NAME} mcp list                  # List all MCP tools
+      ${SCRIPT_NAME} mcp status weather        # Check weather MCP status
+      ${SCRIPT_NAME} mcp enable filesystem     # Enable filesystem MCP
+      ${SCRIPT_NAME} mcp disable github --keep # Disable but keep config
+      ${SCRIPT_NAME} mcp save my-tool --config config.json
+
+  ${CYAN}${BOLD}platform${NC}
+    Display detailed platform and environment information.
+    
+    Examples:
+      ${SCRIPT_NAME} platform                  # Show platform info
+      ${SCRIPT_NAME} platform --json           # JSON format
+
+${BOLD}ENVIRONMENT VARIABLES:${NC}
+    MCP_SETUP_DRY_RUN       Same as --dry-run
+    MCP_SETUP_VERBOSE       Same as --verbose
+    MCP_SETUP_FORCE         Same as --force
+    MCP_SETUP_KEEP_DATA     Same as --keep-data (for uninstall)
+    MCP_SETUP_QUIET         Same as --quiet
+
+${BOLD}EXIT CODES:${NC}
+    0    Success
+    1    General error
+    2    Invalid arguments
+    3    Prerequisites not met
+    4    Installation failed
+    5    Uninstallation failed
+    6    System not found
+    7    Permission denied
+    8    Network error
+    9    Configuration error
+
+${BOLD}EXAMPLES:${NC}
+    # Complete installation with verbose output
+    ${SCRIPT_NAME} --verbose install
+    
+    # Dry run uninstall to see what would be removed
+    ${SCRIPT_NAME} --dry-run uninstall
+    
+    # Check system status and health
+    ${SCRIPT_NAME} status --detailed --check-health
+    
+    # Fix all detected issues
+    ${SCRIPT_NAME} repair --fix-all --force
+    
+    # Silent update with backup
+    ${SCRIPT_NAME} --quiet update --backup
+
+${BOLD}PLATFORM SUPPORT:${NC}
+    ✅ Linux (Ubuntu, Debian, RHEL, etc.)
+    ✅ macOS (Intel and Apple Silicon)
+    ✅ Windows (WSL, Git Bash, MSYS2)
+    ✅ Docker containers
+    ✅ Cloud environments (AWS, Azure, GCP)
+
+${BOLD}MORE INFORMATION:${NC}
+    Repository: https://github.com/dezocode/mcp-system
+    Documentation: https://docs.mcp-system.dev
+    Issues: https://github.com/dezocode/mcp-system/issues
+EOF
+}
+
+# Detect platform and environment
+detect_platform() {
+    local platform_info=""
+    
+    if [ -f /.dockerenv ]; then
+        platform_info="docker"
+    elif grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null; then
+        platform_info="wsl"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        platform_info="linux"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        platform_info="macos"
+    elif [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        platform_info="windows"
+    else
+        platform_info="unknown"
+    fi
+    
+    echo "$platform_info"
+}
+
+# Verbose logging function
+log_verbose() {
+    if [ "$VERBOSE" = "true" ]; then
+        log_debug "$1"
+    fi
+}
+
+# Quiet-aware output
+output() {
+    if [ "$QUIET" != "true" ]; then
+        echo -e "$1"
+    fi
+}
+
+# Check if required files exist
+check_setup_files() {
+    local missing_files=()
+    
+    if [[ ! -f "$SCRIPT_DIR/install.sh" ]]; then
+        missing_files+=("install.sh")
+    fi
+    
+    if [[ ! -f "$SCRIPT_DIR/uninstall.sh" ]]; then
+        missing_files+=("uninstall.sh")
+    fi
+    
+    if [[ ${#missing_files[@]} -gt 0 ]]; then
+        log_error "Missing required setup files: ${missing_files[*]}"
+        log_error "Please ensure you're running this from the MCP system directory"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Load MCP generator library
+load_mcp_generators() {
+    local lib_file="$SCRIPT_DIR/lib/mcp-generators.sh"
+    if [[ -f "$lib_file" ]]; then
+        # shellcheck source=lib/mcp-generators.sh
+        source "$lib_file"
+        log_debug "MCP generators loaded"
+    else
+        log_warn "MCP generator library not found: $lib_file"
+        log_warn "Some features may be limited"
+    fi
+}
+
+# Install command usage
+cmd_install_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME install [OPTIONS]
+
+Install the MCP system with cross-platform compatibility.
+
+Options:
+  -h, --help          Show this help message
+  -c, --check-only    Only check prerequisites, don't install
+  -s, --skip-deps     Skip dependency installation
+  -t, --skip-templates Skip template creation
+  -e, --no-env        Don't modify shell environment
+  -u, --user          Install in user directory (default)
+  -S, --system        Install system-wide (requires sudo)
+  -p, --prefix PATH   Custom installation prefix
+  -b, --backup        Create backup before installation
+
+Examples:
+  $SCRIPT_NAME install                    # Full installation
+  $SCRIPT_NAME install --check-only      # Check prerequisites only
+  $SCRIPT_NAME install --dry-run         # See what would be installed
+  $SCRIPT_NAME install --user --no-env   # User install without env changes
+EOF
+}
+
+# Install command implementation
+cmd_install() {
+    local check_only=false
+    local skip_deps=false
+    local skip_templates=false
+    local no_env=false
+    local user_install=true
+    local system_install=false
+    local custom_prefix=""
+    local create_backup=false
+    local OPTIND=1
+    
+    # Parse install-specific options with getopts
+    while getopts ":hcstuSep:b-:" option; do
+        case $option in
+            h)
+                cmd_install_usage
+                exit $EXIT_SUCCESS
+                ;;
+            c)
+                check_only=true
+                ;;
+            s)
+                skip_deps=true
+                ;;
+            t)
+                skip_templates=true
+                ;;
+            u)
+                user_install=true
+                system_install=false
+                ;;
+            S)
+                system_install=true
+                user_install=false
+                ;;
+            e)
+                no_env=true
+                ;;
+            p)
+                custom_prefix="$OPTARG"
+                ;;
+            b)
+                create_backup=true
+                ;;
+            -)
+                # Handle long options
+                case "$OPTARG" in
+                    help)
+                        cmd_install_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    check-only)
+                        check_only=true
+                        ;;
+                    skip-deps)
+                        skip_deps=true
+                        ;;
+                    skip-templates)
+                        skip_templates=true
+                        ;;
+                    no-env)
+                        no_env=true
+                        ;;
+                    user)
+                        user_install=true
+                        system_install=false
+                        ;;
+                    system)
+                        system_install=true
+                        user_install=false
+                        ;;
+                    prefix=*)
+                        custom_prefix="${OPTARG#*=}"
+                        ;;
+                    backup)
+                        create_backup=true
+                        ;;
+                    *)
+                        log_error "Unknown install option: --$OPTARG"
+                        cmd_install_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                cmd_install_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid install option: -$OPTARG"
+                cmd_install_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    
+    # Validate options
+    if [[ "$user_install" == "true" && "$system_install" == "true" ]]; then
+        log_error "Cannot specify both --user and --system options"
+        exit $EXIT_INVALID_ARGS
+    fi
+    
+    if [[ "$system_install" == "true" ]] && [[ $EUID -ne 0 ]]; then
+        log_error "System installation requires root privileges"
+        log_info "Try: sudo $SCRIPT_NAME install --system"
+        exit $EXIT_PERMISSION_DENIED
+    fi
+    
+    # Verify install script exists
+    if [[ ! -f "$SCRIPT_DIR/install.sh" ]]; then
+        log_error "Install script not found: $SCRIPT_DIR/install.sh"
+        exit $EXIT_NOT_FOUND
+    fi
+    
+    log_header "🚀 MCP System Installation"
+    log_info "Platform: $(detect_platform)"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "Mode: Dry Run (no changes will be made)"
+    fi
+    
+    # Set environment variables for install script
+    export SKIP_DEPS="$skip_deps"
+    export SKIP_TEMPLATES="$skip_templates"
+    export NO_ENV="$no_env"
+    export USER_INSTALL="$user_install"
+    export SYSTEM_INSTALL="$system_install"
+    export CUSTOM_PREFIX="$custom_prefix"
+    export CREATE_BACKUP="$create_backup"
+    
+    # Execute installation
+    local exit_code=0
+    if [[ "$check_only" == "true" ]]; then
+        log_debug "Running prerequisites check only"
+        "$SCRIPT_DIR/install.sh" check || exit_code=$?
+    else
+        log_debug "Running full installation"
+        "$SCRIPT_DIR/install.sh" install || exit_code=$?
+    fi
+    
+    # Handle exit codes
+    case $exit_code in
+        0)
+            log_success "Installation completed successfully"
+            ;;
+        1)
+            log_error "Installation failed with general error"
+            exit $EXIT_INSTALL_FAILED
+            ;;
+        3)
+            log_error "Prerequisites check failed"
+            exit $EXIT_PREREQUISITES_FAILED
+            ;;
+        *)
+            log_error "Installation failed with exit code: $exit_code"
+            exit $EXIT_INSTALL_FAILED
+            ;;
+    esac
+}
+
+# Uninstall command implementation
+cmd_uninstall() {
+    local keep_data=false
+    local remove_all=false
+    
+    # Parse uninstall-specific options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --keep-data)
+                keep_data=true
+                shift
+                ;;
+            --remove-all)
+                remove_all=true
+                shift
+                ;;
+            *)
+                log_error "Unknown uninstall option: $1"
+                exit 2
+                ;;
+        esac
+    done
+    
+    log_header "🧹 MCP System Uninstallation"
+    output "Platform: $(detect_platform)"
+    
+    # Set environment variables for uninstall script
+    export DRY_RUN VERBOSE FORCE
+    export KEEP_DATA="$keep_data"
+    export REMOVE_ALL="$remove_all"
+    
+    log_verbose "Running uninstallation"
+    "$SCRIPT_DIR/uninstall.sh"
+}
+
+# Status command implementation
+cmd_status() {
+    local detailed=false
+    local json_output=false
+    local check_health=false
+    
+    # Parse status-specific options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --detailed)
+                detailed=true
+                shift
+                ;;
+            --json)
+                json_output=true
+                shift
+                ;;
+            --check-health)
+                check_health=true
+                shift
+                ;;
+            *)
+                log_error "Unknown status option: $1"
+                exit 2
+                ;;
+        esac
+    done
+    
+    if [ "$json_output" != "true" ]; then
+        log_header "📊 MCP System Status"
+    fi
+    
+    # Run status check using uninstall script's check function
+    "$SCRIPT_DIR/uninstall.sh" check
+    
+    if [ "$detailed" = "true" ]; then
+        echo ""
+        log_info "Detailed system information:"
+        
+        # Platform details
+        echo "Platform: $(detect_platform)"
+        echo "OS Type: $OSTYPE"
+        echo "Architecture: $(uname -m 2>/dev/null || echo 'unknown')"
+        
+        # Python information
+        if command -v python3 &>/dev/null; then
+            echo "Python: $(python3 --version)"
+            echo "Pip: $(python3 -m pip --version | head -1)"
+        fi
+        
+        # Git information
+        if command -v git &>/dev/null; then
+            echo "Git: $(git --version)"
+        fi
+        
+        # Environment variables
+        echo "Environment:"
+        env | grep -E '^MCP_' | sort || echo "  No MCP environment variables found"
+    fi
+    
+    if [ "$check_health" = "true" ]; then
+        echo ""
+        log_info "Running health checks..."
+        
+        # Check if cross-platform resolver works
+        if [ -f "src/config/cross_platform.py" ]; then
+            if python3 -c "
+import sys; sys.path.insert(0, 'src')
+from config.cross_platform import cross_platform
+print('✅ Cross-platform resolver working')
+print(f'  Platform: {cross_platform.platform_info[\"system\"]}')
+print(f'  Home: {cross_platform.get_path(\"home\")}')
+" 2>/dev/null; then
+                echo "✅ Cross-platform resolver healthy"
+            else
+                echo "❌ Cross-platform resolver has issues"
+            fi
+        else
+            echo "❌ Cross-platform resolver not found"
+        fi
+    fi
+}
+
+# Platform command implementation
+cmd_platform() {
+    local json_output=false
+    
+    # Parse platform options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --json)
+                json_output=true
+                shift
+                ;;
+            *)
+                log_error "Unknown platform option: $1"
+                exit 2
+                ;;
+        esac
+    done
+    
+    local platform=$(detect_platform)
+    
+    if [ "$json_output" = "true" ]; then
+        cat << EOF
+{
+  "platform": "$platform",
+  "ostype": "$OSTYPE",
+  "architecture": "$(uname -m 2>/dev/null || echo 'unknown')",
+  "shell": "${SHELL##*/}",
+  "home": "$HOME",
+  "pwd": "$PWD",
+  "docker": $([ -f /.dockerenv ] && echo "true" || echo "false"),
+  "wsl": $(grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null && echo "true" || echo "false"),
+  "timestamp": "$(date -Iseconds)"
+}
+EOF
+    else
+        log_header "🖥️  Platform Information"
+        echo "Platform: $platform"
+        echo "OS Type: $OSTYPE"
+        echo "Architecture: $(uname -m 2>/dev/null || echo 'unknown')"
+        echo "Shell: ${SHELL##*/}"
+        echo "Home Directory: $HOME"
+        echo "Current Directory: $PWD"
+        echo "Docker Environment: $([ -f /.dockerenv ] && echo "Yes" || echo "No")"
+        echo "WSL Environment: $(grep -qEi "(Microsoft|WSL)" /proc/version 2>/dev/null && echo "Yes" || echo "No")"
+    fi
+}
+
+# Doctor command implementation
+cmd_doctor() {
+    log_header "🩺 MCP System Doctor"
+    
+    local issues=0
+    local warnings=0
+    
+    # Check platform
+    local platform=$(detect_platform)
+    echo "✅ Platform detected: $platform"
+    
+    # Check prerequisites
+    echo ""
+    log_info "Checking prerequisites..."
+    
+    if command -v python3 &>/dev/null; then
+        echo "✅ Python 3: $(python3 --version)"
+    else
+        echo "❌ Python 3: Not found"
+        ((issues++))
+    fi
+    
+    if python3 -m pip --version &>/dev/null; then
+        echo "✅ pip: Available"
+    else
+        echo "❌ pip: Not available"
+        ((issues++))
+    fi
+    
+    if command -v git &>/dev/null; then
+        echo "✅ Git: $(git --version)"
+    else
+        echo "⚠️  Git: Not found (optional)"
+        ((warnings++))
+    fi
+    
+    # Check installation status
+    echo ""
+    log_info "Checking installation..."
+    
+    if [ -f "src/config/cross_platform.py" ]; then
+        echo "✅ Cross-platform resolver: Present"
+        
+        if python3 -c "
+import sys; sys.path.insert(0, 'src')
+from config.cross_platform import cross_platform
+cross_platform.get_path('home')
+" &>/dev/null; then
+            echo "✅ Cross-platform resolver: Working"
+        else
+            echo "❌ Cross-platform resolver: Error"
+            ((issues++))
+        fi
+    else
+        echo "❌ Cross-platform resolver: Missing"
+        ((issues++))
+    fi
+    
+    # Summary
+    echo ""
+    echo "=========================================="
+    if [ $issues -eq 0 ]; then
+        if [ $warnings -eq 0 ]; then
+            log_info "🎉 All systems healthy!"
+        else
+            log_warn "✅ System healthy with $warnings warning(s)"
+        fi
+    else
+        log_error "❌ Found $issues issue(s) and $warnings warning(s)"
+        echo ""
+        log_info "Recommendations:"
+        echo "  1. Run '$SCRIPT_NAME install --check-only' for detailed prerequisite check"
+        echo "  2. Run '$SCRIPT_NAME repair --fix-all' to attempt automatic fixes"
+        echo "  3. Reinstall with '$SCRIPT_NAME install' if issues persist"
+    fi
+}
+
+# MCP Server Management Functions
+# Create MCP server scaffolding based on complexity level
+
+# MCP server creation usage
+cmd_create_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME create [OPTIONS] <TYPE> <NAME>
+
+Create a new MCP server with scaffolding based on official Anthropic standards.
+
+Types:
+  server      Create a new MCP server
+  client      Create a new MCP client
+  tool        Add a tool to existing server
+  resource    Add a resource to existing server
+  prompt      Add a prompt template to existing server
+
+Server Complexity Levels:
+  simple      Basic server with minimal tools (default)
+  standard    Standard server with resources, tools, and prompts
+  advanced    Advanced server with async operations and state management
+  enterprise  Full-featured server with database, caching, and monitoring
+
+Options:
+  -h, --help              Show this help message
+  -l, --language LANG     Programming language (python|typescript|javascript)
+  -c, --complexity LEVEL  Complexity level (simple|standard|advanced|enterprise)
+  -t, --template NAME     Use specific template
+  -o, --output DIR        Output directory (default: current)
+  -f, --force             Overwrite existing files
+  --no-examples          Skip example implementations
+  --with-tests           Include test scaffolding
+  --with-docs            Include documentation templates
+
+Examples:
+  $SCRIPT_NAME create server weather-api --language python
+  $SCRIPT_NAME create server database-tool --complexity enterprise
+  $SCRIPT_NAME create tool file-search --output ./my-server/
+  $SCRIPT_NAME create client cli-client --with-tests
+EOF
+}
+
+# MCP documentation browser
+cmd_docs_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME docs [OPTIONS] [SECTION]
+
+Browse official Anthropic MCP documentation and specifications.
+
+Sections:
+  overview      MCP protocol overview and concepts
+  specification Complete protocol specification  
+  server        Server implementation guide
+  client        Client implementation guide
+  transport     Transport protocols (stdio, http)
+  examples      Official examples and templates
+  best-practices Implementation best practices
+  troubleshooting Common issues and solutions
+
+Options:
+  -h, --help          Show this help message
+  -f, --format FORMAT Output format (text|json|markdown)
+  -s, --search TERM   Search documentation for term
+  -o, --output FILE   Save documentation to file
+  --offline           Use cached documentation only
+  --update            Update cached documentation
+
+Examples:
+  $SCRIPT_NAME docs overview                    # Show protocol overview
+  $SCRIPT_NAME docs server --format markdown   # Server guide as markdown
+  $SCRIPT_NAME docs --search "JSON-RPC"        # Search for JSON-RPC info
+  $SCRIPT_NAME docs specification -o mcp-spec.md  # Save spec to file
+EOF
+}
+
+# Agent-steerable interface functions
+cmd_agent_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME agent [OPTIONS] <COMMAND>
+
+Agent-steerable interface for programmatic control.
+Designed for CLI agents, automation tools, and CI/CD integration.
+
+Commands:
+  status      Get system status in machine-readable format
+  install     Automated installation with minimal interaction
+  validate    Validate MCP server configuration
+  generate    Generate server code from specification
+  deploy      Deploy MCP server to environment
+  test        Run comprehensive tests
+
+Options:
+  -h, --help              Show this help message
+  --json                  Output in JSON format (default for agents)
+  --non-interactive       Never prompt for input
+  --timeout SECONDS       Operation timeout (default: 300)
+  --config-file FILE      Configuration file path
+  --log-level LEVEL       Log level (debug|info|warn|error)
+
+Agent Environment Variables:
+  MCP_AGENT_MODE=true     Enable full agent mode
+  MCP_NO_COLOR=true       Disable color output
+  MCP_LOG_FORMAT=json     JSON log format
+  MCP_WORKSPACE=path      Working directory
+
+Examples:
+  $SCRIPT_NAME agent status --json
+  $SCRIPT_NAME agent install --non-interactive --timeout 600
+  $SCRIPT_NAME agent generate --config-file server.yaml
+EOF
+}
+
+# Create MCP server with modular complexity
+cmd_create() {
+    local server_type="server"
+    local language="python"
+    local complexity="simple"
+    local template=""
+    local output_dir="."
+    local force=false
+    local no_examples=false
+    local with_tests=false
+    local with_docs=false
+    local OPTIND=1
+    
+    # Parse create-specific options
+    while getopts ":hl:c:t:o:f-:" option; do
+        case $option in
+            h)
+                cmd_create_usage
+                exit $EXIT_SUCCESS
+                ;;
+            l)
+                language="$OPTARG"
+                ;;
+            c)
+                complexity="$OPTARG"
+                ;;
+            t)
+                template="$OPTARG"
+                ;;
+            o)
+                output_dir="$OPTARG"
+                ;;
+            f)
+                force=true
+                ;;
+            -)
+                case "$OPTARG" in
+                    help)
+                        cmd_create_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    language=*)
+                        language="${OPTARG#*=}"
+                        ;;
+                    complexity=*)
+                        complexity="${OPTARG#*=}"
+                        ;;
+                    template=*)
+                        template="${OPTARG#*=}"
+                        ;;
+                    output=*)
+                        output_dir="${OPTARG#*=}"
+                        ;;
+                    force)
+                        force=true
+                        ;;
+                    no-examples)
+                        no_examples=true
+                        ;;
+                    with-tests)
+                        with_tests=true
+                        ;;
+                    with-docs)
+                        with_docs=true
+                        ;;
+                    *)
+                        log_error "Unknown create option: --$OPTARG"
+                        cmd_create_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                cmd_create_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid create option: -$OPTARG"
+                cmd_create_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    
+    # Get positional arguments
+    server_type="${1:-server}"
+    local name="${2:-}"
+    
+    if [[ -z "$name" ]]; then
+        log_error "Server name is required"
+        cmd_create_usage >&2
+        exit $EXIT_INVALID_ARGS
+    fi
+    
+    # Validate options
+    case "$language" in
+        python|typescript|javascript) ;;
+        *)
+            log_error "Unsupported language: $language"
+            log_info "Supported languages: python, typescript, javascript"
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+    
+    case "$complexity" in
+        simple|standard|advanced|enterprise) ;;
+        *)
+            log_error "Invalid complexity level: $complexity"
+            log_info "Valid levels: simple, standard, advanced, enterprise"
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+    
+    log_header "🔨 Creating MCP $server_type: $name"
+    log_info "Language: $language"
+    log_info "Complexity: $complexity"
+    log_info "Output directory: $output_dir"
+    
+    # Create output directory
+    local target_dir="$output_dir/$name"
+    if [[ -d "$target_dir" ]] && [[ "$force" != "true" ]]; then
+        log_error "Directory already exists: $target_dir"
+        log_info "Use --force to overwrite"
+        exit $EXIT_GENERAL_ERROR
+    fi
+    
+    if [[ "$DRY_RUN" != "true" ]]; then
+        mkdir -p "$target_dir"
+    fi
+    
+    # Generate server based on complexity and type
+    case "$server_type" in
+        server)
+            generate_mcp_server "$target_dir" "$name" "$language" "$complexity" "$with_tests" "$with_docs"
+            ;;
+        client)
+            generate_mcp_client "$target_dir" "$name" "$language" "$with_tests" "$with_docs"
+            ;;
+        tool|resource|prompt)
+            add_mcp_component "$target_dir" "$server_type" "$name" "$language"
+            ;;
+        *)
+            log_error "Unknown server type: $server_type"
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+    
+    log_success "MCP $server_type '$name' created successfully"
+    log_info "Next steps:"
+    echo "  cd $target_dir"
+    echo "  # Review and customize generated files"
+    [[ "$with_tests" == "true" ]] && echo "  # Run tests: npm test or python -m pytest"
+    echo "  # Connect to Claude Desktop or your MCP client"
+}
+
+# Documentation browser implementation
+cmd_docs() {
+    local section=""
+    local format="text"
+    local search_term=""
+    local output_file=""
+    local offline=false
+    local update=false
+    local OPTIND=1
+    
+    # Parse docs-specific options
+    while getopts ":hf:s:o:-:" option; do
+        case $option in
+            h)
+                cmd_docs_usage
+                exit $EXIT_SUCCESS
+                ;;
+            f)
+                format="$OPTARG"
+                ;;
+            s)
+                search_term="$OPTARG"
+                ;;
+            o)
+                output_file="$OPTARG"
+                ;;
+            -)
+                case "$OPTARG" in
+                    help)
+                        cmd_docs_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    format=*)
+                        format="${OPTARG#*=}"
+                        ;;
+                    search=*)
+                        search_term="${OPTARG#*=}"
+                        ;;
+                    output=*)
+                        output_file="${OPTARG#*=}"
+                        ;;
+                    offline)
+                        offline=true
+                        ;;
+                    update)
+                        update=true
+                        ;;
+                    *)
+                        log_error "Unknown docs option: --$OPTARG"
+                        cmd_docs_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                cmd_docs_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid docs option: -$OPTARG"
+                cmd_docs_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    section="${1:-overview}"
+    
+    log_header "📚 MCP Documentation Browser"
+    
+    # Create docs cache directory
+    local docs_cache="$SCRIPT_DIR/.mcp-docs-cache"
+    if [[ "$DRY_RUN" != "true" ]]; then
+        mkdir -p "$docs_cache"
+    fi
+    
+    # Update documentation if requested or cache is empty
+    if [[ "$update" == "true" ]] || [[ "$offline" != "true" && ! -f "$docs_cache/specification.md" ]]; then
+        update_docs_cache "$docs_cache"
+    fi
+    
+    # Display or search documentation
+    if [[ -n "$search_term" ]]; then
+        search_docs_cache "$docs_cache" "$search_term" "$format" "$output_file"
+    else
+        display_docs_section "$docs_cache" "$section" "$format" "$output_file"
+    fi
+}
+
+# Agent-steerable interface for automation
+cmd_agent() {
+    local command=""
+    local json_output=true  # Default for agents
+    local non_interactive=true
+    local timeout=300
+    local config_file=""
+    local log_level="info"
+    local OPTIND=1
+    
+    # Enable agent mode automatically
+    export MCP_AGENT_MODE=true
+    export MCP_NO_COLOR=true
+    NO_INPUT=true
+    
+    # Parse agent-specific options
+    while getopts ":h-:" option; do
+        case $option in
+            h)
+                cmd_agent_usage
+                exit $EXIT_SUCCESS
+                ;;
+            -)
+                case "$OPTARG" in
+                    help)
+                        cmd_agent_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    json)
+                        json_output=true
+                        ;;
+                    non-interactive)
+                        non_interactive=true
+                        ;;
+                    timeout=*)
+                        timeout="${OPTARG#*=}"
+                        ;;
+                    config-file=*)
+                        config_file="${OPTARG#*=}"
+                        ;;
+                    log-level=*)
+                        log_level="${OPTARG#*=}"
+                        ;;
+                    *)
+                        log_error "Unknown agent option: --$OPTARG"
+                        cmd_agent_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                cmd_agent_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid agent option: -$OPTARG"
+                cmd_agent_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    command="${1:-status}"
+    
+    # Execute agent command with timeout
+    case "$command" in
+        status)
+            agent_get_status "$json_output"
+            ;;
+        install)
+            timeout "$timeout" bash -c "agent_install '$config_file'"
+            ;;
+        validate)
+            agent_validate_config "$config_file" "$json_output"
+            ;;
+        generate)
+            agent_generate_server "$config_file" "$json_output"
+            ;;
+        deploy)
+            agent_deploy_server "$config_file" "$json_output"
+            ;;
+        test)
+            agent_run_tests "$json_output"
+            ;;
+        *)
+            log_error "Unknown agent command: $command"
+            cmd_agent_usage >&2
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+}
+
+# Repair, update, and config commands (enhanced implementations)
+cmd_repair() {
+    log_warn "Repair command not yet implemented"
+    echo "Available options: --fix-paths, --fix-permissions, --fix-env, --fix-all"
+    exit 1
+}
+
+cmd_update() {
+    log_warn "Update command not yet implemented"  
+    echo "Available options: --check-only, --backup, --from-source"
+    exit 1
+}
+
+cmd_config() {
+    log_warn "Config command not yet implemented"
+    echo "Available options: --list, --reset, --export FILE, --import FILE"
+    exit 1
+}
+
+# Analyze command usage
+cmd_analyze_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME analyze [OPTIONS]
+
+Run comprehensive function analysis using the MCP function analyzer.
+Detects duplicates, issues, and provides codebase insights.
+
+Options:
+  -h, --help              Show this help message
+  -o, --output FILE       Output file path (default: mcp-state.md)
+  -f, --format FORMAT     Output format (markdown|json|text)
+  --duplicates-only       Show only duplicate function analysis
+  --stats-only            Show only summary statistics
+  --fix-issues            Attempt to fix detected issues automatically
+
+Examples:
+  $SCRIPT_NAME analyze                    # Full analysis to mcp-state.md
+  $SCRIPT_NAME analyze -o analysis.json --format json
+  $SCRIPT_NAME analyze --duplicates-only # Focus on duplicates
+  $SCRIPT_NAME analyze --fix-issues       # Auto-fix detected problems
+EOF
+}
+
+# Analyze command implementation
+cmd_analyze() {
+    local output_file="mcp-state.md"
+    local format="markdown"
+    local duplicates_only=false
+    local stats_only=false
+    local fix_issues=false
+    local OPTIND=1
+    
+    # Parse analyze-specific options
+    while getopts ":ho:f:-:" option; do
+        case $option in
+            h)
+                cmd_analyze_usage
+                exit $EXIT_SUCCESS
+                ;;
+            o)
+                output_file="$OPTARG"
+                ;;
+            f)
+                format="$OPTARG"
+                ;;
+            -)
+                case "$OPTARG" in
+                    help)
+                        cmd_analyze_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    output=*)
+                        output_file="${OPTARG#*=}"
+                        ;;
+                    format=*)
+                        format="${OPTARG#*=}"
+                        ;;
+                    duplicates-only)
+                        duplicates_only=true
+                        ;;
+                    stats-only)
+                        stats_only=true
+                        ;;
+                    fix-issues)
+                        fix_issues=true
+                        ;;
+                    *)
+                        log_error "Unknown analyze option: --$OPTARG"
+                        cmd_analyze_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                cmd_analyze_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid analyze option: -$OPTARG"
+                cmd_analyze_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    
+    # Validate format
+    case "$format" in
+        markdown|json|text) ;;
+        *)
+            log_error "Invalid format: $format"
+            log_info "Supported formats: markdown, json, text"
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+    
+    # Check if analyzer exists
+    if [[ ! -f "$SCRIPT_DIR/analyze_functions.py" ]]; then
+        log_error "Function analyzer not found: $SCRIPT_DIR/analyze_functions.py"
+        exit $EXIT_NOT_FOUND
+    fi
+    
+    log_header "🔍 Running MCP Function Analysis"
+    log_info "Output file: $output_file"
+    log_info "Format: $format"
+    
+    # Set environment variables for analyzer
+    export ANALYZE_OUTPUT_FILE="$output_file"
+    export ANALYZE_FORMAT="$format"
+    export ANALYZE_DUPLICATES_ONLY="$duplicates_only"
+    export ANALYZE_STATS_ONLY="$stats_only"
+    
+    # Run analysis with enhanced debugging
+    debug_print "Starting analysis with output_file='$output_file', format='$format'"
+    debug_print "Options: duplicates_only=$duplicates_only, stats_only=$stats_only, fix_issues=$fix_issues"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "Would run function analysis (dry run mode)"
+        debug_print "Dry run - would execute: python3 '$SCRIPT_DIR/analyze_functions.py'"
+    else
+        log_debug "Executing function analyzer..."
+        debug_trace "Command: python3 '$SCRIPT_DIR/analyze_functions.py'"
+        debug_trace "Working directory: $(pwd)"
+        debug_trace "Python version: $(python3 --version 2>/dev/null || echo 'Python3 not found')"
+        
+        # Run the analyzer with error handling and debug output
+        if python3 "$SCRIPT_DIR/analyze_functions.py" 2>&1 | tee >(debug_trace "ANALYZER OUTPUT: $(cat)"); then
+            log_success "Analysis completed successfully"
+            
+            # Show summary
+            if [[ -f "$output_file" ]]; then
+                local file_count=$(grep -o "Total Python Files.*: [0-9]*" "$output_file" | grep -o "[0-9]*$" || echo "unknown")
+                local func_count=$(grep -o "Total Functions.*: [0-9]*" "$output_file" | grep -o "[0-9]*$" || echo "unknown")
+                local dup_count=$(grep -o "Duplicate Functions.*: [0-9]*" "$output_file" | grep -o "[0-9]*$" || echo "unknown")
+                
+                log_info "Analysis Summary:"
+                echo "  📁 Files analyzed: $file_count"
+                echo "  ⚙️  Functions found: $func_count"
+                echo "  ⚠️  Duplicate functions: $dup_count"
+                echo "  📄 Report saved to: $output_file"
+                
+                # Show critical issues if any
+                if grep -q "Critical Issues" "$output_file"; then
+                    log_warn "Critical issues detected - review the analysis report"
+                    if [[ "$VERBOSE" == "true" ]]; then
+                        echo ""
+                        grep -A 10 "## Critical Issues" "$output_file" || true
+                    fi
+                fi
+                
+                # Offer to fix issues if requested or integrate with version keeper
+                if [[ "$fix_issues" == "true" ]]; then
+                    log_info "🔧 Auto-fixing detected issues..."
+                    debug_print "Running version keeper integration for fixes..."
+                    
+                    # Try to run version keeper if available
+                    if [[ -f "$SCRIPT_DIR/scripts/version_keeper.py" ]]; then
+                        debug_print "Found version_keeper.py - running Claude lint mode"
+                        if python3 "$SCRIPT_DIR/scripts/version_keeper.py" --claude-lint --output-format=json 2>/dev/null; then
+                            log_success "Version keeper fixes applied"
+                        else
+                            debug_print "Version keeper failed, trying manual fixes"
+                        fi
+                    fi
+                    
+                    if grep -q "Multiple main() functions" "$output_file"; then
+                        log_warn "Multiple main() functions detected - manual review required"
+                        show_fix_instructions "analyze_failed" "Multiple main() functions found"
+                    fi
+                    
+                    # Run quality patcher if available
+                    if [[ -f "$SCRIPT_DIR/scripts/claude_quality_patcher.py" ]]; then
+                        debug_print "Running quality patcher for additional fixes"
+                        python3 "$SCRIPT_DIR/scripts/claude_quality_patcher.py" --auto-apply --quiet 2>/dev/null || true
+                    fi
+                fi
+            else
+                log_warn "Analysis completed but output file not found"
+                debug_print "Expected output file: $output_file"
+                debug_print "Current directory contents: $(ls -la . | head -5)"
+                show_fix_instructions "missing_file" "$output_file"
+            fi
+        else
+            log_error "Function analysis failed"
+            debug_print "Analyzer exit code: $?"
+            debug_print "Checking common failure causes..."
+            
+            # Check for common issues and provide specific help
+            if ! command -v python3 >/dev/null 2>&1; then
+                show_fix_instructions "missing_file" "python3 executable"
+            elif [[ ! -f "$SCRIPT_DIR/analyze_functions.py" ]]; then
+                show_fix_instructions "missing_file" "analyze_functions.py"
+            elif [[ ! -r "$SCRIPT_DIR/analyze_functions.py" ]]; then
+                show_fix_instructions "permission_error" "analyze_functions.py"
+            else
+                show_fix_instructions "analyze_failed"
+            fi
+            
+            # Auto-try fix if requested
+            if [[ "$fix_issues" == "true" ]]; then
+                log_info "🔧 Attempting automatic recovery..."
+                debug_print "Trying to fix analyzer issues automatically"
+                
+                # Try to run the analyzer directly first
+                if python3 analyze_functions.py 2>/dev/null; then
+                    log_success "Direct analyzer run successful"
+                    return 0
+                fi
+                
+                # Try with version keeper as backup
+                if [[ -f "$SCRIPT_DIR/scripts/version_keeper.py" ]]; then
+                    log_info "Falling back to version keeper analysis..."
+                    python3 "$SCRIPT_DIR/scripts/version_keeper.py" --claude-lint --detect-duplicates || true
+                fi
+            fi
+            
+            exit $EXIT_GENERAL_ERROR
+        fi
+    fi
+}
+
+# Usage information for specific commands
+usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME [GLOBAL_OPTIONS] <COMMAND> [COMMAND_OPTIONS]
+
+Use '$SCRIPT_NAME --help' for complete documentation.
+Use '$SCRIPT_NAME <command> --help' for command-specific help.
+
+Common commands:
+  install     Install MCP system
+  uninstall   Remove MCP system  
+  status      Check installation status
+  doctor      Run system diagnostics
+
+Global options:
+  -h, --help     Show help
+  -V, --version  Show version
+  -v, --verbose  Verbose output
+  -q, --quiet    Quiet mode
+  --dry-run      Show what would be done
+  --force        Skip confirmations
+EOF
+}
+
+# Robust argument parsing with getopts for global options
+parse_global_options() {
+    local OPTIND=1
+    local option
+    
+    # Process long options first
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help)
+                show_help
+                exit $EXIT_SUCCESS
+                ;;
+            --version)
+                show_version
+                exit $EXIT_SUCCESS
+                ;;
+            --verbose)
+                VERBOSE=true
+                shift
+                ;;
+            --quiet)
+                QUIET=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --force)
+                FORCE=true
+                shift
+                ;;
+            --no-input)
+                NO_INPUT=true
+                shift
+                ;;
+            --config=*)
+                CONFIG_FILE="${1#*=}"
+                shift
+                ;;
+            --config)
+                if [[ $# -lt 2 ]]; then
+                    log_error "Option --config requires an argument"
+                    exit $EXIT_INVALID_ARGS
+                fi
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --)
+                shift
+                args+=("$@")
+                break
+                ;;
+            -*)
+                # Convert long option to short for getopts processing
+                args+=("$1")
+                shift
+                ;;
+            *)
+                args+=("$1")
+                shift
+                ;;
+        esac
+    done
+    
+    # Set remaining args for getopts processing
+    set -- "${args[@]}"
+    
+    # Process short options with getopts
+    while getopts ":hVvqdfnc:" option; do
+        case $option in
+            h)
+                show_help
+                exit $EXIT_SUCCESS
+                ;;
+            V)
+                show_version
+                exit $EXIT_SUCCESS
+                ;;
+            v)
+                VERBOSE=true
+                ;;
+            q)
+                QUIET=true
+                ;;
+            d)
+                DRY_RUN=true
+                ;;
+            f)
+                FORCE=true
+                ;;
+            n)
+                NO_INPUT=true
+                ;;
+            c)
+                CONFIG_FILE="$OPTARG"
+                ;;
+            :)
+                log_error "Option -$OPTARG requires an argument"
+                usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+            \?)
+                log_error "Invalid option: -$OPTARG"
+                usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    # Shift processed options
+    shift $((OPTIND - 1))
+    
+    # Export remaining arguments count for main function
+    export REMAINING_ARGS="$#"
+    
+    # Validate option combinations
+    if [[ "$QUIET" == "true" && "$VERBOSE" == "true" ]]; then
+        log_error "Cannot use both --quiet and --verbose options"
+        exit $EXIT_INVALID_ARGS
+    fi
+    
+    # Load config file if specified
+    if [[ -n "$CONFIG_FILE" ]]; then
+        if [[ -r "$CONFIG_FILE" ]]; then
+            log_debug "Loading configuration from: $CONFIG_FILE"
+            # shellcheck source=/dev/null
+            source "$CONFIG_FILE"
+        else
+            log_error "Cannot read config file: $CONFIG_FILE"
+            exit $EXIT_CONFIG_ERROR
+        fi
+    fi
+    
+    # Export options for child scripts
+    export DRY_RUN VERBOSE FORCE KEEP_DATA QUIET NO_INPUT
+}
+
+# MCP Tool Manager with Live Dashboard (CLI)
+cmd_mcp_usage() {
+    cat << EOF
+Usage: $SCRIPT_NAME mcp [OPTIONS] <ACTION> [TARGET]
+
+Manage MCP tools and servers with real-time dashboard and Docker integration.
+
+ACTIONS:
+  dashboard              Show live MCP dashboard with status indicators
+  list                   List all available MCP tools
+  status [TARGET]        Show detailed status of MCP tool(s)
+  enable TARGET          Enable/start MCP tool
+  disable TARGET         Disable/stop MCP tool  
+  save TARGET            Save MCP tool configuration
+  remove TARGET          Remove MCP tool (with confirmation)
+  restart TARGET         Restart MCP tool
+  logs TARGET            Show logs for MCP tool
+  monitor TARGET         Monitor MCP tool in real-time
+
+OPTIONS:
+  -h, --help             Show this help message
+  --json                 Output in JSON format
+  --keep                 Keep configuration when disabling
+  --force                Skip confirmation prompts
+  --config FILE          Use specific config file
+  --docker               Show Docker container status
+  --all                  Apply action to all MCP tools
+  --watch                Continuous monitoring mode
+  --refresh N            Dashboard refresh interval (seconds, default: 2)
+
+STATUS INDICATORS:
+  🟢 RUNNING            Tool is active and communicating
+  🟡 PARTIAL            Tool process running, limited communication
+  🔴 FAILED             Tool has errors or crashed
+  ⚫ STOPPED            Tool is not running
+  🔵 STARTING           Tool is starting up
+  ⚠️  STALE             Tool not responding (>30s)
+  📡 COMMUNICATING      Active shell/API communication
+  💤 IDLE               Tool running but no recent activity
+
+EXAMPLES:
+  $SCRIPT_NAME mcp dashboard              # Live dashboard
+  $SCRIPT_NAME mcp dashboard --watch      # Continuous monitoring
+  $SCRIPT_NAME mcp list                   # List all tools
+  $SCRIPT_NAME mcp status weather         # Check weather MCP
+  $SCRIPT_NAME mcp monitor mem0 --watch   # Monitor mem0 continuously
+  $SCRIPT_NAME mcp enable filesystem      # Enable filesystem MCP
+  $SCRIPT_NAME mcp logs github            # Show github MCP logs
+EOF
+}
+
+cmd_mcp() {
+    local action=""
+    local target=""
+    local json_output=false
+    local keep_config=false  
+    local force=false
+    local config_file=""
+    local docker_status=false
+    local apply_all=false
+    local watch_mode=false
+    local refresh_interval=2
+    local OPTIND=1
+
+    debug_print "MCP command called with arguments: $*"
+    
+    # Parse options
+    while getopts ":hr:-:" option; do
+        case $option in
+            h)
+                cmd_mcp_usage
+                exit $EXIT_SUCCESS
+                ;;
+            r)
+                refresh_interval="$OPTARG"
+                ;;
+            -)
+                case "$OPTARG" in
+                    help)
+                        cmd_mcp_usage
+                        exit $EXIT_SUCCESS
+                        ;;
+                    json)
+                        json_output=true
+                        ;;
+                    keep)
+                        keep_config=true
+                        ;;
+                    force)
+                        force=true
+                        ;;
+                    docker)
+                        docker_status=true
+                        ;;
+                    all)
+                        apply_all=true
+                        ;;
+                    watch)
+                        watch_mode=true
+                        ;;
+                    refresh=*)
+                        refresh_interval="${OPTARG#*=}"
+                        ;;
+                    config=*)
+                        config_file="${OPTARG#*=}"
+                        ;;
+                    *)
+                        log_error "Unknown mcp option: --$OPTARG"
+                        cmd_mcp_usage >&2
+                        exit $EXIT_INVALID_ARGS
+                        ;;
+                esac
+                ;;
+            \?)
+                log_error "Invalid mcp option: -$OPTARG"
+                cmd_mcp_usage >&2
+                exit $EXIT_INVALID_ARGS
+                ;;
+        esac
+    done
+    
+    shift $((OPTIND - 1))
+    
+    # Get action and target
+    action="${1:-dashboard}"
+    target="${2:-}"
+    
+    debug_print "MCP action: '$action', target: '$target'"
+    debug_print "Options: json=$json_output, keep=$keep_config, force=$force, all=$apply_all, watch=$watch_mode"
+    
+    # Validate action
+    case "$action" in
+        dashboard|list|status|enable|disable|save|remove|restart|logs|monitor) ;;
+        *)
+            log_error "Unknown MCP action: $action"
+            cmd_mcp_usage >&2
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+    
+    # Load MCP configuration
+    local mcp_config="${config_file:-$SCRIPT_DIR/configs/.mcp-servers.json}"
+    if [[ ! -f "$mcp_config" ]]; then
+        log_error "MCP configuration not found: $mcp_config"
+        show_fix_instructions "missing_file" "$mcp_config"
+        exit $EXIT_NOT_FOUND
+    fi
+    
+    debug_print "Using MCP config: $mcp_config"
+    
+    # Execute action
+    case "$action" in
+        dashboard)
+            mcp_dashboard "$mcp_config" "$json_output" "$watch_mode" "$refresh_interval"
+            ;;
+        list)
+            mcp_list_tools "$mcp_config" "$json_output"
+            ;;
+        status)
+            mcp_status_check "$mcp_config" "$target" "$json_output" "$apply_all" "$docker_status"
+            ;;
+        monitor)
+            mcp_monitor_tool "$mcp_config" "$target" "$watch_mode" "$refresh_interval"
+            ;;
+        enable)
+            mcp_enable_tool "$mcp_config" "$target" "$json_output"
+            ;;
+        disable)
+            mcp_disable_tool "$mcp_config" "$target" "$keep_config" "$json_output"
+            ;;
+        save)
+            mcp_save_tool "$mcp_config" "$target" "$config_file" "$json_output"
+            ;;
+        remove)
+            mcp_remove_tool "$mcp_config" "$target" "$force" "$json_output"
+            ;;
+        restart)
+            mcp_restart_tool "$mcp_config" "$target" "$json_output"
+            ;;
+        logs)
+            mcp_show_logs "$mcp_config" "$target"
+            ;;
+    esac
+}
+
+# MCP Live Dashboard - Real-time status with visual indicators
+mcp_dashboard() {
+    local config_file="$1"
+    local json_output="$2"
+    local watch_mode="$3"
+    local refresh_interval="${4:-2}"
+    
+    debug_print "Starting MCP dashboard (watch: $watch_mode, refresh: ${refresh_interval}s)"
+    
+    if [[ "$json_output" == "true" ]]; then
+        mcp_dashboard_json "$config_file"
+        return
+    fi
+    
+    # CLI Dashboard
+    local iteration=0
+    while true; do
+        # Clear screen for live updates
+        if [[ "$watch_mode" == "true" ]] && [[ $iteration -gt 0 ]]; then
+            clear
+        fi
+        
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        
+        echo "╭─────────────────────────────────────────────────────────────╮"
+        echo "│               🔧 MCP Tools Dashboard                        │"
+        echo "│  Last Updated: $timestamp                     │"
+        echo "├─────────────────────────────────────────────────────────────┤"
+        
+        # Check if jq is available
+        if ! command -v jq >/dev/null 2>&1; then
+            echo "│ ❌ jq not found - install for full dashboard functionality  │"
+            echo "╰─────────────────────────────────────────────────────────────╯"
+            return 1
+        fi
+        
+        # Get all MCP tools
+        local tools_found=0
+        local tools_running=0
+        local tools_failed=0
+        local tools_starting=0
+        
+        echo "│ Tool Name          Status        Port    Activity   Docker   │"
+        echo "├─────────────────────────────────────────────────────────────┤"
+        
+        jq -r 'keys[]' "$config_file" | while read -r tool; do
+            local tool_info=$(jq -r --arg tool "$tool" '.[$tool]' "$config_file")
+            local name=$(echo "$tool_info" | jq -r '.name // "Unknown"')
+            local port=$(echo "$tool_info" | jq -r '.port // "N/A"')
+            local command=$(echo "$tool_info" | jq -r '.command // "N/A"')
+            
+            # Check detailed status
+            local status_info=$(mcp_get_detailed_status "$tool" "$port" "$command")
+            local status_icon=$(echo "$status_info" | cut -d'|' -f1)
+            local activity=$(echo "$status_info" | cut -d'|' -f2)
+            local docker_status=$(echo "$status_info" | cut -d'|' -f3)
+            
+            # Format display
+            local tool_display=$(printf "%-18s" "${tool:0:18}")
+            local status_display=$(printf "%-12s" "$status_icon")
+            local port_display=$(printf "%-7s" "$port")
+            local activity_display=$(printf "%-10s" "$activity")
+            local docker_display=$(printf "%-8s" "$docker_status")
+            
+            echo "│ $tool_display $status_display $port_display $activity_display $docker_display │"
+        done
+        
+        echo "├─────────────────────────────────────────────────────────────┤"
+        echo "│ 🔑 Controls: [r]efresh [q]uit [s]tatus <tool> [e]nable <tool>│"
+        echo "╰─────────────────────────────────────────────────────────────╯"
+        
+        # Statistics summary
+        local total_tools=$(jq 'keys | length' "$config_file")
+        echo ""
+        echo "📊 Summary: $total_tools tools configured"
+        echo "   🟢 Running: $(mcp_count_status "$config_file" "running")"
+        echo "   🟡 Partial: $(mcp_count_status "$config_file" "partial")"  
+        echo "   🔴 Failed:  $(mcp_count_status "$config_file" "failed")"
+        echo "   ⚫ Stopped: $(mcp_count_status "$config_file" "stopped")"
+        
+        # Watch mode handling
+        if [[ "$watch_mode" != "true" ]]; then
+            break
+        fi
+        
+        echo ""
+        echo "⏱️  Auto-refresh in ${refresh_interval}s (Ctrl+C to stop)..."
+        
+        # Interactive input with timeout
+        if read -t "$refresh_interval" -n 1 -s input; then
+            case "$input" in
+                q|Q)
+                    echo ""
+                    log_info "Dashboard stopped"
+                    break
+                    ;;
+                r|R)
+                    echo ""
+                    log_info "Manual refresh..."
+                    ;;
+                *)
+                    # Handle other commands later
+                    ;;
+            esac
+        fi
+        
+        ((iteration++))
+    done
+}
+
+# Get detailed status for a single MCP tool
+mcp_get_detailed_status() {
+    local tool="$1"
+    local port="$2" 
+    local command="$3"
+    
+    local status_icon="⚫ STOPPED"
+    local activity="💤 IDLE"
+    local docker_status="N/A"
+    
+    # Check if port is listening
+    local port_active=false
+    if [[ "$port" != "N/A" ]] && netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+        port_active=true
+    fi
+    
+    # Check if process is running  
+    local process_active=false
+    if [[ "$command" != "N/A" ]] && pgrep -f "$command" >/dev/null 2>&1; then
+        process_active=true
+    fi
+    
+    # Determine status
+    if [[ "$port_active" == "true" ]] && [[ "$process_active" == "true" ]]; then
+        status_icon="🟢 RUNNING"
+        activity="📡 ACTIVE"
+        
+        # Check recent activity (last 30 seconds)
+        local recent_activity=$(netstat -tlnp 2>/dev/null | grep ":$port " | wc -l)
+        if [[ $recent_activity -gt 1 ]]; then
+            activity="📡 COMM"
+        fi
+    elif [[ "$process_active" == "true" ]]; then
+        status_icon="🟡 PARTIAL"
+        activity="⚠️ LIMITED"
+    elif [[ "$port_active" == "true" ]]; then
+        status_icon="🔴 FAILED"
+        activity="⚠️ STALE"
+    else
+        status_icon="⚫ STOPPED"
+        activity="💤 IDLE"
+    fi
+    
+    # Check Docker dependencies
+    if command -v docker >/dev/null 2>&1; then
+        local containers=$(docker ps --format "{{.Names}}" | grep -i "$tool" | wc -l)
+        if [[ $containers -gt 0 ]]; then
+            docker_status="🐳 UP"
+        else
+            docker_status="🐳 DOWN"
+        fi
+    fi
+    
+    echo "$status_icon|$activity|$docker_status"
+}
+
+# Count tools by status type
+mcp_count_status() {
+    local config_file="$1"
+    local status_type="$2"
+    local count=0
+    
+    jq -r 'keys[]' "$config_file" | while read -r tool; do
+        local tool_info=$(jq -r --arg tool "$tool" '.[$tool]' "$config_file")
+        local port=$(echo "$tool_info" | jq -r '.port // "N/A"')
+        local command=$(echo "$tool_info" | jq -r '.command // "N/A"')
+        
+        local port_active=false
+        local process_active=false
+        
+        if [[ "$port" != "N/A" ]] && netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+            port_active=true
+        fi
+        
+        if [[ "$command" != "N/A" ]] && pgrep -f "$command" >/dev/null 2>&1; then
+            process_active=true
+        fi
+        
+        case "$status_type" in
+            running)
+                [[ "$port_active" == "true" && "$process_active" == "true" ]] && ((count++))
+                ;;
+            partial)
+                [[ "$process_active" == "true" && "$port_active" == "false" ]] && ((count++))
+                ;;
+            failed)
+                [[ "$port_active" == "true" && "$process_active" == "false" ]] && ((count++))
+                ;;
+            stopped)
+                [[ "$port_active" == "false" && "$process_active" == "false" ]] && ((count++))
+                ;;
+        esac
+    done | tail -1
+    
+    echo "${count:-0}"
+}
+
+# Monitor a specific MCP tool
+mcp_monitor_tool() {
+    local config_file="$1"
+    local target="$2"
+    local watch_mode="$3"
+    local refresh_interval="$4"
+    
+    if [[ -z "$target" ]]; then
+        log_error "Monitor requires a target MCP tool"
+        exit $EXIT_INVALID_ARGS
+    fi
+    
+    debug_print "Monitoring MCP tool: $target"
+    
+    local iteration=0
+    while true; do
+        if [[ "$watch_mode" == "true" ]] && [[ $iteration -gt 0 ]]; then
+            clear
+        fi
+        
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        
+        echo "╭───────────────────────────────────────────────╮"
+        echo "│        🔍 MCP Tool Monitor: $target"
+        echo "│  Time: $timestamp               │"  
+        echo "├───────────────────────────────────────────────┤"
+        
+        # Get tool info
+        if command -v jq >/dev/null 2>&1; then
+            local tool_info=$(jq -r --arg tool "$target" '.[$tool] // empty' "$config_file")
+            if [[ -n "$tool_info" ]]; then
+                local name=$(echo "$tool_info" | jq -r '.name // "Unknown"')
+                local port=$(echo "$tool_info" | jq -r '.port // "N/A"')  
+                local command=$(echo "$tool_info" | jq -r '.command // "N/A"')
+                local path=$(echo "$tool_info" | jq -r '.path // "N/A"')
+                
+                echo "│ Name: $name"
+                echo "│ Command: $command" 
+                echo "│ Path: $path"
+                echo "│ Port: $port"
+                echo "├───────────────────────────────────────────────┤"
+                
+                # Real-time status
+                local status_info=$(mcp_get_detailed_status "$target" "$port" "$command")
+                local status_icon=$(echo "$status_info" | cut -d'|' -f1)
+                local activity=$(echo "$status_info" | cut -d'|' -f2)
+                local docker_status=$(echo "$status_info" | cut -d'|' -f3)
+                
+                echo "│ Status: $status_icon"
+                echo "│ Activity: $activity"
+                echo "│ Docker: $docker_status"
+                
+                # Process details if running
+                if pgrep -f "$command" >/dev/null 2>&1; then
+                    local pid=$(pgrep -f "$command" | head -1)
+                    local cpu_usage=$(ps -p "$pid" -o %cpu --no-headers 2>/dev/null | tr -d ' ')
+                    local mem_usage=$(ps -p "$pid" -o %mem --no-headers 2>/dev/null | tr -d ' ')
+                    echo "│ PID: $pid"
+                    echo "│ CPU: ${cpu_usage}%"
+                    echo "│ Memory: ${mem_usage}%"
+                fi
+                
+            else
+                echo "│ ❌ MCP tool '$target' not found"
+            fi
+        else
+            echo "│ ❌ jq not available - limited monitoring"
+        fi
+        
+        echo "╰───────────────────────────────────────────────╯"
+        
+        if [[ "$watch_mode" != "true" ]]; then
+            break
+        fi
+        
+        echo ""
+        echo "🔄 Refreshing in ${refresh_interval}s... (Ctrl+C to stop)"
+        sleep "$refresh_interval"
+        ((iteration++))
+    done
+}
+
+# Simplified implementations for other MCP functions
+mcp_list_tools() {
+    local config_file="$1"
+    local json_output="$2"
+    
+    debug_print "Listing MCP tools from: $config_file"
+    
+    if [[ "$json_output" == "true" ]]; then
+        if command -v jq >/dev/null 2>&1; then
+            jq '.' "$config_file"
+        else
+            cat "$config_file"
+        fi
+    else
+        echo "🔧 MCP Tools List"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if command -v jq >/dev/null 2>&1; then
+            jq -r 'to_entries[] | "\(.key)|\(.value.name)|\(.value.port // "N/A")"' "$config_file" | \
+            while IFS='|' read -r key name port; do
+                local status_info=$(mcp_get_detailed_status "$key" "$port" "")
+                local status_icon=$(echo "$status_info" | cut -d'|' -f1)
+                
+                printf "%-20s %-30s %s\n" "$key" "$name" "$status_icon"
+            done
+        else
+            log_warn "jq not available - showing basic info"
+            grep -o '"[^"]*": {' "$config_file" | sed 's/": {//' | sed 's/"//g' | \
+            while read -r tool; do
+                echo "📦 $tool"
+            done
+        fi
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "💡 Use 'mcp-setup mcp dashboard' for live monitoring"
+    fi
+}
+
+# Placeholder implementations for remaining functions
+mcp_status_check() { echo "Status check: $2"; }
+mcp_enable_tool() { echo "Enabling: $2"; }
+mcp_disable_tool() { echo "Disabling: $2"; }
+mcp_save_tool() { echo "Saving: $2"; }
+mcp_remove_tool() { echo "Removing: $2"; }
+mcp_restart_tool() { echo "Restarting: $2"; }
+mcp_show_logs() { echo "Logs for: $2"; }
+mcp_dashboard_json() { echo '{"dashboard": "json_mode"}'; }
+
+# Main function
+main() {
+    debug_print "=== MCP Setup CLI Debug Mode Active ==="
+    debug_print "Original arguments: $*"
+    debug_print "Argument count: $#"
+    debug_print "Script directory: $SCRIPT_DIR"
+    
+    # Simple argument parsing - bypass complex parse_global_options for now
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --verbose|-v)
+                VERBOSE=true
+                debug_print "Verbose mode enabled via argument"
+                shift
+                ;;
+            --debug)
+                DEBUG_MODE=true
+                debug_print "Debug mode enabled via argument"
+                shift
+                ;;
+            --quiet|-q)
+                VERBOSE=false
+                DEBUG_MODE=false
+                debug_print "Quiet mode enabled - disabling debug output"
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                debug_print "Dry run mode enabled"
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit $EXIT_SUCCESS
+                ;;
+            --version|-V)
+                show_version
+                exit $EXIT_SUCCESS
+                ;;
+            *)
+                args+=("$1")
+                shift
+                ;;
+        esac
+    done
+    
+    # Set remaining arguments
+    set -- "${args[@]}"
+    debug_print "Remaining arguments after option parsing: $*"
+    
+    # Check if we have the required setup files
+    debug_print "Checking setup files..."
+    if ! check_setup_files; then
+        debug_print "Setup files check failed"
+        exit $EXIT_NOT_FOUND
+    fi
+    
+    # Load MCP generator functions
+    debug_print "Loading MCP generators..."
+    if ! load_mcp_generators; then
+        debug_print "MCP generators loading failed"
+        show_fix_instructions "missing_file" "lib/mcp-generators.sh"
+    fi
+    debug_print "MCP generators loaded successfully"
+    
+    # Get command (first remaining argument)
+    local command="${1:-help}"
+    shift || true
+    debug_print "Command to execute: '$command'"
+    debug_print "Command arguments: $*"
+    
+    # Execute command
+    case "$command" in
+        install)
+            cmd_install "$@"
+            ;;
+        uninstall)
+            cmd_uninstall "$@"
+            ;;
+        status)
+            cmd_status "$@"
+            ;;
+        create)
+            cmd_create "$@"
+            ;;
+        docs)
+            cmd_docs "$@"
+            ;;
+        agent)
+            cmd_agent "$@"
+            ;;
+        repair)
+            cmd_repair "$@"
+            ;;
+        update)
+            cmd_update "$@"
+            ;;
+        config)
+            cmd_config "$@"
+            ;;
+        doctor)
+            cmd_doctor "$@"
+            ;;
+        platform)
+            cmd_platform "$@"
+            ;;
+        analyze)
+            cmd_analyze "$@"
+            ;;
+        mcp)
+            cmd_mcp "$@"
+            ;;
+        help)
+            show_help
+            ;;
+        *)
+            log_error "Unknown command: $command"
+            echo "Use '$SCRIPT_NAME --help' for usage information"
+            exit $EXIT_INVALID_ARGS
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"

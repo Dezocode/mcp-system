@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Test if pipeline hook is working
 echo "Testing pipeline hook..."
 export CLAUDE_PROMPT="/pipeline"

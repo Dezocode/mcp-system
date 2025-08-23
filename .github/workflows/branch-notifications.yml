@@ -1,0 +1,54 @@
+name: Branch Change Notifications
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    types: [opened, closed, merged, reopened]
+  create:
+    branches: ['**']
+  delete:
+    branches: ['**']
+
+jobs:
+  branch-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Get branch info
+        id: branch_info
+        run: |
+          echo "current_branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "default_branch=${{ github.event.repository.default_branch }}" >> $GITHUB_OUTPUT
+          echo "event_name=${{ github.event_name }}" >> $GITHUB_OUTPUT
+          
+      - name: Branch status notification
+        run: |
+          echo "🔀 Branch Event: ${{ github.event_name }}"
+          echo "📍 Current Branch: ${{ steps.branch_info.outputs.current_branch }}"
+          echo "🏠 Default Branch: ${{ steps.branch_info.outputs.default_branch }}"
+          echo "👤 Actor: ${{ github.actor }}"
+          echo "📝 Repository: ${{ github.repository }}"
+          
+          # Create a summary for GitHub Actions UI
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Branch Activity Summary
+          
+          **Event:** ${{ github.event_name }}
+          **Branch:** \`${{ steps.branch_info.outputs.current_branch }}\`
+          **Actor:** ${{ github.actor }}
+          **Repository:** ${{ github.repository }}
+          **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          ### Recent Commits
+          $(git log --oneline -5 || echo "No recent commits")
+          EOF
+
+      - name: Slack notification (optional)
+        if: false  # Set to true and configure webhook to enable
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🔀 Branch activity in ${{ github.repository }}: ${{ github.event_name }} on `${{ steps.branch_info.outputs.current_branch }}` by ${{ github.actor }}"}' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}

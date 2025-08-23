@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST PRE-TOOL VALIDATION HOOK
 # Generated: 2025-08-14 16:44:00 CST (Chicago Time MANDATORY)
 # Blocks Write/Edit/MultiEdit without proper GTST compliance

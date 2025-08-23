@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST-RM-SNOWBALL-ANALYSIS-CLEANUP.SH
 # Generated: 2025-08-14 17:10:30 CST (Chicago Time MANDATORY)
 # Uses /GTST tools to plan removing and enforce command-wide NOT to overwrite large blocks of code

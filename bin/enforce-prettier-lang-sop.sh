@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # 🎨 PRETTIER-LANG SOP ENFORCEMENT SYSTEM
 # CRITICAL: Enforces CLAUDE.md prettier and langextract requirements

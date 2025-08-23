@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # 📋 END-TO-END SOP COMPLIANCE CHECKER
 # Verifies compliance with project structure, patterns, and SOP requirements

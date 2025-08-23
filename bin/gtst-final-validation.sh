@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST FINAL VALIDATION HOOK
 # Generated: 2025-08-14 16:44:00 CST (Chicago Time MANDATORY)
 # Comprehensive final validation on Stop event

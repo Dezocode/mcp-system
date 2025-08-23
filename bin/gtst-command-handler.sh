@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST COMMAND HANDLER - CLAUDE CODE INTEGRATION
 # Generated: 2025-08-14 17:20:00 CST (Chicago Time MANDATORY)
 # Makes /gtst a first-class Claude command like /docs
@@ -111,7 +111,7 @@ case "${SUBCOMMAND:-help}" in
         echo "🔍 Creating TRACE file and executing 7+ grep checkpoints..."
         
         # Execute planning via main enforcement script
-        /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh "GTST PLANNING: $feature_name" || {
+        cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh "GTST PLANNING: $feature_name" || {
             echo "❌ GTST Planning failed - check violations"
             exit 2
         }
@@ -128,7 +128,7 @@ case "${SUBCOMMAND:-help}" in
         echo "🔍 Checking compliance (≥85/100 required)..."
         
         # Execute validation
-        /Users/dezmondhollins/.claude/hooks/gtst-final-validation.sh || {
+        cross_platform.get_path("home") / .claude/hooks/gtst-final-validation.sh || {
             echo "❌ GTST Validation failed - score below 85 or violations detected"
             exit 2
         }
@@ -181,7 +181,7 @@ EOF
         echo "📊 Cross-referencing with DOM-EXPECTED-FUNCTIONS.md..."
         
         # Execute RM analysis
-        /Users/dezmondhollins/.claude/hooks/gtst-rm-snowball-analysis-cleanup.sh || {
+        cross_platform.get_path("home") / .claude/hooks/gtst-rm-snowball-analysis-cleanup.sh || {
             echo "❌ GTST RM Analysis failed"
             exit 2
         }
@@ -197,7 +197,7 @@ EOF
         echo "📋 Using latest RM analysis for informed patching..."
         
         # Execute patch generation
-        /Users/dezmondhollins/.claude/hooks/gtst-patch-generator.sh || {
+        cross_platform.get_path("home") / .claude/hooks/gtst-patch-generator.sh || {
             echo "❌ GTST Patch Generation failed"
             exit 2
         }
@@ -214,10 +214,10 @@ EOF
         
         # Execute full enforcement protocol
         ( 
-            /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh "$FULL_COMMAND" &
-            /Users/dezmondhollins/.claude/hooks/gtst-pre-tool.sh &
-            /Users/dezmondhollins/.claude/hooks/gtst-post-tool.sh &
-            /Users/dezmondhollins/.claude/hooks/gtst-final-validation.sh &
+            cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh "$FULL_COMMAND" &
+            cross_platform.get_path("home") / .claude/hooks/gtst-pre-tool.sh &
+            cross_platform.get_path("home") / .claude/hooks/gtst-post-tool.sh &
+            cross_platform.get_path("home") / .claude/hooks/gtst-final-validation.sh &
             wait
         ) || {
             echo "❌ GTST Enforcement detected violations"

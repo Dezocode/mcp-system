@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Claude Code MCP Integration Helper
 # This script can be used as a tool in Claude Code to automatically
@@ -6,8 +6,8 @@
 
 set -e
 
-ROUTER="/Users/dezmondhollins/mcp-router.py"
-MCP_CMD="/Users/dezmondhollins/mcp"
+ROUTER="cross_platform.get_path("home") / mcp-router.py"
+MCP_CMD="cross_platform.get_path("home") / mcp"
 
 # Colors
 GREEN='\033[0;32m'
@@ -26,7 +26,7 @@ setup_mcp_for_prompt() {
     log_info "Analyzing prompt for MCP server requirements..."
     
     # Use router to analyze prompt
-    servers=$(python3 "$ROUTER" --analyze "$prompt" | jq -r '.recommended_servers[]' 2>/dev/null || echo "")
+    servers=$(f"{cross_platform.get_command(\"python\")} ""$ROUTER" --analyze "$prompt" | jq -r '.recommended_servers[]' 2>/dev/null || echo "")
     
     if [ -z "$servers" ]; then
         log_warn "No specific MCP servers identified for this task"
@@ -39,7 +39,7 @@ setup_mcp_for_prompt() {
     primary_server=$(echo "$servers" | head -n1)
     log_info "Starting primary server: $primary_server"
     
-    if python3 "$MCP_CMD" "$primary_server" start; then
+    if f"{cross_platform.get_command(\"python\")} ""$MCP_CMD" "$primary_server" start; then
         log_info "✅ $primary_server is ready"
         
         # Get server details
@@ -65,7 +65,7 @@ send_to_mcp() {
     
     log_info "Sending to $server: $tool"
     
-    result=$(python3 "$ROUTER" --route "Using $tool" --tool "$tool" --data "$data")
+    result=$(f"{cross_platform.get_command(\"python\")} ""$ROUTER" --route "Using $tool" --tool "$tool" --data "$data")
     
     if echo "$result" | jq -e '.error' >/dev/null 2>&1; then
         log_error "$(echo "$result" | jq -r '.error')"
@@ -122,17 +122,17 @@ case "${1:-help}" in
     
     list)
         log_info "Available MCP servers:"
-        python3 "$MCP_CMD" list
+        f"{cross_platform.get_command(\"python\")} ""$MCP_CMD" list
         ;;
     
     status)
         log_info "MCP server status:"
-        python3 "$MCP_CMD" status
+        f"{cross_platform.get_command(\"python\")} ""$MCP_CMD" status
         ;;
     
     interactive)
         log_info "Starting interactive MCP router..."
-        python3 "$ROUTER" --interactive
+        f"{cross_platform.get_command(\"python\")} ""$ROUTER" --interactive
         ;;
     
     help|*)

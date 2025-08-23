@@ -9,6 +9,7 @@ shell=False, proper error handling, input sanitization, and privilege dropping
 """
 
 import json
+from src.config.cross_platform import cross_platform
 import re
 import signal
 # Security: subprocess calls use absolute paths, validated args, timeouts,
@@ -953,14 +954,14 @@ class EnhancedClaudeCodeIntegrationLoop:
 1. **Commit changes**: `git add -A && git commit -m \\
    "feat: automated quality improvements - loop {self.loop_session_id}"`
 2. **Push to GitHub**: `git push origin {self.git_branch}`
-3. **Version bump**: `python3 scripts/version_keeper.py --bump-type patch`
+3. **Version bump**: `f"{cross_platform.get_command(\"python\")} "scripts/version_keeper.py --bump-type patch`
 4. **Create release**: Follow version pipeline for release creation
 """
         else:
             report_content += """
 1. **Review remaining issues**: Check latest lint report in `reports/`
 2. **Apply manual fixes**: Use Claude Code integration for complex issues
-3. **Re-run loop**: `python3 scripts/claude_code_integration_loop.py`
+3. **Re-run loop**: `f"{cross_platform.get_command(\"python\")} "scripts/claude_code_integration_loop.py`
 4. **Consider lowering thresholds**: If issues are non-critical
 """
 
@@ -1366,7 +1367,7 @@ successfully resolved all issues.
 1. **Commit Changes**: `git add -A && git commit -m \
 "feat: resolve all lint issues via continuous processing"`
 2. **Push to GitHub**: `git push origin {self.git_branch}`
-3. **Version Bump**: `python3 scripts/version_keeper.py --bump-version`
+3. **Version Bump**: `f"{cross_platform.get_command(\"python\")} "scripts/version_keeper.py --bump-version`
 4. **Create Release**: Follow your release pipeline
 
 ### Quality Metrics:
@@ -1393,7 +1394,7 @@ processing cycles.
                 "duration_seconds": (
 ```bash
                     datetime.now() - cycle_start
-python3 scripts/claude_code_integration_loop.py --max-iterations 50 --target-issues 0
+f"{cross_platform.get_command(\"python\")} "scripts/claude_code_integration_loop.py --max-iterations 50 --target-issues 0
                 ).total_seconds(),
 ```
 """

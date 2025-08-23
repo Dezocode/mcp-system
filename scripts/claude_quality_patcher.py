@@ -6,6 +6,7 @@ and performance optimization
 """
 
 import difflib
+from src.config.cross_platform import cross_platform
 import json
 import os
 import re
@@ -2634,7 +2635,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
         print("2. Work through fixes in priority order (Fix #1, #2, #3, etc.)")
         print("3. For each fix completed, record observation:")
         if self.protocol:
-            print('   python3 -c "')
+            print('   f"{cross_platform.get_command(\"python\")} "-c "')
             print("   from scripts.claude_agent_protocol import get_protocol")
             print("   protocol = get_protocol()")
             print(
@@ -2669,7 +2670,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
 
         print("🔄 NEXT BATCH COMMAND:")
         print(
-            "python3 scripts/claude_quality_patcher.py --claude-agent --max-fixes "
+            "f"{cross_platform.get_command(\"python\")} "scripts/claude_quality_patcher.py --claude-agent --max-fixes "
             "10 --fresh-report"
         )
         if self.session_dir:
@@ -3088,7 +3089,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
                 "3. Continue with next batch of fixes",
                 "",
                 "🔄 To continue fixing:",
-                "python3 scripts/claude_quality_patcher.py --continue --max-fixes 10",
+                "f"{cross_platform.get_command(\"python\")} "scripts/claude_quality_patcher.py --continue --max-fixes 10",
             ]
         )
 
@@ -3350,7 +3351,7 @@ def main(
             print("❌ Failed to generate or find lint report")
             print("💡 Try running manually:")
             print(
-                "   python3 scripts/version_keeper.py --comprehensive-lint "
+                "   f"{cross_platform.get_command(\"python\")} "scripts/version_keeper.py --comprehensive-lint "
                 "--output-dir=reports/"
             )
             sys.exit(1)

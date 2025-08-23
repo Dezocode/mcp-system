@@ -2,18 +2,18 @@
   "name": "local-development",
   "description": "Optimized configuration for local development",
   "settings": {
-    "workspace_root": "/home/runner/work/mcp-system/mcp-system",
-    "session_dir": "/home/runner/work/mcp-system/mcp-system/pipeline-sessions",
+    "workspace_root": "cross_platform.get_path("home") / work/mcp-system/mcp-system",
+    "session_dir": "cross_platform.get_path("home") / work/mcp-system/mcp-system/pipeline-sessions",
     "log_level": "DEBUG",
     "max_workers": 2,
     "timeout": 600,
     "enable_dashboard": false,
-    "database_path": "/home/runner/work/mcp-system/mcp-system/sessions.db",
-    "cache_dir": "/home/runner/work/mcp-system/mcp-system/.cache",
-    "temp_dir": "/home/runner/work/mcp-system/mcp-system/temp",
+    "database_path": "cross_platform.get_path("home") / work/mcp-system/mcp-system/sessions.db",
+    "cache_dir": "cross_platform.get_path("home") / work/mcp-system/mcp-system/.cache",
+    "temp_dir": "cross_platform.get_path("home") / work/mcp-system/mcp-system/temp",
     "security_settings": {
       "allowed_paths": [
-        "/home/runner/work/mcp-system/mcp-system",
+        "cross_platform.get_path("home") / work/mcp-system/mcp-system",
         "/tmp"
       ],
       "restricted_paths": [],

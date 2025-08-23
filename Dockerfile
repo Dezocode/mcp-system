@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 # Set working directory
-WORKDIR /app
+# Platform-agnostic workdir set by build args
+WORKDIR ${WORKDIR:-/app}
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -34,12 +35,12 @@ RUN useradd -m -u 1000 mcpuser && \
 USER mcpuser
 
 # Set up MCP system directories
-RUN mkdir -p /home/mcpuser/.mcp-system/{components,docs,templates,backups,logs} && \
-    mkdir -p /home/mcpuser/bin
+RUN mkdir -p cross_platform.get_path("mcp_home") / .mcp-system/{components,docs,templates,backups,logs} && \
+    mkdir -p cross_platform.get_path("mcp_home") / bin
 
 # Set environment variables
-ENV PATH="/home/mcpuser/bin:$PATH"
-ENV MCP_SYSTEM_PATH="/home/mcpuser/.mcp-system"
+ENV PATH="cross_platform.get_path("mcp_home") / bin:$PATH"
+ENV MCP_SYSTEM_PATH="cross_platform.get_path("mcp_home") / .mcp-system"
 ENV MCP_AUTO_DISCOVERY=true
 ENV MCP_SAFE_MODE=true
 

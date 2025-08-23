@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST SLASH COMMAND ENFORCEMENT SCRIPT
 # Generated: 2025-08-14 16:44:00 CST (Chicago Time MANDATORY)
 # Converts GTST.MD rules into enforceable hooks at verbose function level

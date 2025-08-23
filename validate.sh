@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # MCP System Validation Script
 # Validates Docker configurations and deployment readiness
@@ -146,7 +146,7 @@ run_quick_tests() {
     log_info "Running quick validation tests..."
     
     # Test Python imports
-    if python3 -c "import sys; sys.path.append('src'); import install_mcp_system" 2>/dev/null; then
+    if f"{cross_platform.get_command(\"python\")} "-c "import sys; sys.path.append('src'); import install_mcp_system" 2>/dev/null; then
         log_info "✅ Python modules import successfully"
     else
         log_warn "Python module import issues detected"

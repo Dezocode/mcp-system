@@ -12,14 +12,14 @@ services:
       - MCP_ENV=production
       - DATABASE_URL=postgresql://mcpuser:${DB_PASSWORD}@postgres:5432/mcpsystem
       - REDIS_URL=redis://redis:6379/0
-      - MCP_SYSTEM_PATH=/home/mcpuser/.mcp-system
+      - MCP_SYSTEM_PATH=cross_platform.get_path("mcp_home") / .mcp-system
       - MCP_AUTO_DISCOVERY=true
       - MCP_SAFE_MODE=true
       - MCP_DEBUG=false
       - MCP_LOG_LEVEL=warning
       - PROMETHEUS_ENABLED=true
     volumes:
-      - mcp_data:/home/mcpuser/.mcp-system
+      - mcp_data:cross_platform.get_path("mcp_home") / .mcp-system
       - mcp_logs:/var/log/mcp-system
     depends_on:
       - postgres

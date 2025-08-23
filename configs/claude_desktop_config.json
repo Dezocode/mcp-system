@@ -1,12 +1,12 @@
 {
   "mcpServers": {
     "mcp-system": {
-      "command": "/Users/dezmondhollins/bin/mcp-universal",
+      "command": "cross_platform.get_path("home") / bin/mcp-universal",
       "args": [
         "router"
       ],
       "env": {
-        "MCP_SYSTEM_PATH": "/Users/dezmondhollins/.mcp-system",
+        "MCP_SYSTEM_PATH": "cross_platform.get_path("home") / .mcp-system",
         "MCP_AUTO_DISCOVERY": "true"
       }
     }
@@ -15,7 +15,7 @@
     "enabled": true,
     "auto_discovery": true,
     "safe_mode": true,
-    "installation_path": "/Users/dezmondhollins/.mcp-system",
+    "installation_path": "cross_platform.get_path("home") / .mcp-system",
     "version": "1.0.0"
   }
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # MCP Pipeline Security System - Deletion Protection
 # Protects critical pipeline files from accidental or malicious deletion
 
@@ -139,7 +139,7 @@ protect_pipeline_files() {
 
 create_file_monitor() {
     cat > "${SECURITY_DIR}/monitor.sh" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 # Pipeline File Monitor - Detects unauthorized changes/deletions
 
 SECURITY_DIR=".pipeline-security"

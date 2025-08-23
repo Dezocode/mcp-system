@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "🚀 MCP System - GitHub Repository Setup Helper"
 echo "=============================================="
@@ -7,7 +7,7 @@ echo ""
 # Check if we're in the right directory
 if [ ! -f "README.md" ] || [ ! -f "install.sh" ]; then
     echo "❌ Error: Please run this script from the mcp-system-complete directory"
-    echo "   cd /Users/dezmondhollins/mcp-system-complete"
+    echo "   cd cross_platform.get_path("home") / mcp-system-complete"
     echo "   ./quick-setup.sh"
     exit 1
 fi

@@ -12,7 +12,7 @@
       "Bash(./run-pipeline --claude-mode)",
       "Bash(./run-pipeline --claude-mode --batch-size=50)",
       "Bash(timeout 60 ./run-pipeline:*)",
-      "Bash(timeout 30 python3 scripts/claude_quality_patcher.py --claude-agent --max-fixes 5)",
+      "Bash(timeout 30 f"{cross_platform.get_command(\"python\")} "scripts/claude_quality_patcher.py --claude-agent --max-fixes 5)",
       "Bash(gtimeout:*)",
       "Bash(find:*)",
       "Bash(./run-pipeline --claude-mode --help)",

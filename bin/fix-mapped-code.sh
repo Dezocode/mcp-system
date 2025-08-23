@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # 🔧 FIXMAPPEDCODE - Automated Code Resolution System
 # Processes codemap reports and fixes unresolved calls while enforcing SOP compliance
@@ -7,7 +7,7 @@
 set -e
 
 PROJECT_DIR="${1:-$(pwd)}"
-CODEMAP_TOOL_DIR="/Users/dezmondhollins/my-web-app/codemap-tool"
+CODEMAP_TOOL_DIR="cross_platform.get_path("home") / my-web-app/codemap-tool"
 REPORTS_DIR="$CODEMAP_TOOL_DIR/tmp"
 
 echo "🔧 FIXMAPPEDCODE SYSTEM ACTIVATED"

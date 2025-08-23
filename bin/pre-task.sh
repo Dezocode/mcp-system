@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Pre-task hook for automated MCP pipeline
 # Triggers before each Claude Code task execution
 

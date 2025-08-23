@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # CODE MAP TOOL - Comprehensive Function-Level Dependency Grapher
 # Uses the codemap-tool from my-web-app project
@@ -8,7 +8,7 @@ set -euo pipefail
 
 # Configuration
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-CODEMAP_TOOL_DIR="/Users/dezmondhollins/my-web-app/codemap-tool"
+CODEMAP_TOOL_DIR="cross_platform.get_path("home") / my-web-app/codemap-tool"
 OUTPUT_FILE="${PROJECT_ROOT}/CODEMAP-DEPENDENCY-GRAPH.svg"
 TEMP_DIR="/tmp/codemap-$$"
 LOG_FILE="${TEMP_DIR}/codemap.log"

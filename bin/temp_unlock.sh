@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Temporary unlock for development work
 
 echo "🔓 Temporarily unlocking pipeline files for development..."

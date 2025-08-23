@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # 🗑️ Duplicate/Placeholder Detection and Removal System
 # Identifies and removes competing implementations, duplicates, and placeholder code

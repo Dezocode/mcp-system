@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Claude-MCP Upgrade Integration
 # Allows Claude to intelligently upgrade MCP servers
 
 set -e
 
-UPGRADER="/Users/dezmondhollins/mcp-upgrader.py"
+UPGRADER="cross_platform.get_path("home") / mcp-upgrader.py"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -28,9 +28,9 @@ suggest_upgrades() {
     log_debug "Prompt: $prompt"
     
     if [ -n "$server" ]; then
-        suggestions=$(python3 "$UPGRADER" suggest "$prompt" "$server")
+        suggestions=$(f"{cross_platform.get_command(\"python\")} ""$UPGRADER" suggest "$prompt" "$server")
     else
-        suggestions=$(python3 "$UPGRADER" suggest "$prompt")
+        suggestions=$(f"{cross_platform.get_command(\"python\")} ""$UPGRADER" suggest "$prompt")
     fi
     
     echo "$suggestions"
@@ -42,7 +42,7 @@ analyze_server() {
     
     log_info "Analyzing server '$server' for upgrade opportunities..."
     
-    analysis=$(python3 "$UPGRADER" analyze "$server")
+    analysis=$(f"{cross_platform.get_command(\"python\")} ""$UPGRADER" analyze "$server")
     echo "$analysis"
 }
 
@@ -62,7 +62,7 @@ install_upgrades() {
     
     # Dry run first
     log_info "Running dry run to check compatibility..."
-    if python3 "$UPGRADER" install "$server" "${modules[@]}" --dry-run; then
+    if f"{cross_platform.get_command(\"python\")} ""$UPGRADER" install "$server" "${modules[@]}" --dry-run; then
         log_info "✅ Dry run successful"
         
         # Ask for confirmation
@@ -70,7 +70,7 @@ install_upgrades() {
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             log_info "Installing modules..."
-            python3 "$UPGRADER" install "$server" "${modules[@]}"
+            f"{cross_platform.get_command(\"python\")} ""$UPGRADER" install "$server" "${modules[@]}"
         else
             log_warn "Installation cancelled"
             return 1
@@ -91,7 +91,7 @@ rollback_upgrade() {
     read -p "Are you sure you want to rollback '$module'? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        python3 "$UPGRADER" rollback "$server" "$module"
+        f"{cross_platform.get_command(\"python\")} ""$UPGRADER" rollback "$server" "$module"
     else
         log_warn "Rollback cancelled"
     fi
@@ -104,9 +104,9 @@ list_modules() {
     log_info "Available upgrade modules:"
     
     if [ -n "$template_filter" ]; then
-        python3 "$UPGRADER" list-modules --template "$template_filter"
+        f"{cross_platform.get_command(\"python\")} ""$UPGRADER" list-modules --template "$template_filter"
     else
-        python3 "$UPGRADER" list-modules
+        f"{cross_platform.get_command(\"python\")} ""$UPGRADER" list-modules
     fi
 }
 
@@ -119,7 +119,7 @@ upgrade_wizard() {
     
     # Step 1: Analyze server
     log_info "Step 1: Analyzing server..."
-    analysis=$(python3 "$UPGRADER" analyze "$server")
+    analysis=$(f"{cross_platform.get_command(\"python\")} ""$UPGRADER" analyze "$server")
     
     recommended=$(echo "$analysis" | jq -r '.recommended_upgrades[].module_id' 2>/dev/null || echo "")
     
@@ -249,7 +249,7 @@ case "${1:-help}" in
             log_error "Usage: $0 install-module <module-file.json>"
             exit 1
         fi
-        python3 "$UPGRADER" install-module "$2"
+        f"{cross_platform.get_command(\"python\")} ""$UPGRADER" install-module "$2"
         ;;
     
     help|*)

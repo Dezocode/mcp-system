@@ -15,7 +15,7 @@
       "duration_seconds": 0.051304,
       "start_time": "2025-08-20T08:06:14.554964",
       "end_time": "2025-08-20T08:06:14.606268",
-      "stdout": "Traceback (most recent call last):\n  File \"/Users/dezmondhollins/mcp-system-complete/scripts/claude_code_integration_loop.py\", line 2951, in <module>\n    main()\nTypeError: main() missing 14 required positional arguments: 'max_iterations', 'auto_fix_threshold', 'claude_integration', 'quality_threshold', 'branch', 'dry_run', 'continuous_rerun', 'max_cycles', 'target_issues', 'publish_pipeline', 'non_interactive', 'session_dir', 'protocol_enabled', and 'direct_mode'\n",
+      "stdout": "Traceback (most recent call last):\n  File \"cross_platform.get_path("home") / mcp-system-complete/scripts/claude_code_integration_loop.py\", line 2951, in <module>\n    main()\nTypeError: main() missing 14 required positional arguments: 'max_iterations', 'auto_fix_threshold', 'claude_integration', 'quality_threshold', 'branch', 'dry_run', 'continuous_rerun', 'max_cycles', 'target_issues', 'publish_pipeline', 'non_interactive', 'session_dir', 'protocol_enabled', and 'direct_mode'\n",
       "stderr": "",
       "checkpoint_id": "continuous_integration_loop_integration_loop_1755695174",
       "metrics": {}
@@ -26,14 +26,14 @@
   "redundancy_checkpoints": [
     {
       "id": "continuous_integration_loop_integration_loop_1755695174",
-      "file": "/Users/dezmondhollins/mcp-system-complete/.mcp-pipeline-checkpoints/continuous_integration_loop_integration_loop_1755695174.json",
+      "file": "cross_platform.get_path("home") / mcp-system-complete/.mcp-pipeline-checkpoints/continuous_integration_loop_integration_loop_1755695174.json",
       "timestamp": "2025-08-20T08:06:14.555389",
       "data": {
         "component": "integration_loop",
         "phase": "continuous_integration_loop",
         "command": [
           "python3",
-          "/Users/dezmondhollins/mcp-system-complete/scripts/claude_code_integration_loop.py",
+          "cross_platform.get_path("home") / mcp-system-complete/scripts/claude_code_integration_loop.py",
           "--continuous-rerun",
           "--max-cycles=999",
           "--target-issues=0",

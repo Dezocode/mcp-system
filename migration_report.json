@@ -1,0 +1,261 @@
+{
+  "timestamp": "2025-08-23T15:08:41.944230",
+  "dry_run": false,
+  "files_modified": 60,
+  "changes": [
+    {
+      "file": "analyze_functions.py",
+      "changes": 3
+    },
+    {
+      "file": "core/mcp-router.py",
+      "changes": 4
+    },
+    {
+      "file": "core/claude-code-mcp-bridge.py",
+      "changes": 4
+    },
+    {
+      "file": "scripts/fix_hardcoded_paths.py",
+      "changes": 6
+    },
+    {
+      "file": "scripts/claude_code_integration_loop.py",
+      "changes": 6
+    },
+    {
+      "file": "scripts/claude_quality_patcher.py",
+      "changes": 6
+    },
+    {
+      "file": "installers/install-mcp-system.py",
+      "changes": 3
+    },
+    {
+      "file": "validate.sh",
+      "changes": 1
+    },
+    {
+      "file": "deploy.sh",
+      "changes": 0
+    },
+    {
+      "file": "scripts/backup.sh",
+      "changes": 1
+    },
+    {
+      "file": "bin/gh-branch-monitor.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/claude-upgrade_1.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/check-end-to-end-sop.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/test-pipeline-hook.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/mcp-launcher.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/gtst-final-validation.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/gtst-pre-tool.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/enforce-prettier-lang-sop.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/post-task.sh",
+      "changes": 2
+    },
+    {
+      "file": "bin/fix-mapped-code.sh",
+      "changes": 1
+    },
+    {
+      "file": "bin/setup-file-sync.sh",
+      "changes": 7
+    },
+    {
+      "file": "bin/gtst-rm-snowball-analysis-cleanup.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/pipeline-security.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/validate-codemap.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/claude-upgrade.sh",
+      "changes": 11
+    },
+    {
+      "file": "bin/install-trace-hooks.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/one-click-mcp-installer.sh",
+      "changes": 4
+    },
+    {
+      "file": "bin/code-map.sh",
+      "changes": 1
+    },
+    {
+      "file": "bin/gtst-patch-generator.sh",
+      "changes": 4
+    },
+    {
+      "file": "bin/install.sh",
+      "changes": 4
+    },
+    {
+      "file": "bin/pre-task.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/temp_unlock.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/gtst-post-tool.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/gtst-enforcement.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/gtst-command-handler.sh",
+      "changes": 8
+    },
+    {
+      "file": "bin/quick-setup.sh",
+      "changes": 1
+    },
+    {
+      "file": "bin/monitor.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/claude-mcp_1.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/detect-duplicates.sh",
+      "changes": 0
+    },
+    {
+      "file": "bin/claude-mcp.sh",
+      "changes": 8
+    },
+    {
+      "file": "bin/gtst-timestamping-tool.sh",
+      "changes": 0
+    },
+    {
+      "file": "docker-compose.dev.yml",
+      "changes": 1
+    },
+    {
+      "file": "docker-compose.prod.yml",
+      "changes": 2
+    },
+    {
+      "file": "gemini-polish-analysis.json",
+      "changes": 1283
+    },
+    {
+      "file": "configs/settings.local_1.json",
+      "changes": 2
+    },
+    {
+      "file": "configs/settings.local.json",
+      "changes": 1
+    },
+    {
+      "file": "configs/settings_1.json",
+      "changes": 6
+    },
+    {
+      "file": "configs/pipeline-state.json",
+      "changes": 3
+    },
+    {
+      "file": "configs/.claude.json",
+      "changes": 58
+    },
+    {
+      "file": "configs/.claude-fixes.json",
+      "changes": 7370
+    },
+    {
+      "file": "configs/claude_desktop_config.json",
+      "changes": 3
+    },
+    {
+      "file": "configs/.mcp-servers.json",
+      "changes": 1
+    },
+    {
+      "file": "src/config/profiles/local-development.json",
+      "changes": 6
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_134051/mcp-manager_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_134051.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_133951/claude_code_mcp_bridge_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_133951.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_134032/auto_discovery_system_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_134032.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_134012/install_mcp_system_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_134012.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_134133/mcp-upgrader_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_134133.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": ".claude_patches/quality_patcher_backups/vunknown/unknown/20250823_134112/mcp-router_vunknown_unknown_p2_duplicates_remove_duplicate_20250823_134112.py.qp_metadata.json",
+      "changes": 2
+    },
+    {
+      "file": "Dockerfile",
+      "changes": 4
+    }
+  ],
+  "platform": {
+    "system": "Linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025",
+    "machine": "x86_64",
+    "processor": "x86_64",
+    "python_version": "3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]",
+    "is_64bit": true,
+    "is_docker": false,
+    "is_wsl": true,
+    "is_github_actions": false,
+    "is_ci": false,
+    "platform": "wsl"
+  }
+}

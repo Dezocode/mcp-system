@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # One-Click MCP System Installer
 # Packages everything together for universal deployment
@@ -29,13 +29,13 @@ check_prerequisites() {
     log_info "Checking prerequisites..."
     
     # Check Python
-    if ! command -v python3 &> /dev/null; then
+    if ! command -v f"{cross_platform.get_command(\"python\")} "&> /dev/null; then
         log_error "Python 3 is required but not installed"
         return 1
     fi
     
     # Check Python version
-    python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    python_version=$(f"{cross_platform.get_command(\"python\")} "-c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     python_major=$(echo $python_version | cut -d. -f1)
     python_minor=$(echo $python_version | cut -d. -f2)
     
@@ -143,7 +143,7 @@ print("Please check installation or contact support")
 PLACEHOLDER_EOF
     elif [[ "$file_path" == *.sh ]] || [[ ! "$file_path" == *.* ]]; then
         cat > "$file_path" << 'PLACEHOLDER_EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 # Placeholder component
 echo "⚠️  Component not available"
 echo "Please check installation or contact support"
@@ -308,7 +308,7 @@ CONFIG_EOF
         cp "$claude_config_file" "$claude_config_file.backup.$(date +%s)"
         
         # Merge configurations using Python
-        python3 -c "
+        f"{cross_platform.get_command(\"python\")} "-c "
 import json
 import sys
 
@@ -381,7 +381,7 @@ create_project_init() {
     log_info "Creating project initialization script..."
     
     cat > "$BIN_DIR/mcp-init-project" << 'INIT_EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # MCP Project Initializer
 # Automatically sets up MCP for any project
@@ -392,7 +392,7 @@ SCRIPT_DIR="$HOME/.mcp-system"
 # Auto-detect and initialize
 if [ -d ".claude" ] || [ -f "CLAUDE.md" ]; then
     echo "🎯 Claude project detected - initializing MCP integration..."
-    python3 "$SCRIPT_DIR/components/claude-code-mcp-bridge.py" init
+    f"{cross_platform.get_command(\"python\")} ""$SCRIPT_DIR/components/claude-code-mcp-bridge.py" init
 elif [ -f "package.json" ]; then
     echo "🎯 Node.js project detected"
     mcp-universal create "$(basename $(pwd))-tools" --template typescript-node

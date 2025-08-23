@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST POST-TOOL VERIFICATION HOOK
 # Generated: 2025-08-14 16:44:00 CST (Chicago Time MANDATORY)
 # Validates changes after Write/Edit/MultiEdit operations

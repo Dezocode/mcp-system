@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # install-trace-hooks.sh - Install trace snowball enforcement hooks
 # Created: 2025-01-09 19:45:00 CST

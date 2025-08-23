@@ -15,7 +15,7 @@ services:
       - MCP_SAFE_MODE=true
       - PYTHONPATH=/app/src:/app/core
     volumes:
-      - mcp_data:/home/mcpuser/.mcp-system
+      - mcp_data:cross_platform.get_path("mcp_home") / .mcp-system
       - mcp_logs:/var/log/mcp-system
     healthcheck:
       test: ["CMD", "python3", "-c", "print('Health OK')"]

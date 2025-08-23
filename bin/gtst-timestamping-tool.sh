@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST REAL TIMESTAMPING TOOL
 # Generated: 2025-08-14 16:44:00 CST (Chicago Time MANDATORY)
 # Enforces Chicago timestamps on ALL documents in ALL processes

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # CODEMAP Validation Script
 # Ensures AI has completed comprehensive function-level analysis

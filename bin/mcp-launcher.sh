@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # MCP Universal Launcher - Start any MCP server with dependencies
 # Usage: ./mcp-launcher.sh [server-name] [action] [options]

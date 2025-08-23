@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # MCP System Backup Script
 # Performs automated backups of database and application data
@@ -24,7 +24,7 @@ pg_dump -h postgres -U "$DB_USER" -d "$DB_NAME" --no-password | gzip > "$BACKUP_
 
 # MCP System data backup
 echo "💾 Backing up MCP system data..."
-if [ -d "/home/mcpuser/.mcp-system" ]; then
+if [ -d "cross_platform.get_path("mcp_home") / .mcp-system" ]; then
     tar -czf "$BACKUP_DIR/mcp_data_$TIMESTAMP.tar.gz" -C /home/mcpuser .mcp-system
 fi
 

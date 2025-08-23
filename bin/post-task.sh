@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Post-task hook for automated MCP pipeline
 # Triggers after each Claude Code task execution
 
@@ -15,7 +15,7 @@ fi
 if [[ $files_modified -gt 0 ]]; then
     echo "🔍 Validating syntax of modified files..."
     for file in $(git diff --name-only | grep '\.py$'); do
-        if python3 -m py_compile "$file" 2>/dev/null; then
+        if f"{cross_platform.get_command(\"python\")} "-m py_compile "$file" 2>/dev/null; then
             echo "✅ $file: Syntax valid"
         else
             echo "❌ $file: Syntax error detected"
@@ -25,7 +25,7 @@ fi
 
 # Update pipeline state
 if [[ -f ".mcp-pipeline-state.json" ]]; then
-    python3 -c "
+    f"{cross_platform.get_command(\"python\")} "-c "
 import json
 import datetime
 try:

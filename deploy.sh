@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # MCP System Production Deployment Script
 # Deploys the complete MCP system using Docker Compose

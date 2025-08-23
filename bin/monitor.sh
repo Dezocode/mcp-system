@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Pipeline File Monitor - Detects unauthorized changes/deletions
 
 SECURITY_DIR=".pipeline-security"

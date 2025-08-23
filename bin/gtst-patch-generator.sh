@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST-PATCH-GENERATOR.SH
 # Generated: 2025-08-14 17:15:00 CST (Chicago Time MANDATORY)
 # Generates detailed GTST patch scripts informed by RM analysis
@@ -66,7 +66,7 @@ echo "📄 Using RM Analysis: $(basename "$RM_ANALYSIS_FILE")"
 PATCH_FILE="$PROJECT_DIR/gtst-patch-$CHICAGO_TIMESTAMP-CST-comprehensive.sh"
 
 cat > "$PATCH_FILE" << 'EOF'
-#!/bin/bash
+#!/usr/bin/env bash
 # GTST COMPREHENSIVE PATCH SCRIPT
 # Generated: $(chicago_time)
 # DOM-EXPECTED-FUNCTIONS.md Compliant Automated Cleanup
@@ -106,8 +106,8 @@ echo "📊 DOM elements documented: $DOM_ELEMENTS"
 
 # Execute GTST enforcement before any changes
 echo "🚨 Executing GTST enforcement validation..."
-if command -v /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh >/dev/null 2>&1; then
-    /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh "PATCH PRE-EXECUTION VALIDATION" || {
+if command -v cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh >/dev/null 2>&1; then
+    cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh "PATCH PRE-EXECUTION VALIDATION" || {
         echo "❌ GTST validation failed - patch execution blocked"
         exit 2
     }
@@ -195,8 +195,8 @@ echo "────────────────────────�
 echo "🔍 Executing post-patch GTST validation..."
 
 # Run GTST validation again
-if command -v /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh >/dev/null 2>&1; then
-    /Users/dezmondhollins/.claude/hooks/gtst-enforcement.sh "PATCH POST-EXECUTION VALIDATION" || {
+if command -v cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh >/dev/null 2>&1; then
+    cross_platform.get_path("home") / .claude/hooks/gtst-enforcement.sh "PATCH POST-EXECUTION VALIDATION" || {
         echo "❌ GTST post-validation failed"
         echo "🔄 Patch may need rollback"
         exit 2
