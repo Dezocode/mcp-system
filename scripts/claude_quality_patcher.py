@@ -3308,10 +3308,78 @@ def main(
     output_file,
     auto_apply,
 ):
-    """Enhanced Claude Quality Patcher v2.0 - Protocol Integrated"""
+    """
+    Enhanced Claude Quality Patcher v2.0 - Protocol Integrated
+    
+    Automatically applies quality fixes to code based on lint reports with Claude integration.
+    
+    Examples:
+        # Basic dry run to see what would be fixed
+        python scripts/claude_quality_patcher.py --dry-run
+        
+        # Apply fixes with debug output
+        python scripts/claude_quality_patcher.py --debug --max-fixes=10
+        
+        # Claude agent mode for manual review
+        python scripts/claude_quality_patcher.py --claude-agent --batch-mode
+        
+        # Automated background processing
+        python scripts/claude_quality_patcher.py --auto-mode --background --max-fixes=50
+        
+        # Generate fresh report and apply fixes
+        python scripts/claude_quality_patcher.py --fresh-report --auto-apply
+    """
+    
+    # Configure logging based on debug mode
+    import logging
+    log_level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+    
+    if debug:
+        logger.debug("Debug mode enabled - verbose output will be shown")
+        logger.debug(f"CLI Arguments: max_fixes={max_fixes}, auto_mode={auto_mode}")
 
     print("🤖 Enhanced Claude Quality Patcher v2.0")
     print("=" * 60)
+    
+    # Input validation
+    try:
+        if max_fixes <= 0:
+            logger.error(f"max_fixes must be positive integer, got: {max_fixes}")
+            sys.exit(1)
+            
+        if max_fixes > 1000:
+            logger.warning(f"Large max_fixes value: {max_fixes}. This may take a long time.")
+            
+        if output_file:
+            output_file_path = Path(output_file)
+            if not output_file_path.parent.exists():
+                logger.error(f"Output directory does not exist: {output_file_path.parent}")
+                sys.exit(1)
+                
+        if session_dir:
+            session_dir_path = Path(session_dir)
+            if not session_dir_path.exists():
+                logger.warning(f"Creating session directory: {session_dir_path}")
+                session_dir_path.mkdir(parents=True, exist_ok=True)
+                
+        if lint_report and not Path(lint_report).exists():
+            logger.error(f"Specified lint report does not exist: {lint_report}")
+            sys.exit(1)
+            
+        if debug:
+            logger.debug("Input validation completed successfully")
+            
+    except Exception as e:
+        logger.error(f"Input validation failed: {e}")
+        if debug:
+            logger.exception("Full traceback:")
+        sys.exit(1)
 
     if protocol_dir:
         print(f"🔗 Protocol integration: {protocol_dir}")

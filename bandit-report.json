@@ -1,0 +1,2948 @@
+{
+  "errors": [],
+  "generated_at": "2025-08-23T23:04:31Z",
+  "metrics": {
+    "_totals": {
+      "CONFIDENCE.HIGH": 103,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 14,
+      "SEVERITY.LOW": 89,
+      "SEVERITY.MEDIUM": 2,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 14906,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/__init__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 0,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/auto-discovery-system.py": {
+      "CONFIDENCE.HIGH": 5,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 5,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 786,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/claude-code-mcp-bridge.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 436,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/direct-mem0-usage.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 58,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-create-server.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 878,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-manager.py": {
+      "CONFIDENCE.HIGH": 7,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 6,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 299,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-mem0-client.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 117,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-mem0-simple.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 110,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-router.py": {
+      "CONFIDENCE.HIGH": 3,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 2,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 279,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-test-framework.py": {
+      "CONFIDENCE.HIGH": 3,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 1,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 2,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 1,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 439,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "core/mcp-upgrader.py": {
+      "CONFIDENCE.HIGH": 8,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 2,
+      "SEVERITY.LOW": 6,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1320,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "guardrails/__init__.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 0,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/claude_agent_protocol.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 497,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/claude_code_integration_loop.py": {
+      "CONFIDENCE.HIGH": 33,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 33,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 1927,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/claude_oversight_loop.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 212,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/claude_quality_patcher.py": {
+      "CONFIDENCE.HIGH": 10,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 10,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 2757,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/docker-health-check.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 34,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/fix_hardcoded_paths.py": {
+      "CONFIDENCE.HIGH": 0,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 0,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 174,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/version_keeper.py": {
+      "CONFIDENCE.HIGH": 16,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 15,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 2258,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/version_keeper_1.py": {
+      "CONFIDENCE.HIGH": 15,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 14,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 2086,
+      "nosec": 0,
+      "skipped_tests": 0
+    },
+    "scripts/version_keeper_working.py": {
+      "CONFIDENCE.HIGH": 3,
+      "CONFIDENCE.LOW": 0,
+      "CONFIDENCE.MEDIUM": 0,
+      "CONFIDENCE.UNDEFINED": 0,
+      "SEVERITY.HIGH": 0,
+      "SEVERITY.LOW": 3,
+      "SEVERITY.MEDIUM": 0,
+      "SEVERITY.UNDEFINED": 0,
+      "loc": 239,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "11 import re\n12 import subprocess\n13 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "core/auto-discovery-system.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 12,
+      "line_range": [
+        12
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "407             # Get running processes\n408             result = subprocess.run(\n409                 [\"ps\", \"aux\"],\n410                 capture_output=True,\n411                 text=True,\n412             )\n413             processes = result.stdout.lower()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "core/auto-discovery-system.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 408,
+      "line_range": [
+        408,
+        409,
+        410,
+        411,
+        412
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "407             # Get running processes\n408             result = subprocess.run(\n409                 [\"ps\", \"aux\"],\n410                 capture_output=True,\n411                 text=True,\n412             )\n413             processes = result.stdout.lower()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "core/auto-discovery-system.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 408,
+      "line_range": [
+        408,
+        409,
+        410,
+        411,
+        412
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "523                 return False\n524             subprocess.run(\n525                 [tool, \"--version\"],\n526                 capture_output=True,\n527                 timeout=5,\n528                 check=False,\n529             )\n530             return True\n",
+      "col_offset": 12,
+      "end_col_offset": 13,
+      "filename": "core/auto-discovery-system.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 524,
+      "line_range": [
+        524,
+        525,
+        526,
+        527,
+        528,
+        529
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "766 \n767                     result = subprocess.run(\n768                         cmd_parts,\n769                         capture_output=True,\n770                         text=True,\n771                         timeout=30,\n772                     )\n773 \n",
+      "col_offset": 29,
+      "end_col_offset": 21,
+      "filename": "core/auto-discovery-system.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 767,
+      "line_range": [
+        767,
+        768,
+        769,
+        770,
+        771,
+        772
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "9 import signal\n10 import subprocess\n11 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 10,
+      "line_range": [
+        10
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "75                     f\"docker ps -q -f name={dep_config['name']}\",\n76                     shell=True,\n77                     capture_output=True,\n78                     text=True,\n79                 )\n80 \n81                 if not result.stdout.strip():\n82                     # Try to start existing container\n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 76,
+      "line_range": [
+        74,
+        75,
+        76,
+        77,
+        78,
+        79
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "84                         f\"docker start {dep_config['name']}\",\n85                         shell=True,\n86                         capture_output=True,\n87                     )\n88 \n89                     if start_result.returncode != 0:\n90                         # Create new container\n",
+      "col_offset": 35,
+      "end_col_offset": 21,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 85,
+      "line_range": [
+        83,
+        84,
+        85,
+        86,
+        87
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "107                         )\n108                         subprocess.run(cmd, shell=True, check=True)\n109                         time.sleep(3)  # Wait for container to start\n",
+      "col_offset": 24,
+      "end_col_offset": 67,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 108,
+      "line_range": [
+        108
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "119                             dep_config[\"command\"],\n120                             shell=True,\n121                             stdout=subprocess.DEVNULL,\n122                             stderr=subprocess.DEVNULL,\n123                         )\n124                         time.sleep(2)\n125 \n126         return True\n",
+      "col_offset": 24,
+      "end_col_offset": 25,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 120,
+      "line_range": [
+        118,
+        119,
+        120,
+        121,
+        122,
+        123
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "154         if foreground:\n155             subprocess.run(command, shell=True, cwd=path)\n156             return {\"success\": True, \"message\": \"Server stopped\"}\n",
+      "col_offset": 12,
+      "end_col_offset": 57,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 155,
+      "line_range": [
+        155
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "159                 command,\n160                 shell=True,\n161                 cwd=path,\n162                 stdout=subprocess.PIPE,\n163                 stderr=subprocess.PIPE,\n164             )\n165 \n166             self.running_servers[server_name] = {\n167                 \"process\": process,\n",
+      "col_offset": 22,
+      "end_col_offset": 13,
+      "filename": "core/mcp-manager.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 160,
+      "line_range": [
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "28             # Send POST request with SSE headers\n29             response = requests.post(\n30                 f\"{self.base_url}/sse\",\n31                 json=payload,\n32                 headers={\n33                     \"Content-Type\": \"application/json\",\n34                     \"Accept\": \"text/event-stream\",\n35                 },\n36                 stream=True,\n37             )\n38 \n",
+      "col_offset": 23,
+      "end_col_offset": 13,
+      "filename": "core/mcp-mem0-simple.py",
+      "issue_confidence": "LOW",
+      "issue_cwe": {
+        "id": 400,
+        "link": "https://cwe.mitre.org/data/definitions/400.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Call to requests without timeout",
+      "line_number": 29,
+      "line_range": [
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b113_request_without_timeout.html",
+      "test_id": "B113",
+      "test_name": "request_without_timeout"
+    },
+    {
+      "code": "10 import re\n11 import subprocess\n12 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "core/mcp-router.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 11,
+      "line_range": [
+        11
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "163             cmd = f\"{cross_platform.get_path('home')}/mcp {server} status\"\n164             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)\n165 \n",
+      "col_offset": 21,
+      "end_col_offset": 84,
+      "filename": "core/mcp-router.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 164,
+      "line_range": [
+        164
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "172                 result = subprocess.run(\n173                     cmd, shell=True, capture_output=True, text=True\n174                 )\n175                 results[server] = result.returncode == 0\n176 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "core/mcp-router.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 173,
+      "line_range": [
+        172,
+        173,
+        174
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "8 import json\n9 import subprocess\n10 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "core/mcp-test-framework.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 9,
+      "line_range": [
+        9
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "369                 f\"mcp {server_name} status\",\n370                 shell=True,\n371                 capture_output=True,\n372                 text=True,\n373             )\n374 \n375             if \"running\" in result.stdout.lower():\n376                 print(f\"Server {server_name} is already running\")\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "core/mcp-test-framework.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 370,
+      "line_range": [
+        368,
+        369,
+        370,
+        371,
+        372,
+        373
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "381                 f\"mcp {server_name} start\",\n382                 shell=True,\n383                 capture_output=True,\n384                 text=True,\n385             )\n386 \n387             if start_result.returncode == 0:\n388                 print(f\"Server {server_name} started successfully\")\n",
+      "col_offset": 27,
+      "end_col_offset": 13,
+      "filename": "core/mcp-test-framework.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 382,
+      "line_range": [
+        380,
+        381,
+        382,
+        383,
+        384,
+        385
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "436                 \"tool\": \"list_directory\",\n437                 \"args\": {\"path\": \"/tmp\"},\n438             },\n",
+      "col_offset": 33,
+      "end_col_offset": 39,
+      "filename": "core/mcp-test-framework.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": {
+        "id": 377,
+        "link": "https://cwe.mitre.org/data/definitions/377.html"
+      },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Probable insecure usage of temp file/directory.",
+      "line_number": 437,
+      "line_range": [
+        437
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b108_hardcoded_tmp_directory.html",
+      "test_id": "B108",
+      "test_name": "hardcoded_tmp_directory"
+    },
+    {
+      "code": "9 import shutil\n10 import subprocess\n11 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 10,
+      "line_range": [
+        10
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "138                     return version\n139             except Exception:\n140                 continue\n141 \n",
+      "col_offset": 12,
+      "end_col_offset": 24,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 139,
+      "line_range": [
+        139,
+        140
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "165         try:\n166             result = subprocess.run(\n167                 [\"git\", \"describe\", \"--tags\", \"--abbrev=0\"],\n168                 cwd=path,\n169                 capture_output=True,\n170                 text=True,\n171             )\n172             if result.returncode == 0:\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 166,
+      "line_range": [
+        166,
+        167,
+        168,
+        169,
+        170,
+        171
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "165         try:\n166             result = subprocess.run(\n167                 [\"git\", \"describe\", \"--tags\", \"--abbrev=0\"],\n168                 cwd=path,\n169                 capture_output=True,\n170                 text=True,\n171             )\n172             if result.returncode == 0:\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 166,
+      "line_range": [
+        166,
+        167,
+        168,
+        169,
+        170,
+        171
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "173                 return result.stdout.strip().lstrip(\"v\")\n174         except Exception:\n175             pass\n176         return None\n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 174,
+      "line_range": [
+        174,
+        175
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "184                 return data.get(\"installed_modules\", [])\n185             except Exception:\n186                 pass\n187         return []\n",
+      "col_offset": 12,
+      "end_col_offset": 20,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 185,
+      "line_range": [
+        185,
+        186
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "554                     command,\n555                     shell=True,\n556                     cwd=server.path,\n557                     capture_output=True,\n558                     text=True,\n559                 )\n560                 if result_cmd.returncode != 0:\n561                     result.errors.append(f\"Command failed: {command}\")\n562                     result.errors.append(f\"Error: {result_cmd.stderr}\")\n",
+      "col_offset": 29,
+      "end_col_offset": 17,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 555,
+      "line_range": [
+        553,
+        554,
+        555,
+        556,
+        557,
+        558,
+        559
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "651                     print(f\"  Rolling back: {command}\")\n652                     subprocess.run(command, shell=True, cwd=server.path)\n653 \n",
+      "col_offset": 20,
+      "end_col_offset": 72,
+      "filename": "core/mcp-upgrader.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "subprocess call with shell=True identified, security issue.",
+      "line_number": 652,
+      "line_range": [
+        652
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b602_subprocess_popen_with_shell_equals_true.html",
+      "test_id": "B602",
+      "test_name": "subprocess_popen_with_shell_equals_true"
+    },
+    {
+      "code": "16 # shell=False, proper error handling, input sanitization, privilege dropping\n17 import subprocess\n18 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 17,
+      "line_range": [
+        17
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "308 \n309             result = subprocess.run(\n310                 [\n311                     \"/usr/bin/python3\",  # Security: Use absolute path\n312                     str(self.version_keeper_path.resolve()),  # Security: Resolve path\n313                     \"--comprehensive-lint\",\n314                     \"--lint-only\",\n315                     \"--output-dir=reports/\",\n316                 ],\n317                 capture_output=True,\n318                 text=True,\n319                 cwd=self.repo_path,\n320                 timeout=120,  # Security: Reduced timeout to prevent hanging processes\n321             )\n322 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 309,
+      "line_range": [
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "484 \n485             result = subprocess.run(\n486                 [\n487                     \"/usr/bin/python3\",  # Security: Use absolute path\n488                     str(self.quality_patcher_path),\n489                     \"--claude-agent\",\n490                     f\"--max-fixes={fixes_to_apply}\",\n491                     \"--no-interactive\",\n492                 ],\n493                 capture_output=True,\n494                 text=True,\n495                 cwd=self.repo_path,\n496                 timeout=1800,\n497             )  # 30 minutes for ALL fixes\n498 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 485,
+      "line_range": [
+        485,
+        486,
+        487,
+        488,
+        489,
+        490,
+        491,
+        492,
+        493,
+        494,
+        495,
+        496,
+        497
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "571         try:\n572             patcher_result = subprocess.run(\n573                 [\n574                     \"python3\",\n575                     str(self.quality_patcher_path),\n576                     f\"--max-fixes={manual_fixes_limit}\",\n577                     \"--claude-agent\",\n578                     \"--no-interactive\",\n579                 ],\n580                 capture_output=True,\n581                 text=True,\n582                 cwd=self.repo_path,\n583                 timeout=1800,\n584             )  # 30 minutes for ALL fixes\n585 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 572,
+      "line_range": [
+        572,
+        573,
+        574,
+        575,
+        576,
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "571         try:\n572             patcher_result = subprocess.run(\n573                 [\n574                     \"python3\",\n575                     str(self.quality_patcher_path),\n576                     f\"--max-fixes={manual_fixes_limit}\",\n577                     \"--claude-agent\",\n578                     \"--no-interactive\",\n579                 ],\n580                 capture_output=True,\n581                 text=True,\n582                 cwd=self.repo_path,\n583                 timeout=1800,\n584             )  # 30 minutes for ALL fixes\n585 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 572,
+      "line_range": [
+        572,
+        573,
+        574,
+        575,
+        576,
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1164         try:\n1165             patcher_result = subprocess.run(\n1166                 [\n1167                     \"python3\",\n1168                     str(self.quality_patcher_path),\n1169                     \"--claude-agent\",\n1170                     f\"--max-fixes={current_issues}\",  # Fix ALL issues\n1171                     \"--no-interactive\",\n1172                 ],\n1173                 capture_output=True,\n1174                 text=True,\n1175                 cwd=self.repo_path,\n1176                 timeout=3600,\n1177             )  # 1 hour timeout\n1178 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1165,
+      "line_range": [
+        1165,
+        1166,
+        1167,
+        1168,
+        1169,
+        1170,
+        1171,
+        1172,
+        1173,
+        1174,
+        1175,
+        1176,
+        1177
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1164         try:\n1165             patcher_result = subprocess.run(\n1166                 [\n1167                     \"python3\",\n1168                     str(self.quality_patcher_path),\n1169                     \"--claude-agent\",\n1170                     f\"--max-fixes={current_issues}\",  # Fix ALL issues\n1171                     \"--no-interactive\",\n1172                 ],\n1173                 capture_output=True,\n1174                 text=True,\n1175                 cwd=self.repo_path,\n1176                 timeout=3600,\n1177             )  # 1 hour timeout\n1178 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1165,
+      "line_range": [
+        1165,
+        1166,
+        1167,
+        1168,
+        1169,
+        1170,
+        1171,
+        1172,
+        1173,
+        1174,
+        1175,
+        1176,
+        1177
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1486             # Check if development branch exists\n1487             result = subprocess.run(\n1488                 [\"git\", \"branch\", \"-r\"],\n1489                 capture_output=True,\n1490                 text=True,\n1491                 cwd=self.repo_path,\n1492             )\n1493 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1487,
+      "line_range": [
+        1487,
+        1488,
+        1489,
+        1490,
+        1491,
+        1492
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1486             # Check if development branch exists\n1487             result = subprocess.run(\n1488                 [\"git\", \"branch\", \"-r\"],\n1489                 capture_output=True,\n1490                 text=True,\n1491                 cwd=self.repo_path,\n1492             )\n1493 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1487,
+      "line_range": [
+        1487,
+        1488,
+        1489,
+        1490,
+        1491,
+        1492
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1498                 # Switch to development branch\n1499                 switch_result = subprocess.run(\n1500                     [\"git\", \"checkout\", \"development\"],\n1501                     capture_output=True,\n1502                     text=True,\n1503                     cwd=self.repo_path,\n1504                 )\n1505 \n",
+      "col_offset": 32,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1499,
+      "line_range": [
+        1499,
+        1500,
+        1501,
+        1502,
+        1503,
+        1504
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1498                 # Switch to development branch\n1499                 switch_result = subprocess.run(\n1500                     [\"git\", \"checkout\", \"development\"],\n1501                     capture_output=True,\n1502                     text=True,\n1503                     cwd=self.repo_path,\n1504                 )\n1505 \n",
+      "col_offset": 32,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1499,
+      "line_range": [
+        1499,
+        1500,
+        1501,
+        1502,
+        1503,
+        1504
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1507                     # Try to create local development branch tracking remote\n1508                     track_result = subprocess.run(\n1509                         [\n1510                             \"git\",\n1511                             \"checkout\",\n1512                             \"-b\",\n1513                             \"development\",\n1514                             \"origin/development\",\n1515                         ],\n1516                         capture_output=True,\n1517                         text=True,\n1518                         cwd=self.repo_path,\n1519                     )\n1520 \n",
+      "col_offset": 35,
+      "end_col_offset": 21,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1508,
+      "line_range": [
+        1508,
+        1509,
+        1510,
+        1511,
+        1512,
+        1513,
+        1514,
+        1515,
+        1516,
+        1517,
+        1518,
+        1519
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1507                     # Try to create local development branch tracking remote\n1508                     track_result = subprocess.run(\n1509                         [\n1510                             \"git\",\n1511                             \"checkout\",\n1512                             \"-b\",\n1513                             \"development\",\n1514                             \"origin/development\",\n1515                         ],\n1516                         capture_output=True,\n1517                         text=True,\n1518                         cwd=self.repo_path,\n1519                     )\n1520 \n",
+      "col_offset": 35,
+      "end_col_offset": 21,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1508,
+      "line_range": [
+        1508,
+        1509,
+        1510,
+        1511,
+        1512,
+        1513,
+        1514,
+        1515,
+        1516,
+        1517,
+        1518,
+        1519
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1531                 # Create new development branch\n1532                 create_result = subprocess.run(\n1533                     [\"git\", \"checkout\", \"-b\", \"development\"],\n1534                     capture_output=True,\n1535                     text=True,\n1536                     cwd=self.repo_path,\n1537                 )\n1538 \n",
+      "col_offset": 32,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1532,
+      "line_range": [
+        1532,
+        1533,
+        1534,
+        1535,
+        1536,
+        1537
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1531                 # Create new development branch\n1532                 create_result = subprocess.run(\n1533                     [\"git\", \"checkout\", \"-b\", \"development\"],\n1534                     capture_output=True,\n1535                     text=True,\n1536                     cwd=self.repo_path,\n1537                 )\n1538 \n",
+      "col_offset": 32,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1532,
+      "line_range": [
+        1532,
+        1533,
+        1534,
+        1535,
+        1536,
+        1537
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1549             print()\n1550             merge_result = subprocess.run(\n1551                 [\"git\", \"merge\", \"main\", \"--no-edit\"],\n1552                 capture_output=True,\n1553                 text=True,\n1554                 cwd=self.repo_path,\n1555             )\n1556 \n",
+      "col_offset": 27,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1550,
+      "line_range": [
+        1550,
+        1551,
+        1552,
+        1553,
+        1554,
+        1555
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1549             print()\n1550             merge_result = subprocess.run(\n1551                 [\"git\", \"merge\", \"main\", \"--no-edit\"],\n1552                 capture_output=True,\n1553                 text=True,\n1554                 cwd=self.repo_path,\n1555             )\n1556 \n",
+      "col_offset": 27,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1550,
+      "line_range": [
+        1550,
+        1551,
+        1552,
+        1553,
+        1554,
+        1555
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1596             print()\n1597             stage_result = subprocess.run(\n1598                 [\"git\", \"add\", \"-A\"],\n1599                 capture_output=True,\n1600                 text=True,\n1601                 cwd=self.repo_path,\n1602             )\n1603 \n",
+      "col_offset": 27,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1597,
+      "line_range": [
+        1597,
+        1598,
+        1599,
+        1600,
+        1601,
+        1602
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1596             print()\n1597             stage_result = subprocess.run(\n1598                 [\"git\", \"add\", \"-A\"],\n1599                 capture_output=True,\n1600                 text=True,\n1601                 cwd=self.repo_path,\n1602             )\n1603 \n",
+      "col_offset": 27,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1597,
+      "line_range": [
+        1597,
+        1598,
+        1599,
+        1600,
+        1601,
+        1602
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1616             print()\n1617             commit_result = subprocess.run(\n1618                 [\"git\", \"commit\", \"-m\", commit_message],\n1619                 capture_output=True,\n1620                 text=True,\n1621                 cwd=self.repo_path,\n1622             )\n1623 \n",
+      "col_offset": 28,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1617,
+      "line_range": [
+        1617,
+        1618,
+        1619,
+        1620,
+        1621,
+        1622
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1616             print()\n1617             commit_result = subprocess.run(\n1618                 [\"git\", \"commit\", \"-m\", commit_message],\n1619                 capture_output=True,\n1620                 text=True,\n1621                 cwd=self.repo_path,\n1622             )\n1623 \n",
+      "col_offset": 28,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1617,
+      "line_range": [
+        1617,
+        1618,
+        1619,
+        1620,
+        1621,
+        1622
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1736             print()\n1737             version_result = subprocess.run(\n1738                 [\n1739                     \"python3\",\n1740                     str(self.version_keeper_path),\n1741                     \"--bump-type\",\n1742                     \"patch\",\n1743                     \"--development-release\",\n1744                 ],\n1745                 capture_output=True,\n1746                 text=True,\n1747                 cwd=self.repo_path,\n1748                 timeout=120,\n1749             )\n1750 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1737,
+      "line_range": [
+        1737,
+        1738,
+        1739,
+        1740,
+        1741,
+        1742,
+        1743,
+        1744,
+        1745,
+        1746,
+        1747,
+        1748,
+        1749
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1736             print()\n1737             version_result = subprocess.run(\n1738                 [\n1739                     \"python3\",\n1740                     str(self.version_keeper_path),\n1741                     \"--bump-type\",\n1742                     \"patch\",\n1743                     \"--development-release\",\n1744                 ],\n1745                 capture_output=True,\n1746                 text=True,\n1747                 cwd=self.repo_path,\n1748                 timeout=120,\n1749             )\n1750 \n",
+      "col_offset": 29,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1737,
+      "line_range": [
+        1737,
+        1738,
+        1739,
+        1740,
+        1741,
+        1742,
+        1743,
+        1744,
+        1745,
+        1746,
+        1747,
+        1748,
+        1749
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1767             tag_name = f\"v{new_version}-dev\"\n1768             tag_result = subprocess.run(\n1769                 [\n1770                     \"git\",\n1771                     \"tag\",\n1772                     \"-a\",\n1773                     tag_name,\n1774                     \"-m\",\n1775                     f\"Development release {new_version}\",\n1776                 ],\n1777                 capture_output=True,\n1778                 text=True,\n1779                 cwd=self.repo_path,\n1780             )\n1781 \n",
+      "col_offset": 25,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1768,
+      "line_range": [
+        1768,
+        1769,
+        1770,
+        1771,
+        1772,
+        1773,
+        1774,
+        1775,
+        1776,
+        1777,
+        1778,
+        1779,
+        1780
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1767             tag_name = f\"v{new_version}-dev\"\n1768             tag_result = subprocess.run(\n1769                 [\n1770                     \"git\",\n1771                     \"tag\",\n1772                     \"-a\",\n1773                     tag_name,\n1774                     \"-m\",\n1775                     f\"Development release {new_version}\",\n1776                 ],\n1777                 capture_output=True,\n1778                 text=True,\n1779                 cwd=self.repo_path,\n1780             )\n1781 \n",
+      "col_offset": 25,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1768,
+      "line_range": [
+        1768,
+        1769,
+        1770,
+        1771,
+        1772,
+        1773,
+        1774,
+        1775,
+        1776,
+        1777,
+        1778,
+        1779,
+        1780
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1807             print()\n1808             push_result = subprocess.run(\n1809                 [\"git\", \"push\", \"-u\", \"origin\", \"development\"],\n1810                 capture_output=True,\n1811                 text=True,\n1812                 cwd=self.repo_path,\n1813                 timeout=120,  # Security: Reduced timeout to prevent hanging processes\n1814             )\n1815 \n",
+      "col_offset": 26,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1808,
+      "line_range": [
+        1808,
+        1809,
+        1810,
+        1811,
+        1812,
+        1813,
+        1814
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1807             print()\n1808             push_result = subprocess.run(\n1809                 [\"git\", \"push\", \"-u\", \"origin\", \"development\"],\n1810                 capture_output=True,\n1811                 text=True,\n1812                 cwd=self.repo_path,\n1813                 timeout=120,  # Security: Reduced timeout to prevent hanging processes\n1814             )\n1815 \n",
+      "col_offset": 26,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1808,
+      "line_range": [
+        1808,
+        1809,
+        1810,
+        1811,
+        1812,
+        1813,
+        1814
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1825             print()\n1826             push_tags_result = subprocess.run(\n1827                 [\"git\", \"push\", \"origin\", \"--tags\"],\n1828                 capture_output=True,\n1829                 text=True,\n1830                 cwd=self.repo_path,\n1831                 timeout=120,\n1832             )\n1833 \n",
+      "col_offset": 31,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1826,
+      "line_range": [
+        1826,
+        1827,
+        1828,
+        1829,
+        1830,
+        1831,
+        1832
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1825             print()\n1826             push_tags_result = subprocess.run(\n1827                 [\"git\", \"push\", \"origin\", \"--tags\"],\n1828                 capture_output=True,\n1829                 text=True,\n1830                 cwd=self.repo_path,\n1831                 timeout=120,\n1832             )\n1833 \n",
+      "col_offset": 31,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1826,
+      "line_range": [
+        1826,
+        1827,
+        1828,
+        1829,
+        1830,
+        1831,
+        1832
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1937         try:\n1938             result = subprocess.run(\n1939                 [\"git\", \"rev-parse\", \"HEAD\"],\n1940                 capture_output=True,\n1941                 text=True,\n1942                 cwd=self.repo_path,\n1943             )\n1944             return result.stdout.strip()[:8] if result.returncode == 0 else \"unknown\"\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1938,
+      "line_range": [
+        1938,
+        1939,
+        1940,
+        1941,
+        1942,
+        1943
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1937         try:\n1938             result = subprocess.run(\n1939                 [\"git\", \"rev-parse\", \"HEAD\"],\n1940                 capture_output=True,\n1941                 text=True,\n1942                 cwd=self.repo_path,\n1943             )\n1944             return result.stdout.strip()[:8] if result.returncode == 0 else \"unknown\"\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1938,
+      "line_range": [
+        1938,
+        1939,
+        1940,
+        1941,
+        1942,
+        1943
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1950         try:\n1951             result = subprocess.run(\n1952                 [\"git\", \"diff\", \"--cached\", \"--name-only\"],\n1953                 capture_output=True,\n1954                 text=True,\n1955                 cwd=self.repo_path,\n1956             )\n1957             return (\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 1951,
+      "line_range": [
+        1951,
+        1952,
+        1953,
+        1954,
+        1955,
+        1956
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "1950         try:\n1951             result = subprocess.run(\n1952                 [\"git\", \"diff\", \"--cached\", \"--name-only\"],\n1953                 capture_output=True,\n1954                 text=True,\n1955                 cwd=self.repo_path,\n1956             )\n1957             return (\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_code_integration_loop.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1951,
+      "line_range": [
+        1951,
+        1952,
+        1953,
+        1954,
+        1955,
+        1956
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "13 import shutil\n14 import subprocess\n15 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 14,
+      "line_range": [
+        14
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "164         try:\n165             subprocess.run(\n166                 cmd, capture_output=True, text=True, cwd=self.repo_path\n167             )\n168 \n",
+      "col_offset": 12,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 165,
+      "line_range": [
+        165,
+        166,
+        167
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "289                 # Run version keeper to generate new report\n290                 result = subprocess.run(\n291                     [\n292                         \"python3\",\n293                         str(version_keeper_path),\n294                         \"--comprehensive-lint\",\n295                         \"--lint-only\",\n296                         \"--output-dir=reports/\",\n297                     ],\n298                     capture_output=True,\n299                     text=True,\n300                     cwd=self.repo_path,\n301                 )\n302 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 290,
+      "line_range": [
+        290,
+        291,
+        292,
+        293,
+        294,
+        295,
+        296,
+        297,
+        298,
+        299,
+        300,
+        301
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "289                 # Run version keeper to generate new report\n290                 result = subprocess.run(\n291                     [\n292                         \"python3\",\n293                         str(version_keeper_path),\n294                         \"--comprehensive-lint\",\n295                         \"--lint-only\",\n296                         \"--output-dir=reports/\",\n297                     ],\n298                     capture_output=True,\n299                     text=True,\n300                     cwd=self.repo_path,\n301                 )\n302 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 290,
+      "line_range": [
+        290,
+        291,
+        292,
+        293,
+        294,
+        295,
+        296,
+        297,
+        298,
+        299,
+        300,
+        301
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "517                             )\n518                 except Exception:\n519                     pass\n520 \n",
+      "col_offset": 16,
+      "end_col_offset": 24,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 518,
+      "line_range": [
+        518,
+        519
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "774                 # Run flake8 on specific line\n775                 result = subprocess.run(\n776                     [\n777                         \"flake8\",\n778                         \"--select\",\n779                         error_code,\n780                         \"--max-line-length=120\",\n781                         file_path,\n782                     ],\n783                     capture_output=True,\n784                     text=True,\n785                 )\n786 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 775,
+      "line_range": [
+        775,
+        776,
+        777,
+        778,
+        779,
+        780,
+        781,
+        782,
+        783,
+        784,
+        785
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "774                 # Run flake8 on specific line\n775                 result = subprocess.run(\n776                     [\n777                         \"flake8\",\n778                         \"--select\",\n779                         error_code,\n780                         \"--max-line-length=120\",\n781                         file_path,\n782                     ],\n783                     capture_output=True,\n784                     text=True,\n785                 )\n786 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 775,
+      "line_range": [
+        775,
+        776,
+        777,
+        778,
+        779,
+        780,
+        781,
+        782,
+        783,
+        784,
+        785
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1638         import json\n1639         import subprocess\n1640         from pathlib import Path\n",
+      "col_offset": 8,
+      "end_col_offset": 25,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 1639,
+      "line_range": [
+        1639
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "1689 \n1690             process = subprocess.run(\n1691                 claude_cmd,\n1692                 capture_output=True,\n1693                 text=True,\n1694                 timeout=30,  # 30 second timeout\n1695                 cwd=str(Path.cwd()),\n1696             )\n1697 \n",
+      "col_offset": 22,
+      "end_col_offset": 13,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 1690,
+      "line_range": [
+        1690,
+        1691,
+        1692,
+        1693,
+        1694,
+        1695,
+        1696
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "1827 \n1828         except Exception:\n1829             pass  # If we can't check, assume it's available\n1830 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/claude_quality_patcher.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 1828,
+      "line_range": [
+        1828,
+        1829
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "11 import shutil\n12 import subprocess\n13 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 12,
+      "line_range": [
+        12
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "75         try:\n76             result = subprocess.run(\n77                 [\n78                     \"git\",\n79                     \"branch\",\n80                     \"--show-current\",\n81                 ],\n82                 capture_output=True,\n83                 text=True,\n84                 cwd=self.repo_path,\n85             )\n86             return result.stdout.strip()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 76,
+      "line_range": [
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "75         try:\n76             result = subprocess.run(\n77                 [\n78                     \"git\",\n79                     \"branch\",\n80                     \"--show-current\",\n81                 ],\n82                 capture_output=True,\n83                 text=True,\n84                 cwd=self.repo_path,\n85             )\n86             return result.stdout.strip()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 76,
+      "line_range": [
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "389             # Get diff with base branch\n390             result = subprocess.run(\n391                 [\n392                     \"git\",\n393                     \"diff\",\n394                     f\"origin/{base_branch}...HEAD\",\n395                     \"--name-only\",\n396                 ],\n397                 capture_output=True,\n398                 text=True,\n399                 cwd=self.repo_path,\n400             )\n401 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 390,
+      "line_range": [
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399,
+        400
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "389             # Get diff with base branch\n390             result = subprocess.run(\n391                 [\n392                     \"git\",\n393                     \"diff\",\n394                     f\"origin/{base_branch}...HEAD\",\n395                     \"--name-only\",\n396                 ],\n397                 capture_output=True,\n398                 text=True,\n399                 cwd=self.repo_path,\n400             )\n401 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 390,
+      "line_range": [
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399,
+        400
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "471             # Get file content from base branch\n472             result = subprocess.run(\n473                 [\n474                     \"git\",\n475                     \"show\",\n476                     f\"origin/{base_branch}:{file_path}\",\n477                 ],\n478                 capture_output=True,\n479                 text=True,\n480                 cwd=self.repo_path,\n481             )\n482 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 472,
+      "line_range": [
+        472,
+        473,
+        474,
+        475,
+        476,
+        477,
+        478,
+        479,
+        480,
+        481
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "471             # Get file content from base branch\n472             result = subprocess.run(\n473                 [\n474                     \"git\",\n475                     \"show\",\n476                     f\"origin/{base_branch}:{file_path}\",\n477                 ],\n478                 capture_output=True,\n479                 text=True,\n480                 cwd=self.repo_path,\n481             )\n482 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 472,
+      "line_range": [
+        472,
+        473,
+        474,
+        475,
+        476,
+        477,
+        478,
+        479,
+        480,
+        481
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "569             # Create virtual environment\n570             subprocess.run(\n571                 [\n572                     sys.executable,\n573                     \"-m\",\n574                     \"venv\",\n575                     str(venv_path),\n576                 ]\n577             )\n578 \n",
+      "col_offset": 12,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 570,
+      "line_range": [
+        570,
+        571,
+        572,
+        573,
+        574,
+        575,
+        576,
+        577
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "585             if dist_files:\n586                 result = subprocess.run(\n587                     [\n588                         str(pip_path),\n589                         \"install\",\n590                         str(dist_files[0]),\n591                     ],\n592                     capture_output=True,\n593                     text=True,\n594                 )\n595 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 586,
+      "line_range": [
+        586,
+        587,
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "658         try:\n659             result = subprocess.run(\n660                 cmd,\n661                 cwd=self.repo_path,\n662                 capture_output=True,\n663                 text=True,\n664             )\n665             return result.returncode == 0\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 659,
+      "line_range": [
+        659,
+        660,
+        661,
+        662,
+        663,
+        664
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "671         try:\n672             result = subprocess.run(\n673                 cmd,\n674                 cwd=self.repo_path,\n675                 capture_output=True,\n676                 text=True,\n677             )\n678             return (\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 672,
+      "line_range": [
+        672,
+        673,
+        674,
+        675,
+        676,
+        677
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "711                 content = py_file.read_text()\n712                 file_hash = hashlib.md5(content.encode()).hexdigest()\n713 \n",
+      "col_offset": 28,
+      "end_col_offset": 57,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 327,
+        "link": "https://cwe.mitre.org/data/definitions/327.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "Use of weak MD5 hash for security. Consider usedforsecurity=False",
+      "line_number": 712,
+      "line_range": [
+        712
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b324_hashlib.html",
+      "test_id": "B324",
+      "test_name": "hashlib"
+    },
+    {
+      "code": "982 \n983         except Exception:\n984             pass\n985 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 983,
+      "line_range": [
+        983,
+        984
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "2002 \n2003         except Exception:\n2004             pass\n2005 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 2003,
+      "line_range": [
+        2003,
+        2004
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "2119                         return True\n2120                 except Exception:\n2121                     continue\n2122 \n",
+      "col_offset": 16,
+      "end_col_offset": 28,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 2120,
+      "line_range": [
+        2120,
+        2121
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "2122 \n2123         except Exception:\n2124             pass\n2125 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/version_keeper.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 2123,
+      "line_range": [
+        2123,
+        2124
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "11 import shutil\n12 import subprocess\n13 import sys\n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 12,
+      "line_range": [
+        12
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "71         try:\n72             result = subprocess.run(\n73                 [\n74                     \"git\",\n75                     \"branch\",\n76                     \"--show-current\",\n77                 ],\n78                 capture_output=True,\n79                 text=True,\n80                 cwd=self.repo_path,\n81             )\n82             return result.stdout.strip()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 72,
+      "line_range": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "71         try:\n72             result = subprocess.run(\n73                 [\n74                     \"git\",\n75                     \"branch\",\n76                     \"--show-current\",\n77                 ],\n78                 capture_output=True,\n79                 text=True,\n80                 cwd=self.repo_path,\n81             )\n82             return result.stdout.strip()\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 72,
+      "line_range": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "386             # Get diff with base branch\n387             result = subprocess.run(\n388                 [\n389                     \"git\",\n390                     \"diff\",\n391                     f\"origin/{base_branch}...HEAD\",\n392                     \"--name-only\",\n393                 ],\n394                 capture_output=True,\n395                 text=True,\n396                 cwd=self.repo_path,\n397             )\n398 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 387,
+      "line_range": [
+        387,
+        388,
+        389,
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "386             # Get diff with base branch\n387             result = subprocess.run(\n388                 [\n389                     \"git\",\n390                     \"diff\",\n391                     f\"origin/{base_branch}...HEAD\",\n392                     \"--name-only\",\n393                 ],\n394                 capture_output=True,\n395                 text=True,\n396                 cwd=self.repo_path,\n397             )\n398 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 387,
+      "line_range": [
+        387,
+        388,
+        389,
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "476             # Get file content from base branch\n477             result = subprocess.run(\n478                 [\n479                     \"git\",\n480                     \"show\",\n481                     f\"origin/{base_branch}:{file_path}\",\n482                 ],\n483                 capture_output=True,\n484                 text=True,\n485                 cwd=self.repo_path,\n486             )\n487 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 477,
+      "line_range": [
+        477,
+        478,
+        479,
+        480,
+        481,
+        482,
+        483,
+        484,
+        485,
+        486
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "476             # Get file content from base branch\n477             result = subprocess.run(\n478                 [\n479                     \"git\",\n480                     \"show\",\n481                     f\"origin/{base_branch}:{file_path}\",\n482                 ],\n483                 capture_output=True,\n484                 text=True,\n485                 cwd=self.repo_path,\n486             )\n487 \n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 477,
+      "line_range": [
+        477,
+        478,
+        479,
+        480,
+        481,
+        482,
+        483,
+        484,
+        485,
+        486
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "579             # Create virtual environment\n580             subprocess.run(\n581                 [\n582                     sys.executable,\n583                     \"-m\",\n584                     \"venv\",\n585                     str(venv_path),\n586                 ]\n587             )\n588 \n",
+      "col_offset": 12,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 580,
+      "line_range": [
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "595             if dist_files:\n596                 result = subprocess.run(\n597                     [\n598                         str(pip_path),\n599                         \"install\",\n600                         str(dist_files[0]),\n601                     ],\n602                     capture_output=True,\n603                     text=True,\n604                 )\n605 \n",
+      "col_offset": 25,
+      "end_col_offset": 17,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 596,
+      "line_range": [
+        596,
+        597,
+        598,
+        599,
+        600,
+        601,
+        602,
+        603,
+        604
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "670         try:\n671             result = subprocess.run(\n672                 cmd,\n673                 cwd=self.repo_path,\n674                 capture_output=True,\n675                 text=True,\n676             )\n677             return result.returncode == 0\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 671,
+      "line_range": [
+        671,
+        672,
+        673,
+        674,
+        675,
+        676
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "685         try:\n686             result = subprocess.run(\n687                 cmd,\n688                 cwd=self.repo_path,\n689                 capture_output=True,\n690                 text=True,\n691             )\n692             return (\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 686,
+      "line_range": [
+        686,
+        687,
+        688,
+        689,
+        690,
+        691
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    },
+    {
+      "code": "725                 content = py_file.read_text()\n726                 file_hash = hashlib.md5(content.encode()).hexdigest()\n727 \n",
+      "col_offset": 28,
+      "end_col_offset": 57,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 327,
+        "link": "https://cwe.mitre.org/data/definitions/327.html"
+      },
+      "issue_severity": "HIGH",
+      "issue_text": "Use of weak MD5 hash for security. Consider usedforsecurity=False",
+      "line_number": 726,
+      "line_range": [
+        726
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b324_hashlib.html",
+      "test_id": "B324",
+      "test_name": "hashlib"
+    },
+    {
+      "code": "1860 \n1861         except Exception:\n1862             pass\n1863 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 1861,
+      "line_range": [
+        1861,
+        1862
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "1991                         return True\n1992                 except Exception:\n1993                     continue\n1994 \n",
+      "col_offset": 16,
+      "end_col_offset": 28,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Continue detected.",
+      "line_number": 1992,
+      "line_range": [
+        1992,
+        1993
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b112_try_except_continue.html",
+      "test_id": "B112",
+      "test_name": "try_except_continue"
+    },
+    {
+      "code": "1994 \n1995         except Exception:\n1996             pass\n1997 \n",
+      "col_offset": 8,
+      "end_col_offset": 16,
+      "filename": "scripts/version_keeper_1.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 703,
+        "link": "https://cwe.mitre.org/data/definitions/703.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Try, Except, Pass detected.",
+      "line_number": 1995,
+      "line_range": [
+        1995,
+        1996
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b110_try_except_pass.html",
+      "test_id": "B110",
+      "test_name": "try_except_pass"
+    },
+    {
+      "code": "12 import click\n13 import subprocess\n14 \n",
+      "col_offset": 0,
+      "end_col_offset": 17,
+      "filename": "scripts/version_keeper_working.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Consider possible security implications associated with the subprocess module.",
+      "line_number": 13,
+      "line_range": [
+        13
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "test_id": "B404",
+      "test_name": "blacklist"
+    },
+    {
+      "code": "39         try:\n40             result = subprocess.run(\n41                 [\"flake8\", \"--format=json\", \".\"],\n42                 capture_output=True,\n43                 text=True,\n44                 timeout=30\n45             )\n46             if result.stdout:\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_working.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "Starting a process with a partial executable path",
+      "line_number": 40,
+      "line_range": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b607_start_process_with_partial_path.html",
+      "test_id": "B607",
+      "test_name": "start_process_with_partial_path"
+    },
+    {
+      "code": "39         try:\n40             result = subprocess.run(\n41                 [\"flake8\", \"--format=json\", \".\"],\n42                 capture_output=True,\n43                 text=True,\n44                 timeout=30\n45             )\n46             if result.stdout:\n",
+      "col_offset": 21,
+      "end_col_offset": 13,
+      "filename": "scripts/version_keeper_working.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": {
+        "id": 78,
+        "link": "https://cwe.mitre.org/data/definitions/78.html"
+      },
+      "issue_severity": "LOW",
+      "issue_text": "subprocess call - check for execution of untrusted input.",
+      "line_number": 40,
+      "line_range": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
+      ],
+      "more_info": "https://bandit.readthedocs.io/en/1.8.6/plugins/b603_subprocess_without_shell_equals_true.html",
+      "test_id": "B603",
+      "test_name": "subprocess_without_shell_equals_true"
+    }
+  ]
+}
