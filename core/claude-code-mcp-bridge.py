@@ -294,7 +294,7 @@ class ClaudeCodeMCPBridge:
             # 1. Check if MCP system is installed
             if not self.mcp_system_dir.exists():
                 print("❌ MCP system not found. Please install first with:")
-                print("    f"{cross_platform.get_command(\"python\")} "install-mcp-system.py")
+                print(f"    {cross_platform.get_command('python')} install-mcp-system.py")
                 return False
 
             # 2. Create project MCP configuration
@@ -430,7 +430,7 @@ esac
 
         if not status["mcp_system_installed"]:
             print("🎯 Claude Code detected but MCP system not installed")
-            print("Run: f"{cross_platform.get_command(\"python\")} "install-mcp-system.py")
+            print(f"Run: {cross_platform.get_command('python')} install-mcp-system.py")
             return False
 
         if not status["project_configured"]:
