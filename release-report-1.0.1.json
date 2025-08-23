@@ -1,0 +1,34 @@
+{
+  "version": "1.0.1",
+  "timestamp": "2025-08-23T23:04:31.874832",
+  "branch": "copilot/fix-780abdb2-ab45-44f3-87f2-74208213b0d3",
+  "quality_checks": {
+    "black": false,
+    "isort": false,
+    "mypy": false,
+    "pylint": true,
+    "flake8": false,
+    "bandit": false,
+    "safety": false,
+    "pip_audit": false
+  },
+  "test_results": {
+    "unit": false,
+    "integration": false,
+    "templates": false,
+    "upgrades": false,
+    "docs": false
+  },
+  "compatibility": {
+    "breaking_changes": [],
+    "api_changes": [],
+    "template_changes": [],
+    "upgrade_module_changes": [],
+    "compatible": true
+  },
+  "overall_status": "FAIL",
+  "recommendations": [
+    "Fix code quality issues before release",
+    "Fix failing tests before release"
+  ]
+}

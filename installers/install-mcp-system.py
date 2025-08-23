@@ -511,7 +511,7 @@ def extract_and_install():
 
         # Run installer
         installer_path = Path(temp_dir) / "install-mcp-system.py"
-        os.system(f"f"{cross_platform.get_command(\"python\")} "{{installer_path}}")
+        os.system(f"{cross_platform.get_command('python')} {installer_path}")
 
 if __name__ == "__main__":
     extract_and_install()

@@ -30,12 +30,15 @@ except ImportError:
 
 
 class MCPVersionKeeper:
-    def __init__(self, repo_path: Path = None, session_dir: Path = None):
+    def __init__(self, repo_path: Path = None, session_dir: Path = None, config_path: Path = None):
         self.repo_path = repo_path or Path.cwd()
         self.version_file = self.repo_path / "pyproject.toml"
         self.changelog_file = self.repo_path / "CHANGELOG.md"
         self.package_dir = self.repo_path / "src"
         self.docs_dir = self.repo_path / "docs"
+        
+        # Load configuration
+        self.config = self.load_config(config_path)
 
         self.current_version = self.get_current_version()
         self.protocol = None  # Enhanced with sync monitoring
@@ -49,6 +52,57 @@ class MCPVersionKeeper:
             if claude_session.exists():
                 self.protocol = get_protocol(claude_session)
                 print(f"✅ Protocol integration enabled")
+                
+    def load_config(self, config_path: Path = None) -> Dict[str, Any]:
+        """Load configuration from file with defaults"""
+        default_config = {
+            "timeout": {
+                "subprocess": 120,
+                "build": 300,
+                "test": 600
+            },
+            "linting": {
+                "tools": ["black", "isort", "mypy", "flake8", "pylint"],
+                "max_issues": 1000,
+                "exclude_patterns": ["*.backup.py", "*_old.py"]
+            },
+            "output": {
+                "progress_bars": True,
+                "verbose": False
+            }
+        }
+        
+        # Try to load from various locations
+        config_locations = []
+        if config_path:
+            config_locations.append(config_path)
+        config_locations.extend([
+            self.repo_path / ".mcp-version-keeper.json",
+            self.repo_path / "configs" / "version-keeper.json",
+            Path.home() / ".mcp" / "version-keeper.json"
+        ])
+        
+        for config_file in config_locations:
+            if config_file.exists():
+                try:
+                    with open(config_file, 'r') as f:
+                        user_config = json.load(f)
+                    # Deep merge with defaults
+                    self._deep_update(default_config, user_config)
+                    print(f"📝 Loaded config from: {config_file}")
+                    break
+                except Exception as e:
+                    print(f"⚠️ Failed to load config from {config_file}: {e}")
+                    
+        return default_config
+    
+    def _deep_update(self, base_dict: Dict, update_dict: Dict) -> None:
+        """Deep update dictionary"""
+        for key, value in update_dict.items():
+            if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
+                self._deep_update(base_dict[key], value)
+            else:
+                base_dict[key] = value
 
         # Performance tracking
         self.lint_start_time = None
@@ -567,14 +621,28 @@ class MCPVersionKeeper:
             venv_path = Path(temp_dir) / "test_venv"
 
             # Create virtual environment
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "venv",
-                    str(venv_path),
-                ]
-            )
+            try:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "venv",
+                        str(venv_path),
+                    ],
+                    timeout=120,  # 2 minutes timeout
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+            except subprocess.TimeoutExpired:
+                print(f"⚠️ Virtual environment creation timed out after 2 minutes")
+                return {"passed": False, "error": "Timeout creating virtual environment"}
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️ Failed to create virtual environment: {e.stderr}")
+                return {"passed": False, "error": f"venv creation failed: {e.stderr}"}
+            except Exception as e:
+                print(f"⚠️ Unexpected error creating virtual environment: {e}")
+                return {"passed": False, "error": f"Unexpected error: {e}"}
 
             # Install package
             pip_path = venv_path / "bin" / "pip"
@@ -1107,11 +1175,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             },
         ]
 
+        # Import tqdm for progress indicators
+        try:
+            from tqdm import tqdm
+            use_progress = True
+        except ImportError:
+            use_progress = False
+            
         for pattern_info in competing_patterns:
             pattern = pattern_info["pattern"]
             found_files = []
 
-            for py_file in self.repo_path.rglob("*.py"):
+            # Get all Python files first for progress tracking
+            python_files = list(self.repo_path.rglob("*.py"))
+            
+            if use_progress and len(python_files) > 100:
+                file_iterator = tqdm(python_files, desc=f"Scanning for {pattern}", leave=False)
+            else:
+                file_iterator = python_files
+                
+            for py_file in file_iterator:
                 if re.search(
                     pattern,
                     py_file.name,
@@ -2357,6 +2440,11 @@ def generate_json_report(keeper, session_id=None, claude_lint_report=None, dupli
     type=click.Path(),
     help="Output file path for JSON reports (required for pipeline integration)",
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug mode - show detailed information and verbose output",
+)
 def main(
     bump_type,
     base_branch,
@@ -2377,18 +2465,92 @@ def main(
     real_issues_only,
     output_format,
     output_file,
+    debug,
 ):
-    """MCP System Version Keeper - Enhanced with Protocol Integration"""
+    """
+    MCP System Version Keeper - Enhanced with Protocol Integration
+    
+    Manages versions, packaging, linting, and compatibility validation for MCP systems.
+    
+    Examples:
+        # Run comprehensive linting with debug output
+        python scripts/version_keeper.py --comprehensive-lint --debug
+        
+        # Generate JSON report for pipeline integration
+        python scripts/version_keeper.py --claude-lint --output-format=json --output-file=report.json
+        
+        # Quick lint check excluding false positives
+        python scripts/version_keeper.py --quick-check --real-issues-only
+        
+        # Version bump with validation
+        python scripts/version_keeper.py --bump-type=patch --skip-tests
+    """
+    
+    # Configure logging based on debug mode
+    import logging
+    log_level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+    
+    if debug:
+        logger.debug("Debug mode enabled - verbose output will be shown")
+        logger.debug(f"CLI Arguments: bump_type={bump_type}, output_format={output_format}")
 
-    print("🚀 MCP System Version Keeper v2.0")
-    print("=" * 50)
+    try:
+        print("🚀 MCP System Version Keeper v2.0")
+        print("=" * 50)
 
-    # Initialize with protocol support
-    session_path = Path(session_dir) if session_dir else None
-    keeper = MCPVersionKeeper(session_dir=session_path)
+        # Initialize with protocol support
+        session_path = Path(session_dir) if session_dir else None
+        keeper = MCPVersionKeeper(session_dir=session_path)
 
-    print(f"📍 Current version: {keeper.current_version}")
-    print(f"🌿 Current branch: {keeper.git_branch}")
+        print(f"📍 Current version: {keeper.current_version}")
+        print(f"🌿 Current branch: {keeper.git_branch}")
+        
+        if debug:
+            logger.debug(f"Repository path: {keeper.repo_path}")
+            logger.debug(f"Session directory: {session_path}")
+
+    except Exception as e:
+        logger.error(f"Failed to initialize Version Keeper: {e}")
+        if debug:
+            logger.exception("Full traceback:")
+        sys.exit(1)
+
+    # Input validation
+    try:
+        if output_file:
+            output_file_path = Path(output_file)
+            if not output_file_path.parent.exists():
+                logger.error(f"Output directory does not exist: {output_file_path.parent}")
+                sys.exit(1)
+                
+        if session_dir:
+            session_dir_path = Path(session_dir)
+            if not session_dir_path.exists():
+                logger.warning(f"Session directory does not exist, creating: {session_dir_path}")
+                session_dir_path.mkdir(parents=True, exist_ok=True)
+                
+        if output_format == "json" and not output_file:
+            logger.warning("JSON output format specified but no output file provided")
+            
+        # Validate bump type
+        if bump_type not in ["major", "minor", "patch"]:
+            logger.error(f"Invalid bump type: {bump_type}")
+            sys.exit(1)
+            
+        if debug:
+            logger.debug("Input validation completed successfully")
+            
+    except Exception as e:
+        logger.error(f"Input validation failed: {e}")
+        if debug:
+            logger.exception("Full traceback:")
+        sys.exit(1)
 
     # Handle comprehensive lint mode - UPGRADED for freshness
     if comprehensive_lint:

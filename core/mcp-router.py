@@ -160,7 +160,7 @@ class MCPRouter:
                 continue
 
             # Check if already running
-            cmd = f"cross_platform.get_path("home") / mcp {server} status"
+            cmd = f"{cross_platform.get_path('home')}/mcp {server} status"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
             if "running" in result.stdout.lower():
@@ -168,7 +168,7 @@ class MCPRouter:
                 results[server] = True
             else:
                 print(f"Starting {server}...")
-                cmd = f"cross_platform.get_path("home") / mcp {server} start"
+                cmd = f"{cross_platform.get_path('home')}/mcp {server} start"
                 result = subprocess.run(
                     cmd, shell=True, capture_output=True, text=True
                 )

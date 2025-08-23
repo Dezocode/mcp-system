@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "description": "MCP Version Keeper Configuration",
+  "timeout": {
+    "subprocess": 120,
+    "build": 300,
+    "test": 600,
+    "lint": 180
+  },
+  "linting": {
+    "tools": ["black", "isort", "mypy", "flake8", "pylint"],
+    "max_issues": 1000,
+    "exclude_patterns": [
+      "*.backup.py",
+      "*_old.py", 
+      "*_legacy.py",
+      "*/backup/*",
+      "*/old/*"
+    ],
+    "security_tools": ["bandit"],
+    "parallel_execution": true
+  },
+  "output": {
+    "progress_bars": true,
+    "verbose": false,
+    "colors": true,
+    "timestamps": true
+  },
+  "quality_patcher": {
+    "max_fixes_per_session": 50,
+    "auto_backup": true,
+    "validation_after_fix": true,
+    "retry_failed_fixes": 2
+  },
+  "paths": {
+    "reports_dir": "reports",
+    "session_dir": ".mcp-sessions",
+    "backup_dir": ".mcp-backups"
+  },
+  "performance": {
+    "enable_caching": true,
+    "cache_duration_hours": 24,
+    "parallel_file_processing": true,
+    "max_workers": 4
+  },
+  "security": {
+    "validate_file_paths": true,
+    "sanitize_subprocess_args": true,
+    "check_permissions": true
+  }
+}
