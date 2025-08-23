@@ -2670,7 +2670,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
 
         print("🔄 NEXT BATCH COMMAND:")
         print(
-            "f"{cross_platform.get_command(\"python\")} "scripts/claude_quality_patcher.py --claude-agent --max-fixes "
+            f"{cross_platform.get_command('python')} scripts/claude_quality_patcher.py --claude-agent --max-fixes "
             "10 --fresh-report"
         )
         if self.session_dir:
@@ -3089,7 +3089,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
                 "3. Continue with next batch of fixes",
                 "",
                 "🔄 To continue fixing:",
-                "f"{cross_platform.get_command(\"python\")} "scripts/claude_quality_patcher.py --continue --max-fixes 10",
+                f"{cross_platform.get_command('python')} scripts/claude_quality_patcher.py --continue --max-fixes 10",
             ]
         )
 
@@ -3351,7 +3351,7 @@ def main(
             print("❌ Failed to generate or find lint report")
             print("💡 Try running manually:")
             print(
-                "   f"{cross_platform.get_command(\"python\")} "scripts/version_keeper.py --comprehensive-lint "
+                f"   {cross_platform.get_command('python')} scripts/version_keeper.py --comprehensive-lint "
                 "--output-dir=reports/"
             )
             sys.exit(1)
