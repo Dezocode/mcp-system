@@ -71,5 +71,21 @@
     "port": 8055,
     "env_file": ".env",
     "dependencies": {}
+  },
+  "test-tool": {
+    "name": "Test Tool MCP Server",
+    "path": "mcp-tools/test-tool",
+    "command": "uv run python src/main.py",
+    "port": 8055,
+    "env_file": ".env",
+    "dependencies": {}
+  },
+  "test-tool2": {
+    "name": "Test Tool2 MCP Server",
+    "path": "mcp-tools/test-tool2",
+    "command": "uv run python src/main.py",
+    "port": 8055,
+    "env_file": ".env",
+    "dependencies": {}
   }
 }

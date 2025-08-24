@@ -1169,16 +1169,35 @@ cmd_create() {
         mkdir -p "$target_dir"
     fi
     
-    # Generate server based on complexity and type
+    # Route to the core MCP create server script
     case "$server_type" in
         server)
-            generate_mcp_server "$target_dir" "$name" "$language" "$complexity" "$with_tests" "$with_docs"
+            log_debug "Routing to core MCP create script"
+            
+            if [[ "$DRY_RUN" != "true" ]]; then
+                if [[ -f "$SCRIPT_DIR/core/mcp-create-server.py" ]]; then
+                    # Pass the name and some basic options to the core script
+                    local core_args=("$name")
+                    [[ "$language" != "python" ]] && core_args+=("--template" "$language-fastmcp")
+                    [[ "$complexity" != "simple" ]] && core_args+=("--complexity" "$complexity")
+                    [[ "$force" == "true" ]] && core_args+=("--force")
+                    [[ "$with_tests" == "true" ]] && core_args+=("--with-tests")
+                    [[ "$with_docs" == "true" ]] && core_args+=("--with-docs")
+                    
+                    log_debug "Executing: python3 '$SCRIPT_DIR/core/mcp-create-server.py' ${core_args[*]}"
+                    python3 "$SCRIPT_DIR/core/mcp-create-server.py" "${core_args[@]}"
+                else
+                    log_error "Core MCP create script not found: $SCRIPT_DIR/core/mcp-create-server.py"
+                    exit $EXIT_NOT_FOUND
+                fi
+            else
+                log_info "Would execute core MCP create script with server type: $server_type, name: $name"
+            fi
             ;;
-        client)
-            generate_mcp_client "$target_dir" "$name" "$language" "$with_tests" "$with_docs"
-            ;;
-        tool|resource|prompt)
-            add_mcp_component "$target_dir" "$server_type" "$name" "$language"
+        client|tool|resource|prompt)
+            log_warn "$server_type creation not yet implemented"
+            log_info "Use 'server' type for now, then customize the generated code"
+            exit $EXIT_GENERAL_ERROR
             ;;
         *)
             log_error "Unknown server type: $server_type"

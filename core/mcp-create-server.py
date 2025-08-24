@@ -1015,6 +1015,10 @@ mcp {server_name} start
         port: int,
         description: str = None,
         path: str = None,
+        complexity: str = "simple",
+        force: bool = False,
+        with_tests: bool = False,
+        with_docs: bool = False,
     ) -> bool:
         """Create a new MCP server from template"""
 
@@ -1027,12 +1031,16 @@ mcp {server_name} start
         if not description:
             description = f"MCP server for {name}"
         if not path:
-            path = Path.home() / f"mcp-{name}"
+            # Default to mcp-tools directory for better organization
+            if Path("mcp-tools").exists() or Path("mcp-setup").exists():
+                path = Path("mcp-tools") / name
+            else:
+                path = Path.home() / f"mcp-{name}"
         else:
             path = Path(path).expanduser()
 
         # Check if path exists
-        if path.exists():
+        if path.exists() and not force:
             response = input(
                 f"Directory {path} already exists. Continue? (y/N): "
             )
@@ -1078,7 +1086,17 @@ mcp {server_name} start
 
     def _add_to_config(self, name: str, path: str, port: int, template: str):
         """Add server to MCP configuration"""
-        config_file = Path.home() / ".mcp-servers.json"
+        # Try project config first, then fall back to home directory
+        project_config = Path("configs/.mcp-servers.json")
+        home_config = Path.home() / ".mcp-servers.json"
+        
+        # Prefer project config if it exists or if we're in a project
+        if project_config.parent.exists() or Path("mcp-setup").exists():
+            config_file = project_config
+            # Create configs directory if it doesn't exist
+            config_file.parent.mkdir(exist_ok=True)
+        else:
+            config_file = home_config
 
         if config_file.exists():
             config = json.loads(config_file.read_text())
@@ -1105,7 +1123,7 @@ mcp {server_name} start
         }
 
         config_file.write_text(json.dumps(config, indent=2))
-        print(f"Added {name} to MCP configuration")
+        print(f"Added {name} to MCP configuration at {config_file}")
 
 
 def main_create_server():
@@ -1140,7 +1158,17 @@ Examples:
         help="Port number (default: 8055)",
     )
     parser.add_argument("--description", "-d", help="Server description")
-    parser.add_argument("--path", help="Custom path (default: ~/mcp-<name>)")
+    parser.add_argument("--path", help="Custom path (default: mcp-tools/<name> or ~/mcp-<name>)")
+    parser.add_argument("--complexity", "-c", 
+                       choices=["simple", "standard", "advanced", "enterprise"],
+                       default="simple",
+                       help="Complexity level (affects generated features)")
+    parser.add_argument("--force", "-f", action="store_true",
+                       help="Overwrite existing files")
+    parser.add_argument("--with-tests", action="store_true",
+                       help="Include test scaffolding")
+    parser.add_argument("--with-docs", action="store_true",
+                       help="Include documentation templates")
     parser.add_argument(
         "--list-templates",
         action="store_true",
@@ -1163,6 +1191,10 @@ Examples:
         args.port,
         args.description,
         args.path,
+        args.complexity,
+        args.force,
+        args.with_tests,
+        args.with_docs,
     )
 
     if not success:
