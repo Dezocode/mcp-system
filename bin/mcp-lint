@@ -118,7 +118,7 @@ echo -e "${BLUE}📁 Project: $PROJECT_ROOT${NC}"
 echo ""
 
 # Run the command
-if python scripts/version_keeper.py "${ARGS[@]}"; then
+if python3 scripts/version_keeper.py "${ARGS[@]}"; then
     echo ""
     echo -e "${GREEN}✅ Linting completed successfully${NC}"
     

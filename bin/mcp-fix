@@ -136,7 +136,7 @@ echo -e "${BLUE}🔧 Max fixes: $MAX_FIXES${NC}"
 echo ""
 
 # Run the command
-if python scripts/claude_quality_patcher.py "${ARGS[@]}"; then
+if python3 scripts/claude_quality_patcher.py "${ARGS[@]}"; then
     echo ""
     echo -e "${GREEN}✅ Quality patching completed successfully${NC}"
     exit 0
