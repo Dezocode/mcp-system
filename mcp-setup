@@ -965,7 +965,8 @@ Options:
   -l, --language LANG     Programming language (python|typescript|javascript)
   -c, --complexity LEVEL  Complexity level (simple|standard|advanced|enterprise)
   -t, --template NAME     Use specific template
-  -o, --output DIR        Output directory (default: current)
+  -o, --output DIR        Output directory (default: mcp-tools)
+  -d, --description DESC  Server description
   -f, --force             Overwrite existing files
   --no-examples          Skip example implementations
   --with-tests           Include test scaffolding
@@ -973,7 +974,7 @@ Options:
 
 Examples:
   $SCRIPT_NAME create server weather-api --language python
-  $SCRIPT_NAME create server database-tool --complexity enterprise
+  $SCRIPT_NAME create server database-tool --complexity enterprise --description "Database management tools"
   $SCRIPT_NAME create tool file-search --output ./my-server/
   $SCRIPT_NAME create client cli-client --with-tests
 EOF
@@ -1060,10 +1061,11 @@ cmd_create() {
     local no_examples=false
     local with_tests=false
     local with_docs=false
+    local description=""  # Add description variable
     local OPTIND=1
     
     # Parse create-specific options
-    while getopts ":hl:c:t:o:f-:" option; do
+    while getopts ":hl:c:t:o:d:f-:" option; do
         case $option in
             h)
                 cmd_create_usage
@@ -1080,6 +1082,9 @@ cmd_create() {
                 ;;
             o)
                 output_dir="$OPTARG"
+                ;;
+            d)
+                description="$OPTARG"
                 ;;
             f)
                 force=true
@@ -1101,6 +1106,9 @@ cmd_create() {
                         ;;
                     output=*)
                         output_dir="${OPTARG#*=}"
+                        ;;
+                    description=*)
+                        description="${OPTARG#*=}"
                         ;;
                     force)
                         force=true
@@ -1197,6 +1205,7 @@ cmd_create() {
                     else
                         core_args+=("--template" "$language-node")
                     fi
+                    [[ -n "$description" ]] && core_args+=("--description" "$description")
                     [[ "$complexity" != "simple" ]] && core_args+=("--complexity" "$complexity")
                     [[ "$force" == "true" ]] && core_args+=("--force")
                     [[ "$with_tests" == "true" ]] && core_args+=("--with-tests")
