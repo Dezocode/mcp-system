@@ -35,18 +35,37 @@ mcp-system-complete/
 │   ├── tests/                      # Testing framework
 │   └── utils/                      # Pipeline utilities
 │
-├── src/                            # MCP System Source Components
-│   ├── auto-discovery-system.py   # Auto-discovery system
-│   ├── claude-code-mcp-bridge.py  # Claude-MCP bridge
-│   ├── mcp-create-server.py       # Server creation
-│   ├── mcp-manager.py              # MCP manager
-│   ├── mcp-mem0-client.py          # Mem0 client
-│   ├── mcp-mem0-simple.py          # Simple Mem0 implementation
-│   ├── mcp-router.py               # MCP router
-│   ├── mcp-test-framework.py       # Testing framework
-│   ├── mcp-upgrader.py             # System upgrader
-│   ├── mcp-mem0/                   # Mem0 system directory
-│   └── mcp/                        # Core MCP directory
+├── mcp_tools/                      # STANDARDIZED MCP TOOLS DIRECTORY
+│   ├── core/                       # Core MCP functionality
+│   │   ├── router.py               # MCP router (from core/mcp-router.py)
+│   │   ├── manager.py              # MCP manager (from core/mcp-manager.py)
+│   │   ├── server.py               # Pipeline MCP server (from src/pipeline_mcp_server.py)
+│   │   └── types.py                # Local types (from src/mcp_local_types.py)
+│   ├── installation/               # Installation and setup tools
+│   │   ├── installer.py            # MCP system installer (from src/install_mcp_system.py)
+│   │   ├── auto_discovery.py       # Auto-discovery system (from src/auto_discovery_system.py)
+│   │   └── config/                 # Configuration management (from src/config/)
+│   ├── integration/                # Integration tools
+│   │   ├── claude_bridge.py        # Claude-MCP bridge (from src/claude_code_mcp_bridge.py)
+│   │   └── mem0/                   # Mem0 integration tools
+│   │       ├── mcp-mem0-client.py
+│   │       ├── mcp-mem0-simple.py
+│   │       └── direct-mem0-usage.py
+│   ├── development/                # Development and testing tools
+│   │   ├── create_server.py        # Server creation (from core/mcp-create-server.py)
+│   │   ├── test_framework.py       # Testing framework (from core/mcp-test-framework.py)
+│   │   ├── upgrader.py             # System upgrader (from core/mcp-upgrader.py)
+│   │   └── linter                  # Linting tool (from bin/mcp-lint)
+│   ├── launchers/                  # Launcher scripts and executables
+│   │   ├── universal               # Universal launcher (from bin/mcp-universal)
+│   │   ├── init-project            # Project initializer (from bin/mcp-init-project)
+│   │   ├── fix                     # Fix tool (from bin/mcp-fix)
+│   │   └── launcher.sh             # Shell launcher (from bin/mcp-launcher.sh)
+│   └── examples/                   # Example tools and demos
+│       ├── final-demo/
+│       ├── standards-demo/
+│       ├── test-tool/
+│       └── test-tool2/
 │
 ├── scripts/                        # Utility Scripts
 │   ├── claude_code_integration_loop.py

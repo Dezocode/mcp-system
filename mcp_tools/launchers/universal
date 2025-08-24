@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""
+Universal MCP System Launcher
+Works in any project directory with auto-detection
+"""
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+class UniversalMCPLauncher:
+    def __init__(self):
+        self.home = Path.home()
+        self.install_dir = self.home / ".mcp-system"
+        self.current_project = Path.cwd()
+        
+    def detect_context(self):
+        """Detect current project context"""
+        # Check for project indicators
+        indicators = {
+            "python": ["pyproject.toml", "setup.py", "requirements.txt"],
+            "nodejs": ["package.json", "node_modules"],
+            "rust": ["Cargo.toml"],
+            "go": ["go.mod"],
+            "claude": [".claude", "CLAUDE.md"]
+        }
+        
+        detected = []
+        for context_type, patterns in indicators.items():
+            for pattern in patterns:
+                if (self.current_project / pattern).exists():
+                    detected.append(context_type)
+                    break
+        
+        return detected if detected else ["generic"]
+    
+    def auto_initialize(self):
+        """Auto-initialize MCP for current project"""
+        contexts = self.detect_context()
+        
+        if "claude" in contexts:
+            # Claude project detected - run bridge
+            bridge_path = self.install_dir / "components" / "claude-code-mcp-bridge.py"
+            if bridge_path.exists():
+                subprocess.run([sys.executable, str(bridge_path), "auto-init"])
+                return True
+        
+        return False
+    
+    def route_command(self, args):
+        """Route command to appropriate component"""
+        if not args:
+            # No arguments - try auto-initialization
+            if self.auto_initialize():
+                return 0
+            else:
+                self.show_help()
+                return 0
+        
+        command = args[0]
+        component_map = {
+            "create": "mcp-create-server.py",
+            "test": "mcp-test-framework.py",
+            "upgrade": "claude-upgrade.sh",
+            "router": "mcp-router.py",
+            "bridge": "claude-code-mcp-bridge.py"
+        }
+        
+        if command in component_map:
+            component_path = self.install_dir / "components" / component_map[command]
+            if component_path.exists():
+                subprocess.run([sys.executable, str(component_path)] + args[1:])
+                return 0
+        
+        # Default to main MCP launcher
+        main_launcher = self.install_dir / "components" / "mcp"
+        if main_launcher.exists():
+            subprocess.run([str(main_launcher)] + args)
+        else:
+            print(f"❌ Component '{command}' not found")
+            return 1
+    
+    def show_help(self):
+        """Show help information"""
+        contexts = self.detect_context()
+        print(f"""
+🎯 Universal MCP Launcher
+📍 Current directory: {self.current_project}
+🔍 Detected contexts: {', '.join(contexts)}
+
+Commands:
+  mcp-universal create <name>    Create new MCP server
+  mcp-universal test [server]    Test MCP servers
+  mcp-universal upgrade <server> Upgrade MCP server
+  mcp-universal bridge init     Initialize Claude Code bridge
+  mcp-universal <server> <cmd>  Control specific server
+
+Auto-initialization:
+  Running 'mcp-universal' in a Claude project automatically initializes MCP integration.
+""")
+
+if __name__ == "__main__":
+    launcher = UniversalMCPLauncher()
+    sys.exit(launcher.route_command(sys.argv[1:]))

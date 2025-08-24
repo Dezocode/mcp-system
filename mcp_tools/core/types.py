@@ -1,0 +1,12 @@
+from enum import IntEnum
+
+
+class ErrorCode(IntEnum):
+    SUCCESS = 0
+    GENERAL_ERROR = 1
+    INSTALLATION_FAILED = 10
+    CONFIG_ERROR = 20
+    SERVER_ERROR = 30
+    UPGRADE_ERROR = 40
+    DISCOVERY_ERROR = 50
+    PERMISSION_ERROR = 60

@@ -1,0 +1,35 @@
+{
+  "name": "kubernetes-production",
+  "description": "Production configuration for Kubernetes environments",
+  "settings": {
+    "workspace_root": "/app",
+    "session_dir": "/app/pipeline-sessions",
+    "log_level": "WARNING",
+    "max_workers": 8,
+    "timeout": 180,
+    "enable_dashboard": true,
+    "database_path": "/data/sessions.db",
+    "cache_dir": "/tmp/cache",
+    "temp_dir": "/tmp",
+    "security_settings": {
+      "allowed_paths": [
+        "/app",
+        "/data",
+        "/tmp"
+      ],
+      "restricted_paths": [
+        "/etc",
+        "/usr",
+        "/var",
+        "/home"
+      ],
+      "max_file_size_mb": 5
+    },
+    "performance_settings": {
+      "memory_limit_mb": 2048,
+      "cpu_limit_cores": 4.0,
+      "disk_quota_gb": 10
+    }
+  },
+  "enabled": true
+}
