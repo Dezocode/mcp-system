@@ -1191,7 +1191,12 @@ cmd_create() {
                 if [[ -f "$SCRIPT_DIR/core/mcp-create-server.py" ]]; then
                     # Pass the name and some basic options to the core script
                     local core_args=("$name")
-                    [[ "$language" != "python" ]] && core_args+=("--template" "$language-fastmcp")
+                    # Use official MCP template by default for Python, others get their specific templates
+                    if [[ "$language" == "python" ]]; then
+                        core_args+=("--template" "python-official")
+                    else
+                        core_args+=("--template" "$language-node")
+                    fi
                     [[ "$complexity" != "simple" ]] && core_args+=("--complexity" "$complexity")
                     [[ "$force" == "true" ]] && core_args+=("--force")
                     [[ "$with_tests" == "true" ]] && core_args+=("--with-tests")

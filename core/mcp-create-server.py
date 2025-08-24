@@ -15,9 +15,22 @@ class MCPServerGenerator:
         self.templates_dir.mkdir(exist_ok=True)
 
         self.templates = {
+            "python-official": {
+                "name": "Python Official MCP Server",
+                "description": "Python server using official Anthropic MCP protocol",
+                "files": [
+                    "src/main.py",
+                    "pyproject.toml",
+                    ".env.example",
+                    "README.md",
+                    "Dockerfile",
+                    "docker-compose.yml",
+                    "tests/test_server.py",
+                ],
+            },
             "python-fastmcp": {
-                "name": "Python FastMCP Server",
-                "description": "Python server using FastMCP framework",
+                "name": "Python FastMCP Server (Legacy)",
+                "description": "Python server using FastMCP framework (not recommended)",
                 "files": [
                     "src/main.py",
                     "pyproject.toml",
@@ -53,124 +66,213 @@ class MCPServerGenerator:
             },
         }
 
-    def create_python_fastmcp_template(
+    def create_python_official_template(
         self, server_name: str, port: int, description: str
     ) -> dict:
-        """Generate Python FastMCP server template files"""
+        """Generate Python MCP server template using official Anthropic protocol"""
 
-        # Main server file
-        main_py = f'''"""
-{server_name} - MCP Server
+        # Main server file using official MCP protocol
+        main_py = f'''#!/usr/bin/env python3
+"""
+{server_name} - Official MCP Server
 {description}
+
+This server follows the official Anthropic MCP protocol specification.
 """
 
-from mcp.server.fastmcp import FastMCP, Context
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from dotenv import load_dotenv
 import asyncio
 import json
-import os
+import logging
+from typing import Any, Sequence
+from mcp.server import Server, NotificationOptions
+from mcp.server.models import InitializationOptions
+import mcp.server.stdio
+import mcp.types as types
+from pydantic import AnyUrl
 
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("{server_name}")
 
-# Server configuration
+# Server metadata
 SERVER_NAME = "{server_name}"
-SERVER_PORT = {port}
-SERVER_HOST = os.getenv("HOST", "localhost")
+SERVER_VERSION = "0.1.0"
 
-@dataclass
-class {server_name.title().replace("-", "")}Context:
-    """Context for the {server_name} MCP server."""
-    # Add your context variables here
-    initialized: bool = False
-
-@asynccontextmanager
-async def server_lifespan(
-    server: FastMCP
-) -> AsyncIterator[{server_name.title().replace("-", "")}Context]:
+class {server_name.title().replace("-", "")}Server:
     """
-    Manages the server lifecycle.
-
-    Args:
-        server: The FastMCP server instance
-
-    Yields:
-        Context: The server context
+    Official MCP Server implementation for {server_name}.
+    
+    Follows Anthropic MCP protocol specification:
+    - Uses stdio transport (recommended by Anthropic)
+    - Implements standard MCP capabilities
+    - Provides proper error handling
     """
-    # Initialize your server resources here
-    print(f"Starting {{SERVER_NAME}} server...")
+    
+    def __init__(self):
+        self.server = Server(SERVER_NAME)
+        self.setup_handlers()
+    
+    def setup_handlers(self):
+        """Set up MCP protocol handlers following official patterns."""
+        
+        @self.server.list_tools()
+        async def handle_list_tools() -> list[types.Tool]:
+            """
+            List available tools.
+            
+            Returns the tools offered by this server.
+            """
+            return [
+                types.Tool(
+                    name="hello_world",
+                    description="Say hello to someone",
+                    inputSchema={{
+                        "type": "object",
+                        "properties": {{
+                            "name": {{
+                                "type": "string",
+                                "description": "The name to greet"
+                            }}
+                        }},
+                        "required": []
+                    }}
+                ),
+                types.Tool(
+                    name="get_status",
+                    description="Get server status information",
+                    inputSchema={{
+                        "type": "object",
+                        "properties": {{}},
+                        "required": []
+                    }}
+                ),
+                types.Tool(
+                    name="example_tool",
+                    description="Example tool demonstrating parameter handling",
+                    inputSchema={{
+                        "type": "object",
+                        "properties": {{
+                            "param1": {{
+                                "type": "string",
+                                "description": "A required string parameter"
+                            }},
+                            "param2": {{
+                                "type": "integer",
+                                "description": "An optional integer parameter",
+                                "default": 10
+                            }}
+                        }},
+                        "required": ["param1"]
+                    }}
+                )
+            ]
 
-    context = {server_name.title().replace("-", "")}Context(initialized=True)
+        @self.server.call_tool()
+        async def handle_call_tool(
+            name: str, arguments: dict[str, Any] | None
+        ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+            """
+            Handle tool calls.
+            
+            Args:
+                name: The name of the tool to call
+                arguments: The arguments for the tool
+                
+            Returns:
+                The result of the tool call
+            """
+            if arguments is None:
+                arguments = {{}}
 
-    try:
-        yield context
-    finally:
-        # Cleanup resources here
-        print(f"Shutting down {{SERVER_NAME}} server...")
+            try:
+                if name == "hello_world":
+                    return await self.hello_world(**arguments)
+                elif name == "get_status":
+                    return await self.get_status(**arguments)
+                elif name == "example_tool":
+                    return await self.example_tool(**arguments)
+                else:
+                    raise ValueError(f"Unknown tool: {{name}}")
+            except Exception as e:
+                logger.error(f"Error in tool {{name}}: {{e}}")
+                raise
 
-# Initialize FastMCP server
-mcp = FastMCP(
-    SERVER_NAME,
-    description="{description}",
-    lifespan=server_lifespan,
-    host=SERVER_HOST,
-    port=SERVER_PORT
-)
+    async def hello_world(self, name: str = "World") -> list[types.TextContent]:
+        """
+        Say hello to someone.
+        
+        Args:
+            name: The name to greet
+            
+        Returns:
+            A greeting message
+        """
+        message = f"Hello, {{name}}! This is {{SERVER_NAME}} server."
+        return [types.TextContent(type="text", text=message)]
 
-@mcp.tool()
-async def hello_world(ctx: Context, name: str = "World") -> str:
-    """Say hello to someone.
+    async def get_status(self) -> list[types.TextContent]:
+        """
+        Get server status information.
+        
+        Returns:
+            Server status information in JSON format
+        """
+        status = {{
+            "server": SERVER_NAME,
+            "version": SERVER_VERSION,
+            "status": "running",
+            "description": "{description}",
+            "capabilities": [
+                "tools"
+            ]
+        }}
+        return [types.TextContent(type="text", text=json.dumps(status, indent=2))]
 
-    Args:
-        ctx: The MCP server provided context
-        name: The name to greet
+    async def example_tool(self, param1: str, param2: int = 10) -> list[types.TextContent]:
+        """
+        Example tool demonstrating parameter handling.
+        
+        Args:
+            param1: A required string parameter
+            param2: An optional integer parameter (default: 10)
+            
+        Returns:
+            Result of the operation
+        """
+        result = f"Processed '{{param1}}' with value {{param2}}"
+        return [types.TextContent(type="text", text=result)]
 
-    Returns:
-        A greeting message
-    """
-    return f"Hello, {{name}}! This is {{SERVER_NAME}} server."
+    async def run(self):
+        """Run the server using stdio transport (Anthropic recommended)."""
+        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+            await self.server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name=SERVER_NAME,
+                    server_version=SERVER_VERSION,
+                    capabilities=self.server.get_capabilities(
+                        notification_options=NotificationOptions(),
+                        experimental_capabilities={{}}
+                    )
+                )
+            )
 
-@mcp.tool()
-async def get_status(ctx: Context) -> str:
-    """Get server status.
 
-    Args:
-        ctx: The MCP server provided context
+async def main():
+    """Main entry point for the MCP server."""
+    logger.info(f"Starting {{SERVER_NAME}} v{{SERVER_VERSION}}")
+    logger.info("Using stdio transport (Anthropic MCP standard)")
+    
+    server = {server_name.title().replace("-", "")}Server()
+    await server.run()
 
-    Returns:
-        Server status information
-    """
-    context = ctx.request_context.lifespan_context
-    return json.dumps({{
-        "server": SERVER_NAME,
-        "status": "running",
-        "initialized": context.initialized,
-        "port": SERVER_PORT
-    }}, indent=2)
-
-# Add your custom tools here
-@mcp.tool()
-async def example_tool(ctx: Context, param1: str, param2: int = 10) -> str:
-    """Example tool demonstrating parameter handling.
-
-    Args:
-        ctx: The MCP server provided context
-        param1: A required string parameter
-        param2: An optional integer parameter (default: 10)
-
-    Returns:
-        Result of the operation
-    """
-    return f"Processed {{param1}} with value {{param2}}"
 
 if __name__ == "__main__":
-    print(f"Starting {{SERVER_NAME}} MCP server on {{SERVER_HOST}}:{{SERVER_PORT}}")
-    mcp.run()
+    asyncio.run(main())
 '''
 
-        # pyproject.toml
+        # pyproject.toml - Official MCP dependencies
         pyproject_toml = f"""[build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -183,94 +285,163 @@ authors = [
     {{name = "Your Name", email = "your.email@example.com"}}
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
-    "mcp",
-    "python-dotenv",
-    "fastapi",
-    "uvicorn[standard]",
-    "pydantic",
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-asyncio",
-    "black",
-    "isort",
-    "mypy",
-    "pre-commit",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+    "ruff>=0.1.0",
 ]
 
 [project.scripts]
-{server_name} = "{server_name}.main:main"
+{server_name} = "{server_name.replace('-', '_')}.main:main"
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
+include = '\\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \\.eggs
+  | \\.git
+  | \\.hg
+  | \\.mypy_cache
+  | \\.tox
+  | \\.venv
+  | build
+  | dist
+)/
+'''
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
 """
 
-        # .env.example
-        env_example = f"""# {server_name.upper()} Server Configuration
+        # .env.example - MCP standard configuration
+        env_example = f"""# {server_name.upper()} MCP Server Configuration
 
-# Server settings
-HOST=localhost
-PORT={port}
+# MCP server settings (optional - stdio is preferred)
+# MCP_SERVER_PORT={port}
+# MCP_SERVER_HOST=localhost
 
-# Add your environment variables here
+# Logging configuration
+# LOG_LEVEL=INFO
+# LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+
+# Add your service-specific environment variables here
 # DATABASE_URL=postgresql://user:pass@localhost:5432/{server_name.replace("-", "_")}
 # API_KEY=your-api-key-here
-# DEBUG=true
+# DEBUG=false
+
+# Development settings
+# DEVELOPMENT=true
 """
 
-        # README.md
+        # README.md - Official MCP standards documentation
         readme_md = f"""# {server_name.title().replace("-", " ")} MCP Server
 
 {description}
 
-## Overview
+This MCP server follows the **official Anthropic MCP protocol specification** and implements the standard MCP capabilities using stdio transport.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.10 or higher
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+### Installation
+
+1. **Clone and navigate to the server directory:**
+   ```bash
+   git clone <repository-url>
+   cd {server_name}
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   # Using uv (recommended)
+   uv sync
+
+   # Or using pip
+   pip install -e .
+   ```
+
+3. **Configure environment (optional):**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration if needed
+   ```
+
+## 📋 Available Tools
 
 This MCP server provides the following tools:
 
-- `hello_world`: Say hello to someone
-- `get_status`: Get server status information
-- `example_tool`: Example tool demonstrating parameter handling
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `hello_world` | Say hello to someone | `name` (optional): The name to greet |
+| `get_status` | Get server status information | None |
+| `example_tool` | Example tool demonstrating parameter handling | `param1` (required): String parameter<br>`param2` (optional): Integer parameter |
 
-## Installation
+## 🔧 Usage
 
-1. Clone this repository:
-```bash
-git clone <repository-url>
-cd {server_name}
-```
-
-2. Install dependencies:
-```bash
-pip install -e .
-```
-
-3. Copy environment configuration:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-## Usage
-
-### Start the server:
+### Command Line Interface
 
 ```bash
-# Development mode
+# Run the server directly (stdio transport)
 python src/main.py
 
 # Or using the installed script
@@ -280,24 +451,169 @@ python src/main.py
 uv run python src/main.py
 ```
 
-The server will start on `http://localhost:{port}` by default.
+### Claude Desktop Integration
 
-### Configuration
+Add this server to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
-Edit `.env` file to customize:
+```json
+{{
+  "mcpServers": {{
+    "{server_name}": {{
+      "command": "uv",
+      "args": ["run", "python", "/path/to/{server_name}/src/main.py"],
+      "env": {{
+        "LOG_LEVEL": "INFO"
+      }}
+    }}
+  }}
+}}
+```
 
-- `HOST`: Server host (default: localhost)
-- `PORT`: Server port (default: {port})
-- Add other configuration variables as needed
+### Manual MCP Client Integration
 
-### Docker
+If you're integrating with a custom MCP client:
+
+```python
+from mcp.client import StdioMCPClient
+
+# Connect to the server
+client = StdioMCPClient()
+await client.connect(
+    command=["python", "/path/to/{server_name}/src/main.py"]
+)
+
+# List available tools
+tools = await client.list_tools()
+
+# Call a tool
+result = await client.call_tool("hello_world", {{"name": "World"}})
+```
+
+## 🏗️ Development
+
+### Project Structure
+
+```
+{server_name}/
+├── src/
+│   └── main.py          # Main MCP server implementation
+├── tests/
+│   └── test_server.py   # Test suite
+├── pyproject.toml       # Project configuration
+├── .env.example         # Environment template
+├── README.md           # This file
+└── Dockerfile          # Container configuration
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov={server_name.replace('-', '_')}
+
+# Run specific test
+uv run pytest tests/test_server.py::test_hello_world
+```
+
+### Code Quality
+
+```bash
+# Format code
+uv run black src/ tests/
+uv run isort src/ tests/
+
+# Lint code
+uv run ruff check src/ tests/
+
+# Type checking
+uv run mypy src/
+```
+
+## 🐳 Docker Deployment
 
 Build and run with Docker:
 
 ```bash
+# Build image
 docker build -t {server_name} .
-docker run -p {port}:{port} {server_name}
+
+# Run container
+docker run --rm {server_name}
+
+# Or with docker-compose
+docker-compose up
 ```
+
+## 🔧 Configuration
+
+The server uses environment variables for configuration. See `.env.example` for available options.
+
+### Important Configuration Notes
+
+- **Transport**: This server uses stdio transport (Anthropic's recommended method)
+- **No HTTP server**: Unlike FastMCP, this implementation follows the official MCP standard
+- **Logging**: Configured via LOG_LEVEL environment variable
+
+## 📚 MCP Protocol Reference
+
+This server implements the official MCP protocol:
+
+- **Protocol Version**: 2024-11-05
+- **Transport**: stdio (stdin/stdout)
+- **Capabilities**: tools
+- **Documentation**: [Anthropic MCP Docs](https://docs.anthropic.com/mcp)
+
+### Tool Call Format
+
+Tools expect parameters in this format:
+
+```json
+{{
+  "name": "tool_name",
+  "arguments": {{
+    "param1": "value1",
+    "param2": "value2"
+  }}
+}}
+```
+
+### Response Format
+
+Responses follow the MCP content format:
+
+```json
+[
+  {{
+    "type": "text",
+    "text": "Response content here"
+  }}
+]
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the code style
+4. Run tests and ensure they pass
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🔗 Additional Resources
+
+- [Official MCP Documentation](https://docs.anthropic.com/mcp)
+- [MCP Protocol Specification](https://docs.anthropic.com/mcp/specification)
+- [Claude Desktop Configuration](https://docs.anthropic.com/claude/claude-desktop)
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+"""
 
 Or use Docker Compose:
 
@@ -371,55 +687,102 @@ mcp {server_name} start
 This project is licensed under the MIT License.
 """
 
-        # Dockerfile
-        dockerfile = f"""FROM python:3.11-slim
+        # Dockerfile - Official MCP server container
+        dockerfile = f"""# Official MCP Server Dockerfile
+# Multi-stage build for smaller production image
+FROM python:3.11-slim as builder
 
-WORKDIR /app
+# Set build arguments
+ARG BUILD_DATE
+ARG VERSION=0.1.0
+
+# Add metadata
+LABEL org.opencontainers.image.title="{server_name}"
+LABEL org.opencontainers.image.description="{description}"
+LABEL org.opencontainers.image.version=$VERSION
+LABEL org.opencontainers.image.created=$BUILD_DATE
+LABEL org.opencontainers.image.source="https://github.com/your-org/{server_name}"
+LABEL org.opencontainers.image.licenses="MIT"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \\
-    gcc \\
+    build-essential \\
+    curl \\
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Set up working directory
+WORKDIR /app
+
+# Copy dependency files
 COPY pyproject.toml ./
-RUN pip install -e .
+COPY README.md ./
+
+# Install dependencies
+RUN uv venv && uv pip install -e .
+
+# Production stage
+FROM python:3.11-slim as production
+
+# Create non-root user for security
+RUN groupadd -r mcpuser && useradd -r -g mcpuser mcpuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
 
 # Copy source code
 COPY src/ ./src/
-COPY .env.example ./.env
 
-# Expose port
-EXPOSE {port}
+# Set ownership and permissions
+RUN chown -R mcpuser:mcpuser /app
+USER mcpuser
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV LOG_LEVEL=INFO
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:{port}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD python -c "import sys; sys.exit(0)" || exit 1
 
-# Run server
+# Default command (stdio transport)
 CMD ["python", "src/main.py"]
 """
 
-        # docker-compose.yml
+        # docker-compose.yml - MCP server composition
         docker_compose = f"""version: '3.8'
 
 services:
   {server_name}:
-    build: .
-    ports:
-      - "{port}:{port}"
+    build: 
+      context: .
+      args:
+        BUILD_DATE: ${{BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}}
+        VERSION: ${{VERSION:-0.1.0}}
     environment:
-      - HOST=0.0.0.0
-      - PORT={port}
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
     restart: unless-stopped
+    # Note: MCP servers use stdio transport, not HTTP ports
     # volumes:
     #   - ./data:/app/data
+    #   - ./.env:/app/.env
+    
+    # Uncomment if your MCP server needs external services
     # depends_on:
     #   - database
+    #   - redis
 
-  # Uncomment and configure if you need a database
+  # Example database service (uncomment if needed)
   # database:
-  #   image: postgres:15
+  #   image: postgres:15-alpine
   #   environment:
   #     POSTGRES_DB: {server_name.replace("-", "_")}
   #     POSTGRES_USER: postgres
@@ -428,71 +791,227 @@ services:
   #     - postgres_data:/var/lib/postgresql/data
   #   ports:
   #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
+  # Example Redis service (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+
+# Uncomment if using persistent volumes
 # volumes:
 #   postgres_data:
+#   redis_data:
+
+networks:
+  default:
+    name: {server_name}_network
 """
 
-        # Test file
+        # Test file - Official MCP protocol tests
         test_py = f'''"""
 Tests for {server_name} MCP server
+
+Tests the official MCP protocol implementation.
 """
 
 import pytest
 import asyncio
 import json
-from unittest.mock import Mock, AsyncMock
-from mcp.server.fastmcp import Context
+from unittest.mock import Mock, AsyncMock, patch
+import mcp.types as types
 
-# Import your server modules here
-# from src.main import hello_world, get_status, example_tool
+# Import the server class
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-@pytest.mark.asyncio
-async def test_hello_world():
-    \"\"\"Test the hello_world tool\"\"\"
-    # Mock context
-    ctx = Mock(spec=Context)
+from main import {server_name.title().replace("-", "")}Server
 
-    # Test with default name
-    result = await hello_world(ctx)
-    assert "Hello, World!" in result
-    assert "{server_name}" in result
 
-    # Test with custom name
-    result = await hello_world(ctx, name="Alice")
-    assert "Hello, Alice!" in result
+class TestMCPServer:
+    """Test suite for the MCP server implementation."""
 
-@pytest.mark.asyncio
-async def test_get_status():
-    \"\"\"Test the get_status tool\"\"\"
-    # Mock context
-    ctx = Mock(spec=Context)
-    ctx.request_context = Mock()
-    ctx.request_context.lifespan_context = Mock()
-    ctx.request_context.lifespan_context.initialized = True
+    @pytest.fixture
+    async def server(self):
+        """Create a test server instance."""
+        return {server_name.title().replace("-", "")}Server()
 
-    result = await get_status(ctx)
-    status_data = json.loads(result)
+    @pytest.mark.asyncio
+    async def test_server_initialization(self, server):
+        """Test that the server initializes correctly."""
+        assert server.server.name == "{server_name}"
+        assert hasattr(server, 'hello_world')
+        assert hasattr(server, 'get_status')
+        assert hasattr(server, 'example_tool')
 
-    assert status_data["server"] == "{server_name}"
-    assert status_data["status"] == "running"
-    assert status_data["initialized"] is True
-    assert status_data["port"] == {port}
+    @pytest.mark.asyncio
+    async def test_list_tools(self, server):
+        """Test the list_tools handler."""
+        # Mock the server's list_tools handler
+        tools = await server.server._tool_handlers["list_tools"]()
+        
+        assert len(tools) == 3
+        
+        # Check hello_world tool
+        hello_tool = next(tool for tool in tools if tool.name == "hello_world")
+        assert hello_tool.description == "Say hello to someone"
+        assert "name" in hello_tool.inputSchema["properties"]
+        
+        # Check get_status tool
+        status_tool = next(tool for tool in tools if tool.name == "get_status")
+        assert status_tool.description == "Get server status information"
+        
+        # Check example_tool
+        example_tool = next(tool for tool in tools if tool.name == "example_tool")
+        assert example_tool.description == "Example tool demonstrating parameter handling"
+        assert "param1" in example_tool.inputSchema["properties"]
+        assert "param2" in example_tool.inputSchema["properties"]
 
-@pytest.mark.asyncio
-async def test_example_tool():
-    \"\"\"Test the example_tool\"\"\"
-    ctx = Mock(spec=Context)
+    @pytest.mark.asyncio
+    async def test_hello_world_tool(self, server):
+        """Test the hello_world tool."""
+        # Test with default name
+        result = await server.hello_world()
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "Hello, World!" in result[0].text
+        assert "{server_name}" in result[0].text
 
-    # Test with required parameter
-    result = await example_tool(ctx, param1="test")
-    assert "Processed test with value 10" == result
+        # Test with custom name
+        result = await server.hello_world(name="Alice")
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "Hello, Alice!" in result[0].text
 
-    # Test with both parameters
-    result = await example_tool(ctx, param1="test", param2=20)
-    assert "Processed test with value 20" == result
+    @pytest.mark.asyncio
+    async def test_get_status_tool(self, server):
+        """Test the get_status tool."""
+        result = await server.get_status()
+        assert len(result) == 1
+        assert result[0].type == "text"
+        
+        # Parse the JSON response
+        status_data = json.loads(result[0].text)
+        assert status_data["server"] == "{server_name}"
+        assert status_data["version"] == "0.1.0"
+        assert status_data["status"] == "running"
+        assert "capabilities" in status_data
 
-# Add more tests for your custom tools here
+    @pytest.mark.asyncio
+    async def test_example_tool(self, server):
+        """Test the example_tool."""
+        # Test with required parameter only
+        result = await server.example_tool(param1="test")
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "Processed 'test' with value 10" in result[0].text
+
+        # Test with both parameters
+        result = await server.example_tool(param1="test", param2=20)
+        assert len(result) == 1
+        assert result[0].type == "text"
+        assert "Processed 'test' with value 20" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_call_tool_handler(self, server):
+        """Test the call_tool handler with various scenarios."""
+        call_tool_handler = server.server._tool_handlers["call_tool"]
+        
+        # Test hello_world
+        result = await call_tool_handler("hello_world", {{"name": "Test"}})
+        assert len(result) == 1
+        assert "Hello, Test!" in result[0].text
+        
+        # Test with empty arguments
+        result = await call_tool_handler("hello_world", {{}})
+        assert len(result) == 1
+        assert "Hello, World!" in result[0].text
+        
+        # Test with None arguments
+        result = await call_tool_handler("hello_world", None)
+        assert len(result) == 1
+        assert "Hello, World!" in result[0].text
+        
+        # Test unknown tool
+        with pytest.raises(ValueError, match="Unknown tool"):
+            await call_tool_handler("unknown_tool", {{}})
+
+    @pytest.mark.asyncio
+    async def test_tool_error_handling(self, server):
+        """Test error handling in tool calls."""
+        call_tool_handler = server.server._tool_handlers["call_tool"]
+        
+        # Test with invalid parameters (should raise appropriate error)
+        with pytest.raises(TypeError):
+            await call_tool_handler("example_tool", {{"param2": "not_an_int"}})
+
+    def test_server_metadata(self, server):
+        """Test server metadata and configuration."""
+        assert hasattr(server, 'server')
+        assert server.server.name == "{server_name}"
+
+    @pytest.mark.asyncio 
+    async def test_mcp_protocol_compliance(self, server):
+        """Test MCP protocol compliance."""
+        # Test that tools return proper MCP content types
+        result = await server.hello_world()
+        assert all(isinstance(content, types.TextContent) for content in result)
+        assert all(content.type == "text" for content in result)
+        
+        result = await server.get_status()
+        assert all(isinstance(content, types.TextContent) for content in result)
+        
+        result = await server.example_tool("test")
+        assert all(isinstance(content, types.TextContent) for content in result)
+
+
+# Integration tests
+class TestMCPIntegration:
+    """Integration tests for MCP server."""
+
+    @pytest.mark.asyncio
+    async def test_full_workflow(self):
+        """Test a complete MCP workflow."""
+        server = {server_name.title().replace("-", "")}Server()
+        
+        # List tools
+        tools = await server.server._tool_handlers["list_tools"]()
+        assert len(tools) > 0
+        
+        # Call each tool
+        call_tool = server.server._tool_handlers["call_tool"]
+        
+        # Test hello_world
+        result = await call_tool("hello_world", {{"name": "Integration Test"}})
+        assert "Integration Test" in result[0].text
+        
+        # Test get_status
+        result = await call_tool("get_status", {{}})
+        status = json.loads(result[0].text)
+        assert status["server"] == "{server_name}"
+        
+        # Test example_tool
+        result = await call_tool("example_tool", {{"param1": "integration", "param2": 42}})
+        assert "integration" in result[0].text
+        assert "42" in result[0].text
+
+
+if __name__ == "__main__":
+    # Run tests with pytest
+    pytest.main([__file__, "-v"])
 '''
 
         return {
@@ -1051,7 +1570,9 @@ mcp {server_name} start
         path.mkdir(parents=True, exist_ok=True)
 
         # Generate template files
-        if template == "python-fastmcp":
+        if template == "python-official":
+            files = self.create_python_official_template(name, port, description)
+        elif template == "python-fastmcp":
             files = self.create_python_fastmcp_template(name, port, description)
         elif template == "typescript-node":
             files = self.create_typescript_template(name, port, description)
@@ -1103,9 +1624,11 @@ mcp {server_name} start
         else:
             config = {}
 
-        # Determine command based on template
-        if template == "python-fastmcp":
-            command = "uv run python src/main.py"
+        # Determine command based on template - Official MCP uses stdio
+        if template == "python-official":
+            command = "python src/main.py"  # stdio transport
+        elif template == "python-fastmcp":
+            command = "uv run python src/main.py"  # legacy FastMCP
         elif template == "typescript-node":
             command = "npm start"
         elif template == "minimal-python":
@@ -1113,14 +1636,26 @@ mcp {server_name} start
         else:
             command = "your-start-command"
 
-        config[name] = {
-            "name": f"{name.title().replace('-', ' ')} MCP Server",
-            "path": path,
-            "command": command,
-            "port": port,
-            "env_file": ".env",
-            "dependencies": {},
-        }
+        # For official MCP servers, use stdio transport configuration
+        if template == "python-official":
+            config[name] = {
+                "name": f"{name.title().replace('-', ' ')} MCP Server",
+                "path": path,
+                "command": command,
+                "transport": "stdio",  # Official MCP uses stdio
+                "env_file": ".env",
+                "dependencies": {},
+            }
+        else:
+            # Legacy configuration format
+            config[name] = {
+                "name": f"{name.title().replace('-', ' ')} MCP Server",
+                "path": path,
+                "command": command,
+                "port": port,
+                "env_file": ".env",
+                "dependencies": {},
+            }
 
         config_file.write_text(json.dumps(config, indent=2))
         print(f"Added {name} to MCP configuration at {config_file}")
@@ -1132,9 +1667,10 @@ def main_create_server():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  mcp-create-server my-weather --template python-fastmcp --port 8055
+  mcp-create-server my-weather --template python-official --port 8055
   mcp-create-server file-manager --template typescript-node --port 8056
   mcp-create-server simple-calc --template minimal-python --port 8057
+  mcp-create-server legacy-server --template python-fastmcp --port 8058
         """,
     )
 
@@ -1143,12 +1679,13 @@ Examples:
         "--template",
         "-t",
         choices=[
+            "python-official",
             "python-fastmcp",
             "typescript-node",
             "minimal-python",
         ],
-        default="python-fastmcp",
-        help="Template to use (default: python-fastmcp)",
+        default="python-official",
+        help="Template to use (default: python-official)",
     )
     parser.add_argument(
         "--port",
