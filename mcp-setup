@@ -2208,11 +2208,31 @@ mcp_get_detailed_status() {
     local activity="💤 IDLE"
     local docker_status="N/A"
     
-    # Check if path exists first
+    # Check if path exists first - with proper resolution
     if [[ -n "$path" ]] && [[ "$path" != "N/A" ]]; then
         local expanded_path="${path/#\~/$HOME}"
+        # Handle relative paths by making them absolute
+        if [[ "$expanded_path" != /* ]]; then
+            expanded_path="$PWD/$expanded_path"
+        fi
+        # Resolve the path properly
+        expanded_path=$(realpath -m "$expanded_path" 2>/dev/null || echo "$expanded_path")
+        
         if [[ ! -d "$expanded_path" ]]; then
-            echo "📦 NOT INSTALLED|❌ MISSING|N/A"
+            # Check if tool exists elsewhere in discovered locations
+            local discovered_path=""
+            for search_dir in "mcp-tools" "." "$HOME"; do
+                if [[ -d "$search_dir/$tool" ]]; then
+                    discovered_path="$search_dir/$tool"
+                    break
+                fi
+            done
+            
+            if [[ -n "$discovered_path" ]]; then
+                echo "⚙️ NOT CONFIGURED|⚠️ MISMATCHED PATH|N/A"
+            else
+                echo "📦 NOT INSTALLED|❌ MISSING|N/A"
+            fi
             return
         fi
     fi
@@ -2270,6 +2290,44 @@ mcp_get_detailed_status() {
     fi
     
     echo "$status_icon|$activity|$docker_status"
+}
+
+# Simplified status check for discovered tools
+mcp_get_detailed_status_simple() {
+    local tool="$1"
+    local port="$2" 
+    local command="$3"
+    local path="$4"
+    
+    # Check if port is listening
+    local port_active=false
+    if [[ "$port" != "N/A" ]] && netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+        port_active=true
+    fi
+    
+    # Check if process is running
+    local process_active=false
+    if [[ "$command" != "N/A" ]]; then
+        local pids=$(pgrep -f "$command" 2>/dev/null | while read pid; do
+            if ps -p "$pid" -o args= 2>/dev/null | grep -v "pgrep" | grep -v "grep" | grep -q "$command"; then
+                echo "$pid"
+            fi
+        done)
+        if [[ -n "$pids" ]]; then
+            process_active=true
+        fi
+    fi
+    
+    # Determine status
+    if [[ "$port_active" == "true" ]] && [[ "$process_active" == "true" ]]; then
+        echo "🟢 RUNNING|📡 ACTIVE|N/A"
+    elif [[ "$process_active" == "true" ]]; then
+        echo "🟡 PARTIAL|⚠️ LIMITED|N/A"
+    elif [[ "$port_active" == "true" ]]; then
+        echo "🔴 FAILED|⚠️ STALE|N/A"
+    else
+        echo "⚫ STOPPED|💤 IDLE|N/A"
+    fi
 }
 
 # Count tools by status type
@@ -2408,7 +2466,7 @@ mcp_list_tools() {
     local config_file="$1"
     local json_output="$2"
     
-    debug_print "Listing MCP tools from: $config_file"
+    debug_print "Listing MCP tools with discovery-first approach"
     
     if [[ "$json_output" == "true" ]]; then
         if command -v jq >/dev/null 2>&1; then
@@ -2416,69 +2474,109 @@ mcp_list_tools() {
         else
             cat "$config_file"
         fi
-    else
-        echo "🔧 MCP Tools List"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        
-        if command -v jq >/dev/null 2>&1; then
-            # First, show all configured tools
-            jq -r 'to_entries[] | "\(.key)|\(.value.name)|\(.value.port // "N/A")|\(.value.command // "N/A")|\(.value.path // "N/A")"' "$config_file" | \
-            while IFS='|' read -r key name port command path; do
-                local status_info=$(mcp_get_detailed_status "$key" "$port" "$command" "$path")
-                local status_icon=$(echo "$status_info" | cut -d'|' -f1)
-                printf "%-20s %-30s %s\n" "$key" "$name" "$status_icon"
-            done
-            
-            # Discover all MCP tools in the system
-            local all_discovered=$(mcp_discover_tools)
-            declare -A seen_tools
-            local unconfigured_tools=()
-            
-            # Filter out configured tools and remove duplicates
-            while IFS= read -r line; do
-                if [[ -n "$line" ]]; then
-                    IFS=':' read -r tool_path tool_name <<< "$line"
-                    if [[ -n "$tool_name" ]] && ! mcp_is_configured "$config_file" "$tool_name"; then
-                        # Use associative array to track unique tools
-                        if [[ -z "${seen_tools[$tool_name]:-}" ]]; then
-                            seen_tools[$tool_name]=1
-                            unconfigured_tools+=("$tool_name:$tool_path")
-                        fi
-                    fi
-                fi
-            done <<< "$all_discovered"
-            
-            # Show discovered but unconfigured tools
-            if [[ ${#unconfigured_tools[@]} -gt 0 ]]; then
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "📂 Discovered but not configured:"
-                for tool_info in "${unconfigured_tools[@]}"; do
-                    IFS=':' read -r tool_name tool_path <<< "$tool_info"
-                    printf "%-20s %-30s %s\n" "${tool_name#mcp-}" "$tool_name" "⚙️ NOT CONFIGURED"
-                done
-            fi
-        else
-            log_warn "jq not available - showing basic info"
-            grep -o '"[^"]*": {' "$config_file" | sed 's/": {//' | sed 's/"//g' | \
-            while read -r tool; do
-                echo "📦 $tool"
-            done
-        fi
-        
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        
-        # Show total count
-        local configured_count=$(jq 'keys | length' "$config_file" 2>/dev/null || echo "0")
-        local discovered_count=${#unconfigured_tools[@]:-0}
-        local total_count=$((configured_count + discovered_count))
-        
-        echo "📊 Total: $total_count tools ($configured_count configured, $discovered_count unconfigured)"
-        
-        if [[ $discovered_count -gt 0 ]]; then
-            echo "💡 To configure discovered tools: mcp-setup mcp configure <tool-name>"
-        fi
-        echo "💡 Use 'mcp-setup mcp dashboard' for live monitoring"
+        return
     fi
+    
+    echo "🔧 MCP Tools List"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    if ! command -v jq >/dev/null 2>&1; then
+        log_warn "jq not available - showing basic info"
+        return 1
+    fi
+    
+    # 1. DISCOVERY FIRST: Find all tools with proper path resolution
+    local all_discovered=$(mcp_discover_tools)
+    declare -A all_tools
+    declare -A tool_configs
+    declare -A tool_paths
+    
+    # Process discovered tools
+    while IFS= read -r line; do
+        if [[ -n "$line" ]]; then
+            IFS=':' read -r tool_path tool_name <<< "$line"
+            # Resolve path properly
+            local resolved_path=$(realpath "$tool_path" 2>/dev/null || echo "$tool_path")
+            all_tools["$tool_name"]="discovered"
+            tool_paths["$tool_name"]="$resolved_path"
+        fi
+    done <<< "$all_discovered"
+    
+    # 2. Overlay configuration data (avoid subshell to preserve arrays)
+    local config_output
+    config_output=$(jq -r 'to_entries[] | "\(.key)|\(.value.name // .key)|\(.value.port // "N/A")|\(.value.command // "N/A")|\(.value.path // "N/A")"' "$config_file")
+    
+    while IFS='|' read -r key name port command config_path; do
+        if [[ -n "$key" ]]; then
+            # Resolve configured path
+            local resolved_config_path="$config_path"
+            if [[ "$config_path" != "N/A" ]]; then
+                resolved_config_path="${config_path/#\~/$HOME}"
+                if [[ "$resolved_config_path" != /* ]]; then
+                    resolved_config_path="$PWD/$resolved_config_path"
+                fi
+                resolved_config_path=$(realpath -m "$resolved_config_path" 2>/dev/null || echo "$resolved_config_path")
+            fi
+            
+            all_tools["$key"]="configured"
+            tool_configs["$key"]="$name|$port|$command|$resolved_config_path"
+        fi
+    done <<< "$config_output"
+    
+    # 3. Show all tools with proper status resolution
+    for tool_name in $(printf '%s\n' "${!all_tools[@]}" | sort); do
+        local tool_status="${all_tools[$tool_name]}"
+        local discovered_path="${tool_paths[$tool_name]:-}"
+        local config_data="${tool_configs[$tool_name]:-}"
+        
+        if [[ "$config_data" != "" ]]; then
+            IFS='|' read -r name port command config_path <<< "$config_data"
+            
+            # Determine final path and status
+            local final_path="$config_path"
+            local status_info
+            
+            if [[ -d "$config_path" ]]; then
+                # Config path exists - use it
+                status_info=$(mcp_get_detailed_status_simple "$tool_name" "$port" "$command" "$config_path")
+            elif [[ -n "$discovered_path" ]] && [[ -d "$discovered_path" ]]; then
+                # Config path wrong but tool discovered - path mismatch
+                status_info="⚙️ PATH MISMATCH|⚠️ WRONG CONFIG|N/A"
+                final_path="$discovered_path"
+            else
+                # Neither exists
+                status_info="📦 NOT INSTALLED|❌ MISSING|N/A"
+            fi
+            
+            local status_icon=$(echo "$status_info" | cut -d'|' -f1)
+            printf "%-20s %-30s %s\n" "$tool_name" "$name" "$status_icon"
+        else
+            # Discovered but not configured
+            printf "%-20s %-30s %s\n" "$tool_name" "$tool_name" "⚙️ NOT CONFIGURED"
+        fi
+    done
+    
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Show summary
+    local total_count=${#all_tools[@]}
+    local configured_count=0
+    local discovered_count=0
+    
+    for tool_name in "${!all_tools[@]}"; do
+        if [[ "${all_tools[$tool_name]}" == "configured" ]]; then
+            ((configured_count++))
+        else
+            ((discovered_count++))
+        fi
+    done
+    
+    echo "📊 Total: $total_count tools ($configured_count configured, $discovered_count unconfigured)"
+    
+    if [[ $discovered_count -gt 0 ]]; then
+        echo "💡 To configure discovered tools: mcp-setup mcp configure <tool-name>"
+    fi
+    echo "💡 Use 'mcp-setup mcp dashboard' for live monitoring"
 }
 
 # Placeholder implementations for remaining functions

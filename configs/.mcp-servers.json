@@ -104,17 +104,33 @@
     "env_file": ".env",
     "dependencies": {}
   },
-  "compliance-test": {
-    "name": "Compliance Test MCP Server",
-    "path": "mcp-tools/compliance-test",
+  "test-tool2": {
+    "name": "Test Tool2 MCP Server",
+    "path": "mcp-tools/test-tool2",
     "command": "python src/main.py",
     "transport": "stdio",
     "env_file": ".env",
     "dependencies": {}
   },
-  "test-simple": {
-    "name": "Test Simple MCP Server",
-    "path": "mcp-tools/test-simple",
+  "final-demo": {
+    "name": "Final Demo MCP Server",
+    "path": "mcp-tools/final-demo",
+    "command": "python src/main.py",
+    "transport": "stdio",
+    "env_file": ".env",
+    "dependencies": {}
+  },
+  "standards-demo": {
+    "name": "Standards Demo MCP Server",
+    "path": "mcp-tools/standards-demo",
+    "command": "python src/main.py",
+    "transport": "stdio",
+    "env_file": ".env",
+    "dependencies": {}
+  },
+  "pipeline-mcp": {
+    "name": "Pipeline MCP Server", 
+    "path": "mcp-tools/pipeline-mcp",
     "command": "python src/main.py",
     "transport": "stdio",
     "env_file": ".env",
