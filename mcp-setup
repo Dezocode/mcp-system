@@ -284,15 +284,22 @@ ${BOLD}COMMANDS:${NC}
       ${SCRIPT_NAME} repair --fix-all --dry-run # See what would be fixed
 
   ${CYAN}${BOLD}create [OPTIONS] <TYPE> <NAME>${NC}
-    Create new MCP servers, clients, and components with official Anthropic standards.
+    Create new MCP servers with automatic project integration.
     
-    Types: server, client, tool, resource, prompt
+    Types: server (others coming soon)
+    Languages: python, typescript, javascript  
     Complexity: simple, standard, advanced, enterprise
     
+    Auto-features:
+    ✅ Creates in mcp-tools/ directory
+    ✅ Auto-registers in project configuration
+    ✅ Immediate discovery in mcp list
+    ✅ Full scaffolding with FastMCP framework
+    
     Examples:
-      ${SCRIPT_NAME} create server weather-api --language python
+      ${SCRIPT_NAME} create server weather-api         # Create Python server
       ${SCRIPT_NAME} create server db-tool --complexity enterprise
-      ${SCRIPT_NAME} create tool file-search --output ./my-server/
+      ${SCRIPT_NAME} create server my-tool --force     # Overwrite existing
 
   ${CYAN}${BOLD}docs [OPTIONS] [SECTION]${NC}
     Browse official Anthropic MCP documentation and specifications.
@@ -397,11 +404,17 @@ ${BOLD}EXAMPLES:${NC}
     # Complete installation with verbose output
     ${SCRIPT_NAME} --verbose install
     
+    # Create a new MCP server with auto-configuration
+    ${SCRIPT_NAME} create server my-weather-api
+    
     # Dry run uninstall to see what would be removed
     ${SCRIPT_NAME} --dry-run uninstall
     
     # Check system status and health
     ${SCRIPT_NAME} status --detailed --check-health
+    
+    # List all MCP tools (including newly created ones)
+    ${SCRIPT_NAME} mcp list
     
     # Fix all detected issues
     ${SCRIPT_NAME} repair --fix-all --force
@@ -1042,7 +1055,7 @@ cmd_create() {
     local language="python"
     local complexity="simple"
     local template=""
-    local output_dir="."
+    local output_dir="mcp-tools"  # Default to mcp-tools directory for modular organization
     local force=false
     local no_examples=false
     local with_tests=false

@@ -87,5 +87,13 @@
     "port": 8055,
     "env_file": ".env",
     "dependencies": {}
+  },
+  "final-demo": {
+    "name": "Final Demo MCP Server",
+    "path": "mcp-tools/final-demo",
+    "command": "uv run python src/main.py",
+    "port": 8055,
+    "env_file": ".env",
+    "dependencies": {}
   }
 }
