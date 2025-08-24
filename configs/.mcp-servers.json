@@ -104,11 +104,11 @@
     "env_file": ".env",
     "dependencies": {}
   },
-  "standards-demo": {
-    "name": "Standards Demo MCP Server",
-    "path": "mcp-tools/standards-demo",
-    "command": "python src/main.py",
-    "transport": "stdio",
+  "test-standardization": {
+    "name": "Test Standardization MCP Server",
+    "path": "mcp-tools/test-standardization",
+    "command": "python main.py",
+    "port": 8055,
     "env_file": ".env",
     "dependencies": {}
   }
