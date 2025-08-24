@@ -1478,11 +1478,10 @@ mcp {server_name} start
         if not description:
             description = f"MCP server for {name}"
         if not path:
-            # Default to mcp-tools directory for better organization
-            if Path("mcp-tools").exists() or Path("mcp-setup").exists():
-                path = Path("mcp-tools") / name
-            else:
-                path = Path.home() / f"mcp-{name}"
+            # Always use mcp-tools directory for standardization
+            mcp_tools_path = Path("mcp-tools")
+            mcp_tools_path.mkdir(exist_ok=True)
+            path = mcp_tools_path / name
         else:
             path = Path(path).expanduser()
 
@@ -1623,7 +1622,7 @@ Examples:
         help="Port number (default: 8055)",
     )
     parser.add_argument("--description", "-d", help="Server description")
-    parser.add_argument("--path", help="Custom path (default: mcp-tools/<name> or ~/mcp-<name>)")
+    parser.add_argument("--path", help="Custom path (default: mcp-tools/<name>)")
     parser.add_argument("--complexity", "-c", 
                        choices=["simple", "standard", "advanced", "enterprise"],
                        default="simple",
