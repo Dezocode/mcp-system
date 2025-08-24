@@ -15,7 +15,7 @@ from datetime import datetime
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from src.config.cross_platform import CrossPlatformResolver
+from mcp_tools.installation.config.cross_platform import CrossPlatformResolver
 
 
 class PathMigrator:
@@ -112,14 +112,14 @@ class PathMigrator:
                     content = re.sub(pattern, replacement, content)
             
             # Add import if needed (for Python files)
-            if filepath.suffix == '.py' and 'cross_platform' in content and 'from src.config.cross_platform import' not in content:
+            if filepath.suffix == '.py' and 'cross_platform' in content and 'from mcp_tools.installation.config.cross_platform import' not in content:
                 lines = content.splitlines()
                 import_added = False
                 
                 for i, line in enumerate(lines):
                     if line.startswith('import ') or line.startswith('from '):
                         # Add after other imports
-                        lines.insert(i + 1, 'from src.config.cross_platform import cross_platform')
+                        lines.insert(i + 1, 'from mcp_tools.installation.config.cross_platform import cross_platform')
                         import_added = True
                         break
                 
@@ -135,7 +135,7 @@ class PathMigrator:
                                 insert_pos = j + 1
                                 break
                     
-                    lines.insert(insert_pos, '\nfrom src.config.cross_platform import cross_platform\n')
+                    lines.insert(insert_pos, '\nfrom mcp_tools.installation.config.cross_platform import cross_platform\n')
                 
                 content = '\n'.join(lines)
             

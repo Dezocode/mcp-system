@@ -9,7 +9,7 @@ shell=False, proper error handling, input sanitization, and privilege dropping
 """
 
 import json
-from src.config.cross_platform import cross_platform
+from mcp_tools.installation.config.cross_platform import cross_platform
 import re
 import signal
 # Security: subprocess calls use absolute paths, validated args, timeouts,

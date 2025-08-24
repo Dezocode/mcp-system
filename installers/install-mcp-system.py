@@ -20,14 +20,14 @@ class MCPSystemInstaller:
         self.claude_settings_dir = self.home / ".claude"
         self.current_dir = Path(__file__).parent
 
-        # Components to package
+        # Components to package (updated for mcp_tools structure)
         self.components = {
             "mcp": "Universal MCP server launcher",
-            "core/mcp-router.py": "Intelligent server router",
+            "mcp_tools/core/router.py": "Intelligent server router",
             "claude-mcp.sh": "Claude integration helper",
-            "core/mcp-create-server.py": "Server template generator",
-            "core/mcp-test-framework.py": "Testing framework",
-            "core/mcp-upgrader.py": "Modular upgrade system",
+            "mcp_tools/development/create_server.py": "Server template generator",
+            "mcp_tools/development/test_framework.py": "Testing framework",
+            "mcp_tools/development/upgrader.py": "Modular upgrade system",
             "claude-upgrade.sh": "Upgrade integration helper",
         }
 
@@ -292,10 +292,10 @@ class MCPBridge:
         if len(args) > 1:
             command = args[1]
             component_map = {
-                "create": "core/mcp-create-server.py",
-                "test": "core/mcp-test-framework.py",
+                "create": "mcp_tools/development/create_server.py",
+                "test": "mcp_tools/development/test_framework.py",
                 "upgrade": "claude-upgrade.sh",
-                "router": "core/mcp-router.py"
+                "router": "mcp_tools/core/router.py"
             }
 
             if command in component_map:

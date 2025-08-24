@@ -123,12 +123,12 @@ validate_source_structure() {
         fi
     done
     
-    # Check key files
+    # Check key files (updated for mcp_tools structure)
     key_files=(
-        "src/pipeline_mcp_server.py"
-        "src/install_mcp_system.py"
-        "src/claude_code_mcp_bridge.py"
-        "src/auto_discovery_system.py"
+        "mcp_tools/core/server.py"
+        "mcp_tools/installation/installer.py"
+        "mcp_tools/integration/claude_bridge.py"
+        "mcp_tools/installation/auto_discovery.py"
         "pyproject.toml"
         "requirements.txt"
     )

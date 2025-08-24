@@ -6,7 +6,7 @@ and performance optimization
 """
 
 import difflib
-from src.config.cross_platform import cross_platform
+from mcp_tools.installation.config.cross_platform import cross_platform
 import json
 import os
 import re
