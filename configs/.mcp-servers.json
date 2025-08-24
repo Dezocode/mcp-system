@@ -103,13 +103,5 @@
     "transport": "stdio",
     "env_file": ".env",
     "dependencies": {}
-  },
-  "test-standardization": {
-    "name": "Test Standardization MCP Server",
-    "path": "mcp-tools/test-standardization",
-    "command": "python main.py",
-    "port": 8055,
-    "env_file": ".env",
-    "dependencies": {}
   }
 }
