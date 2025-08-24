@@ -1,109 +1,198 @@
+#!/usr/bin/env python3
 """
-test-tool - MCP Server
+test-tool - Official MCP Server
 MCP server for test-tool
+
+This server follows the official Anthropic MCP protocol specification.
 """
 
-from mcp.server.fastmcp import FastMCP, Context
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
-from dotenv import load_dotenv
 import asyncio
 import json
-import os
+import logging
+from typing import Any, Sequence
+from mcp.server import Server, NotificationOptions
+from mcp.server.models import InitializationOptions
+import mcp.server.stdio
+import mcp.types as types
+from pydantic import AnyUrl
 
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("test-tool")
 
-# Server configuration
+# Server metadata
 SERVER_NAME = "test-tool"
-SERVER_PORT = 8055
-SERVER_HOST = os.getenv("HOST", "localhost")
+SERVER_VERSION = "0.1.0"
 
-@dataclass
-class TestToolContext:
-    """Context for the test-tool MCP server."""
-    # Add your context variables here
-    initialized: bool = False
-
-@asynccontextmanager
-async def server_lifespan(
-    server: FastMCP
-) -> AsyncIterator[TestToolContext]:
+class TestToolServer:
     """
-    Manages the server lifecycle.
-
-    Args:
-        server: The FastMCP server instance
-
-    Yields:
-        Context: The server context
+    Official MCP Server implementation for test-tool.
+    
+    Follows Anthropic MCP protocol specification:
+    - Uses stdio transport (recommended by Anthropic)
+    - Implements standard MCP capabilities
+    - Provides proper error handling
     """
-    # Initialize your server resources here
-    print(f"Starting {SERVER_NAME} server...")
+    
+    def __init__(self):
+        self.server = Server(SERVER_NAME)
+        self.setup_handlers()
+    
+    def setup_handlers(self):
+        """Set up MCP protocol handlers following official patterns."""
+        
+        @self.server.list_tools()
+        async def handle_list_tools() -> list[types.Tool]:
+            """
+            List available tools.
+            
+            Returns the tools offered by this server.
+            """
+            return [
+                types.Tool(
+                    name="hello_world",
+                    description="Say hello to someone",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The name to greet"
+                            }
+                        },
+                        "required": []
+                    }
+                ),
+                types.Tool(
+                    name="get_status",
+                    description="Get server status information",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                ),
+                types.Tool(
+                    name="example_tool",
+                    description="Example tool demonstrating parameter handling",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "param1": {
+                                "type": "string",
+                                "description": "A required string parameter"
+                            },
+                            "param2": {
+                                "type": "integer",
+                                "description": "An optional integer parameter",
+                                "default": 10
+                            }
+                        },
+                        "required": ["param1"]
+                    }
+                )
+            ]
 
-    context = TestToolContext(initialized=True)
+        @self.server.call_tool()
+        async def handle_call_tool(
+            name: str, arguments: dict[str, Any] | None
+        ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+            """
+            Handle tool calls.
+            
+            Args:
+                name: The name of the tool to call
+                arguments: The arguments for the tool
+                
+            Returns:
+                The result of the tool call
+            """
+            if arguments is None:
+                arguments = {}
 
-    try:
-        yield context
-    finally:
-        # Cleanup resources here
-        print(f"Shutting down {SERVER_NAME} server...")
+            try:
+                if name == "hello_world":
+                    return await self.hello_world(**arguments)
+                elif name == "get_status":
+                    return await self.get_status(**arguments)
+                elif name == "example_tool":
+                    return await self.example_tool(**arguments)
+                else:
+                    raise ValueError(f"Unknown tool: {name}")
+            except Exception as e:
+                logger.error(f"Error in tool {name}: {e}")
+                raise
 
-# Initialize FastMCP server
-mcp = FastMCP(
-    SERVER_NAME,
-    description="MCP server for test-tool",
-    lifespan=server_lifespan,
-    host=SERVER_HOST,
-    port=SERVER_PORT
-)
+    async def hello_world(self, name: str = "World") -> list[types.TextContent]:
+        """
+        Say hello to someone.
+        
+        Args:
+            name: The name to greet
+            
+        Returns:
+            A greeting message
+        """
+        message = f"Hello, {name}! This is {SERVER_NAME} server."
+        return [types.TextContent(type="text", text=message)]
 
-@mcp.tool()
-async def hello_world(ctx: Context, name: str = "World") -> str:
-    """Say hello to someone.
+    async def get_status(self) -> list[types.TextContent]:
+        """
+        Get server status information.
+        
+        Returns:
+            Server status information in JSON format
+        """
+        status = {
+            "server": SERVER_NAME,
+            "version": SERVER_VERSION,
+            "status": "running",
+            "description": "MCP server for test-tool",
+            "capabilities": [
+                "tools"
+            ]
+        }
+        return [types.TextContent(type="text", text=json.dumps(status, indent=2))]
 
-    Args:
-        ctx: The MCP server provided context
-        name: The name to greet
+    async def example_tool(self, param1: str, param2: int = 10) -> list[types.TextContent]:
+        """
+        Example tool demonstrating parameter handling.
+        
+        Args:
+            param1: A required string parameter
+            param2: An optional integer parameter (default: 10)
+            
+        Returns:
+            Result of the operation
+        """
+        result = f"Processed '{param1}' with value {param2}"
+        return [types.TextContent(type="text", text=result)]
 
-    Returns:
-        A greeting message
-    """
-    return f"Hello, {name}! This is {SERVER_NAME} server."
+    async def run(self):
+        """Run the server using stdio transport (Anthropic recommended)."""
+        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+            await self.server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name=SERVER_NAME,
+                    server_version=SERVER_VERSION,
+                    capabilities=self.server.get_capabilities(
+                        notification_options=NotificationOptions(),
+                        experimental_capabilities={}
+                    )
+                )
+            )
 
-@mcp.tool()
-async def get_status(ctx: Context) -> str:
-    """Get server status.
 
-    Args:
-        ctx: The MCP server provided context
+async def main():
+    """Main entry point for the MCP server."""
+    logger.info(f"Starting {SERVER_NAME} v{SERVER_VERSION}")
+    logger.info("Using stdio transport (Anthropic MCP standard)")
+    
+    server = TestToolServer()
+    await server.run()
 
-    Returns:
-        Server status information
-    """
-    context = ctx.request_context.lifespan_context
-    return json.dumps({
-        "server": SERVER_NAME,
-        "status": "running",
-        "initialized": context.initialized,
-        "port": SERVER_PORT
-    }, indent=2)
-
-# Add your custom tools here
-@mcp.tool()
-async def example_tool(ctx: Context, param1: str, param2: int = 10) -> str:
-    """Example tool demonstrating parameter handling.
-
-    Args:
-        ctx: The MCP server provided context
-        param1: A required string parameter
-        param2: An optional integer parameter (default: 10)
-
-    Returns:
-        Result of the operation
-    """
-    return f"Processed {param1} with value {param2}"
 
 if __name__ == "__main__":
-    print(f"Starting {SERVER_NAME} MCP server on {SERVER_HOST}:{SERVER_PORT}")
-    mcp.run()
+    asyncio.run(main())
