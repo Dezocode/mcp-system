@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  standards-demo:
+    build: 
+      context: .
+      args:
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        VERSION: ${VERSION:-0.1.0}
+    environment:
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # Note: MCP servers use stdio transport, not HTTP ports
+    # volumes:
+    #   - ./data:/app/data
+    #   - ./.env:/app/.env
+    
+    # Uncomment if your MCP server needs external services
+    # depends_on:
+    #   - database
+    #   - redis
+
+  # Example database service (uncomment if needed)
+  # database:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: standards_demo
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Example Redis service (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+
+# Uncomment if using persistent volumes
+# volumes:
+#   postgres_data:
+#   redis_data:
+
+networks:
+  default:
+    name: standards-demo_network

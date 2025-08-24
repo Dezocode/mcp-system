@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  test-tool2:
+    build: .
+    ports:
+      - "8055:8055"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8055
+    restart: unless-stopped
+    # volumes:
+    #   - ./data:/app/data
+    # depends_on:
+    #   - database
+
+  # Uncomment and configure if you need a database
+  # database:
+  #   image: postgres:15
+  #   environment:
+  #     POSTGRES_DB: test_tool2
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: password
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:
