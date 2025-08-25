@@ -35,6 +35,16 @@ import click
 import psutil
 from dotenv import load_dotenv
 
+# Web API imports
+try:
+    from fastapi import FastAPI, WebSocket, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
+    import uvicorn
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+
 # Add the repository root to path for imports
 repo_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(repo_root))
@@ -180,6 +190,124 @@ class WindowsDockerIntegration:
         
         return distros
     
+    async def launch_docker(self) -> Tuple[bool, str]:
+        """Launch Docker Desktop or Docker daemon based on platform."""
+        try:
+            if self.is_windows:
+                # Windows: Start Docker Desktop
+                return await self._launch_docker_windows()
+            elif platform.system().lower() == "darwin":
+                # macOS: Start Docker.app
+                return await self._launch_docker_macos()
+            else:
+                # Linux: Start dockerd
+                return await self._launch_docker_linux()
+        except Exception as e:
+            logger.error(f"Docker launch failed: {e}")
+            return False, str(e)
+    
+    async def _launch_docker_windows(self) -> Tuple[bool, str]:
+        """Launch Docker Desktop on Windows."""
+        try:
+            # Try to start Docker Desktop
+            process = await asyncio.create_subprocess_exec(
+                "powershell", "-Command", 
+                "Start-Process 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode == 0:
+                # Wait a bit for Docker to start
+                await asyncio.sleep(5)
+                # Verify Docker is running
+                if await self._check_docker_running():
+                    return True, "Docker Desktop started successfully"
+                else:
+                    return True, "Docker Desktop launched, starting up..."
+            else:
+                return False, f"Failed to start Docker Desktop: {stderr.decode()}"
+                
+        except Exception as e:
+            # Fallback: try alternative paths
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "cmd", "/c", "start", "", "Docker Desktop",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await process.communicate()
+                return True, "Docker Desktop launch attempted via cmd"
+            except Exception as e2:
+                return False, f"Docker Desktop launch failed: {e}, {e2}"
+    
+    async def _launch_docker_macos(self) -> Tuple[bool, str]:
+        """Launch Docker.app on macOS."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "open", "-a", "Docker",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode == 0:
+                await asyncio.sleep(5)
+                if await self._check_docker_running():
+                    return True, "Docker.app started successfully"
+                else:
+                    return True, "Docker.app launched, starting up..."
+            else:
+                return False, f"Failed to start Docker.app: {stderr.decode()}"
+                
+        except Exception as e:
+            return False, f"Docker.app launch failed: {e}"
+    
+    async def _launch_docker_linux(self) -> Tuple[bool, str]:
+        """Launch Docker daemon on Linux."""
+        try:
+            # Try systemctl first
+            process = await asyncio.create_subprocess_exec(
+                "sudo", "systemctl", "start", "docker",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            
+            if process.returncode == 0:
+                await asyncio.sleep(3)
+                if await self._check_docker_running():
+                    return True, "Docker daemon started via systemctl"
+                else:
+                    return True, "Docker daemon start initiated"
+            else:
+                # Fallback: try service command
+                process = await asyncio.create_subprocess_exec(
+                    "sudo", "service", "docker", "start",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await process.communicate()
+                
+                if process.returncode == 0:
+                    return True, "Docker daemon started via service"
+                else:
+                    return False, f"Failed to start Docker daemon: {stderr.decode()}"
+                
+        except Exception as e:
+            return False, f"Docker daemon launch failed: {e}"
+    
+    async def _check_docker_running(self) -> bool:
+        """Check if Docker is running."""
+        try:
+            if self.docker_client:
+                self.docker_client.ping()
+                return True
+            return False
+        except Exception:
+            return False
+
     async def execute_docker_command(self, command: List[str], use_wsl: bool = False) -> Tuple[int, str, str]:
         """Execute Docker command with WSL integration support."""
         if use_wsl and self.is_windows:
@@ -449,6 +577,196 @@ class CLIResolver:
             }
 
 
+class WebAPIOrchestrator:
+    """FastAPI web interface for AI steering via React/JSON framework communication."""
+    
+    def __init__(self, orchestrator_server):
+        self.orchestrator_server = orchestrator_server
+        self.app = None
+        self.active_connections = []
+        
+        if FASTAPI_AVAILABLE:
+            self.app = FastAPI(
+                title="MCP Orchestrator API",
+                description="AI-steerable Docker orchestration API with React/JSON framework support",
+                version="1.0.0"
+            )
+            self._setup_routes()
+            self._setup_middleware()
+        else:
+            logger.warning("FastAPI not available - Web API disabled")
+    
+    def _setup_middleware(self):
+        """Setup CORS and other middleware for React compatibility."""
+        if not self.app:
+            return
+            
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # Configure appropriately for production
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    
+    def _setup_routes(self):
+        """Setup API routes for AI steering."""
+        if not self.app:
+            return
+        
+        @self.app.get("/api/status")
+        async def get_status():
+            """Get overall orchestrator status."""
+            return {
+                "status": "running",
+                "platform": platform.system(),
+                "docker_available": DOCKER_AVAILABLE,
+                "fastapi_available": FASTAPI_AVAILABLE,
+                "watchdog_available": WATCHDOG_AVAILABLE,
+                "timestamp": time.time()
+            }
+        
+        @self.app.post("/api/docker/launch")
+        async def launch_docker(payload: dict = None):
+            """Launch Docker via API."""
+            if payload is None:
+                payload = {}
+            
+            result = await handle_docker_launch(payload)
+            return json.loads(result[0].text)
+        
+        @self.app.post("/api/docker/operation")
+        async def docker_operation(payload: dict):
+            """Execute Docker operation via API."""
+            result = await handle_docker_operation(payload)
+            return json.loads(result[0].text)
+        
+        @self.app.post("/api/container/management")
+        async def container_management(payload: dict):
+            """Container management via API."""
+            result = await handle_container_management(payload)
+            return json.loads(result[0].text)
+        
+        @self.app.post("/api/environment/setup")
+        async def environment_setup(payload: dict):
+            """Environment setup via API."""
+            result = await handle_environment_setup(payload)
+            return json.loads(result[0].text)
+        
+        @self.app.post("/api/health/monitoring")
+        async def health_monitoring(payload: dict):
+            """Health monitoring via API."""
+            result = await handle_health_monitoring(payload)
+            return json.loads(result[0].text)
+        
+        @self.app.get("/api/platforms/detect")
+        async def detect_platforms():
+            """Detect available platforms and capabilities."""
+            detection = {
+                "current_platform": platform.system(),
+                "architecture": platform.machine(),
+                "python_version": platform.python_version(),
+                "docker_available": DOCKER_AVAILABLE,
+                "watchdog_available": WATCHDOG_AVAILABLE,
+                "fastapi_available": FASTAPI_AVAILABLE
+            }
+            
+            # Windows-specific detection
+            if self.orchestrator_server.windows_docker.is_windows:
+                detection["wsl"] = self.orchestrator_server.windows_docker.detect_wsl_environment()
+                detection["docker_desktop"] = self.orchestrator_server.windows_docker.get_docker_desktop_status()
+            
+            return detection
+        
+        @self.app.websocket("/ws/updates")
+        async def websocket_endpoint(websocket: WebSocket):
+            """WebSocket for real-time updates."""
+            await websocket.accept()
+            self.active_connections.append(websocket)
+            
+            try:
+                while True:
+                    # Send periodic status updates
+                    status = {
+                        "type": "status_update",
+                        "timestamp": time.time(),
+                        "docker_status": self.orchestrator_server.windows_docker.get_docker_desktop_status(),
+                        "system_health": {
+                            "cpu_percent": psutil.cpu_percent(),
+                            "memory_percent": psutil.virtual_memory().percent
+                        }
+                    }
+                    await websocket.send_json(status)
+                    await asyncio.sleep(5)
+                    
+            except Exception as e:
+                logger.debug(f"WebSocket connection closed: {e}")
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
+        
+        @self.app.post("/api/config/update")
+        async def update_config(config: dict):
+            """Update orchestrator configuration dynamically."""
+            try:
+                # Update environment variables
+                for key, value in config.get("environment", {}).items():
+                    os.environ[key] = str(value)
+                
+                # Update orchestrator settings
+                settings = config.get("orchestrator", {})
+                if "workspace_root" in settings:
+                    new_root = Path(settings["workspace_root"])
+                    if new_root.exists():
+                        self.orchestrator_server.workspace_root = new_root
+                
+                return {
+                    "success": True,
+                    "message": "Configuration updated successfully",
+                    "timestamp": time.time()
+                }
+                
+            except Exception as e:
+                return {
+                    "success": False,
+                    "message": f"Configuration update failed: {str(e)}",
+                    "timestamp": time.time()
+                }
+    
+    async def broadcast_update(self, message: dict):
+        """Broadcast update to all connected WebSocket clients."""
+        if not self.active_connections:
+            return
+            
+        message["timestamp"] = time.time()
+        disconnected = []
+        
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                disconnected.append(connection)
+        
+        # Remove disconnected connections
+        for connection in disconnected:
+            self.active_connections.remove(connection)
+    
+    async def start_server(self, host: str = "0.0.0.0", port: int = 8000):
+        """Start the FastAPI web server."""
+        if not FASTAPI_AVAILABLE or not self.app:
+            logger.error("FastAPI not available - cannot start web server")
+            return
+        
+        config = uvicorn.Config(
+            app=self.app,
+            host=host,
+            port=port,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
+
+
 class OrchestratorServer:
     """Main MCP Orchestrator Server class."""
     
@@ -470,15 +788,92 @@ class OrchestratorServer:
             try:
                 self.environment_detector = EnvironmentDetector()
                 self.docker_health_check = DockerHealthCheck()
-                logger.info("Infrastructure components initialized")
             except Exception as e:
                 logger.warning(f"Infrastructure initialization failed: {e}")
+        
+        # Initialize Web API for AI steering
+        self.web_api = WebAPIOrchestrator(self)
+        self.web_server_enabled = os.getenv("WEB_SERVER_ENABLED", "false").lower() == "true"
+        self.web_server_host = os.getenv("WEB_SERVER_HOST", "0.0.0.0")
+        self.web_server_port = int(os.getenv("WEB_SERVER_PORT", "8000"))
+        
+        # Enhanced platform resolution
+        self.platform_info = self._detect_platform_capabilities()
+        
+        # Setup MCP tools
+        self._setup_tools()
         
         # Ensure directories exist
         self.session_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Orchestrator initialized at {self.workspace_root}")
         logger.info(f"Session directory: {self.session_dir}")
+    
+    def _detect_platform_capabilities(self) -> Dict[str, Any]:
+        """Enhanced cross-platform detection for Windows/Linux/WSL/Mac."""
+        platform_info = {
+            "system": platform.system(),
+            "architecture": platform.machine(),
+            "python_version": platform.python_version(),
+            "hostname": platform.node(),
+            "platform_release": platform.release(),
+            "docker_available": DOCKER_AVAILABLE,
+            "watchdog_available": WATCHDOG_AVAILABLE,
+            "fastapi_available": FASTAPI_AVAILABLE,
+            "capabilities": []
+        }
+        
+        # Windows-specific detection
+        if platform_info["system"] == "Windows":
+            platform_info["capabilities"].extend(["windows_docker_desktop", "wsl_integration"])
+            try:
+                platform_info["wsl"] = self.windows_docker.detect_wsl_environment()
+                platform_info["docker_desktop"] = self.windows_docker.get_docker_desktop_status()
+            except Exception as e:
+                logger.debug(f"Windows detection failed: {e}")
+        
+        # macOS-specific detection
+        elif platform_info["system"] == "Darwin":
+            platform_info["capabilities"].extend(["macos_docker_app", "homebrew_support"])
+            try:
+                # Check for Docker.app
+                docker_app_path = Path("/Applications/Docker.app")
+                platform_info["docker_app_available"] = docker_app_path.exists()
+                
+                # Check for Homebrew
+                homebrew_path = Path("/opt/homebrew/bin/brew") or Path("/usr/local/bin/brew")
+                platform_info["homebrew_available"] = homebrew_path.exists()
+            except Exception as e:
+                logger.debug(f"macOS detection failed: {e}")
+        
+        # Linux-specific detection
+        else:
+            platform_info["capabilities"].extend(["linux_docker_daemon", "systemctl_support"])
+            try:
+                # Check for systemctl
+                result = subprocess.run(["which", "systemctl"], capture_output=True, timeout=5)
+                platform_info["systemctl_available"] = result.returncode == 0
+                
+                # Check for Docker daemon
+                result = subprocess.run(["which", "dockerd"], capture_output=True, timeout=5)
+                platform_info["dockerd_available"] = result.returncode == 0
+                
+                # Check if running in WSL
+                if Path("/proc/version").exists():
+                    with open("/proc/version", "r") as f:
+                        version_info = f.read().lower()
+                        if "microsoft" in version_info or "wsl" in version_info:
+                            platform_info["is_wsl"] = True
+                            platform_info["capabilities"].append("wsl_environment")
+            except Exception as e:
+                logger.debug(f"Linux detection failed: {e}")
+        
+        return platform_info
+    
+    def _setup_tools(self):
+        """Setup MCP tools with enhanced capabilities."""
+        logger.info("Setting up MCP tools with enhanced Docker launch and platform resolution")
+        logger.info(f"Platform capabilities: {self.platform_info.get('capabilities', [])}")
 
 
 # Initialize server instance
@@ -520,6 +915,31 @@ async def handle_list_tools() -> List[Tool]:
                     }
                 },
                 "required": ["operation"]
+            }
+        ),
+        Tool(
+            name="docker_launch",
+            description="Launch Docker Desktop or Docker daemon on Windows/Linux/WSL/Mac platforms",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "platform": {
+                        "type": "string",
+                        "enum": ["auto", "windows", "linux", "macos", "wsl"],
+                        "description": "Target platform (auto-detect if not specified)",
+                        "default": "auto"
+                    },
+                    "wait_for_ready": {
+                        "type": "boolean",
+                        "description": "Wait for Docker to be fully ready before returning",
+                        "default": True
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Timeout in seconds to wait for Docker to be ready",
+                        "default": 60
+                    }
+                }
             }
         ),
         Tool(
@@ -712,6 +1132,8 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
     try:
         if name == "docker_operation":
             return await handle_docker_operation(arguments)
+        elif name == "docker_launch":
+            return await handle_docker_launch(arguments)
         elif name == "environment_setup":
             return await handle_environment_setup(arguments)
         elif name == "container_management":
@@ -799,6 +1221,84 @@ async def handle_docker_operation(arguments: Dict[str, Any]) -> List[TextContent
         "docker_status": docker_status,
         "timestamp": time.time()
     }
+    
+    return [TextContent(
+        type="text",
+        text=json.dumps(result, indent=2)
+    )]
+
+
+async def handle_docker_launch(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Handle Docker launch requests with cross-platform support."""
+    platform_target = arguments.get("platform", "auto")
+    wait_for_ready = arguments.get("wait_for_ready", True)
+    timeout = arguments.get("timeout", 60)
+    
+    result = {
+        "tool": "docker_launch",
+        "platform_target": platform_target,
+        "wait_for_ready": wait_for_ready,
+        "timeout": timeout,
+        "success": False,
+        "message": "",
+        "platform_detected": platform.system(),
+        "docker_status": {}
+    }
+    
+    try:
+        # Determine target platform
+        if platform_target == "auto":
+            current_platform = platform.system().lower()
+            if current_platform == "windows":
+                platform_target = "windows"
+            elif current_platform == "darwin":
+                platform_target = "macos"
+            else:
+                platform_target = "linux"
+        
+        result["platform_resolved"] = platform_target
+        
+        # Check if Docker is already running
+        initial_status = orchestrator_server.windows_docker.get_docker_desktop_status()
+        result["initial_docker_status"] = initial_status
+        
+        if initial_status.get("running", False):
+            result["success"] = True
+            result["message"] = "Docker is already running"
+            result["docker_status"] = initial_status
+        else:
+            # Launch Docker
+            success, message = await orchestrator_server.windows_docker.launch_docker()
+            result["success"] = success
+            result["message"] = message
+            
+            # Wait for Docker to be ready if requested
+            if success and wait_for_ready:
+                start_time = time.time()
+                ready = False
+                
+                while (time.time() - start_time) < timeout and not ready:
+                    await asyncio.sleep(2)
+                    try:
+                        status = orchestrator_server.windows_docker.get_docker_desktop_status()
+                        if status.get("running", False):
+                            ready = True
+                            result["docker_status"] = status
+                            result["message"] = f"{message} - Docker is now ready"
+                            break
+                    except Exception as e:
+                        logger.debug(f"Docker readiness check failed: {e}")
+                
+                if not ready:
+                    result["message"] = f"{message} - Docker may still be starting up"
+                    result["timeout_reached"] = True
+    
+    except Exception as e:
+        result["success"] = False
+        result["message"] = f"Docker launch failed: {str(e)}"
+        result["error"] = str(e)
+    
+    result["timestamp"] = time.time()
     
     return [TextContent(
         type="text",
@@ -1333,34 +1833,92 @@ async def handle_deployment_orchestration(arguments: Dict[str, Any]) -> List[Tex
 
 
 async def main():
-    """Main server entry point."""
+    """Main server entry point with support for MCP and Web API modes."""
     logger.info("Starting MCP Orchestrator Server...")
-    logger.info("Tools available: 8")
+    logger.info("Tools available: 9 (including docker_launch)")
     logger.info("MCP Protocol: v1.0")
     logger.info(f"Workspace: {orchestrator_server.workspace_root}")
+    logger.info(f"Platform: {orchestrator_server.platform_info['system']}")
+    logger.info(f"Capabilities: {orchestrator_server.platform_info.get('capabilities', [])}")
     
-    # Run server with stdio transport
-    async with stdio_server() as (read_stream, write_stream):
-        await orchestrator_server.server.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="orchestrator",
-                server_version="1.0.0",
-                capabilities={}
+    # Check if web server should run alongside MCP
+    if orchestrator_server.web_server_enabled:
+        logger.info(f"Web API enabled at http://{orchestrator_server.web_server_host}:{orchestrator_server.web_server_port}")
+        
+        # Run both MCP server and Web API server concurrently
+        async def run_mcp_server():
+            async with stdio_server() as (read_stream, write_stream):
+                await orchestrator_server.server.run(
+                    read_stream,
+                    write_stream,
+                    InitializationOptions(
+                        server_name="orchestrator",
+                        server_version="1.0.0",
+                        capabilities={}
+                    )
+                )
+        
+        async def run_web_server():
+            await orchestrator_server.web_api.start_server(
+                host=orchestrator_server.web_server_host,
+                port=orchestrator_server.web_server_port
             )
+        
+        # Run both servers concurrently
+        await asyncio.gather(
+            run_mcp_server(),
+            run_web_server()
         )
+    else:
+        # Run only MCP server with stdio transport
+        async with stdio_server() as (read_stream, write_stream):
+            await orchestrator_server.server.run(
+                read_stream,
+                write_stream,
+                InitializationOptions(
+                    server_name="orchestrator",
+                    server_version="1.0.0",
+                    capabilities={}
+                )
+            )
 
 
 @click.command()
 @click.option("--help-info", is_flag=True, help="Show this help message")
-def cli(help_info):
-    """MCP Orchestrator Server CLI."""
+@click.option("--enable-web-api", is_flag=True, help="Enable FastAPI web interface for AI steering")
+@click.option("--web-host", default="0.0.0.0", help="Web API host (default: 0.0.0.0)")
+@click.option("--web-port", default=8000, type=int, help="Web API port (default: 8000)")
+@click.option("--platform-info", is_flag=True, help="Show platform detection information")
+def cli(help_info, enable_web_api, web_host, web_port, platform_info):
+    """MCP Orchestrator Server CLI with enhanced Docker launch and AI steering capabilities."""
     if help_info:
-        click.echo("MCP Orchestrator Server - Windows Docker Integration with Watchdog")
-        click.echo("Usage: orchestrator")
-        click.echo("Starts the MCP server for Docker orchestration and monitoring")
+        click.echo("MCP Orchestrator Server - Enhanced Docker Integration with AI Steering")
+        click.echo("Usage: orchestrator [OPTIONS]")
+        click.echo("\nFeatures:")
+        click.echo("  • Docker Desktop/daemon launch capabilities")
+        click.echo("  • AI steering via React/JSON framework communication")
+        click.echo("  • Enhanced Windows/Linux/WSL/Mac platform resolution")
+        click.echo("  • Real-time monitoring and configuration")
+        click.echo("\nOptions:")
+        click.echo("  --enable-web-api    Enable FastAPI web interface")
+        click.echo("  --web-host HOST     Web API host (default: 0.0.0.0)")
+        click.echo("  --web-port PORT     Web API port (default: 8000)")
+        click.echo("  --platform-info     Show platform detection information")
         return
+    
+    if platform_info:
+        click.echo("Platform Detection Information:")
+        click.echo(json.dumps(orchestrator_server.platform_info, indent=2))
+        return
+    
+    # Set web server options if specified
+    if enable_web_api:
+        os.environ["WEB_SERVER_ENABLED"] = "true"
+        os.environ["WEB_SERVER_HOST"] = web_host
+        os.environ["WEB_SERVER_PORT"] = str(web_port)
+        orchestrator_server.web_server_enabled = True
+        orchestrator_server.web_server_host = web_host
+        orchestrator_server.web_server_port = web_port
     
     try:
         asyncio.run(main())
@@ -1372,10 +1930,4 @@ def cli(help_info):
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Server shutdown by user")
-    except Exception as e:
-        logger.error(f"Server error: {e}")
-        sys.exit(1)
+    cli()
