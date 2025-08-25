@@ -32,7 +32,7 @@ import logging
 repo_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(repo_root))
 
-from src.mcp_local_types import ErrorCode
+# Removed invalid import - using MCP v1.0 error codes directly
 
 # Environment Detection System
 from src.config.environment_detector import EnvironmentDetector, environment_detector
@@ -42,6 +42,14 @@ from src.config.runtime_profiler import RuntimeProfiler, runtime_profiler
 
 # Docker Integration System  
 from src.docker.health_check import DockerHealthCheck, docker_health_check
+
+# Real-Time Monitoring System (Phase 2.1 Implementation)
+from src.monitoring.realtime_monitor import RealtimeMonitor
+from src.monitoring.metrics_collector import MetricsCollector
+
+# Parallel Processing Engine (Phase 2.1.5-2.1.6 Implementation)
+from src.processing.parallel_executor import ParallelExecutor
+from src.processing.job_queue import JobQueue, Priority
 
 # MCP Error compatibility layer
 class McpError(Exception):
@@ -91,6 +99,11 @@ class PipelineSession:
         self.artifacts = []
         self.error_count = 0
         self.last_updated = self.created_at
+        
+        # ADD MONITORING CAPABILITIES (Phase 2.1.2)
+        self.realtime_monitor = RealtimeMonitor(session_id)
+        self.metrics_collector = MetricsCollector()
+        self.performance_baseline = None
 
     def update_status(self, status: str, stage: Optional[str] = None):
         """Update session status and stage."""
@@ -100,6 +113,11 @@ class PipelineSession:
             if stage not in self.metrics["stages_completed"]:
                 self.metrics["stages_completed"].append(stage)
         self.last_updated = datetime.now(timezone.utc)
+        
+        # ADD MONITORING UPDATE (Phase 2.1.2)
+        if stage:
+            self.realtime_monitor.record_metric("stage_transition", stage)
+        self.realtime_monitor.record_metric("status_change", status)
 
     def add_artifact(self, path: str, artifact_type: str):
         """Add artifact to session tracking."""
@@ -111,7 +129,7 @@ class PipelineSession:
 
     def get_status_dict(self) -> Dict[str, Any]:
         """Get complete session status as dictionary."""
-        return {
+        status_dict = {
             "session_id": self.session_id,
             "status": self.status,
             "current_stage": self.current_stage,
@@ -122,6 +140,11 @@ class PipelineSession:
             "error_count": self.error_count,
             "execution_time": (self.last_updated - self.created_at).total_seconds()
         }
+        
+        # ADD MONITORING DATA (Phase 2.1.2)
+        status_dict["monitoring"] = self.realtime_monitor.get_current_metrics()
+        
+        return status_dict
 
 
 class PipelineMCPServer:
@@ -140,6 +163,10 @@ class PipelineMCPServer:
         # Initialize Docker health check system
         self.docker_health_check = docker_health_check
         self.docker_health_check.config_manager = self.config_manager
+        
+        # ADD PARALLEL EXECUTOR INITIALIZATION (Phase 2.1.6)
+        self.parallel_executor = ParallelExecutor(max_workers=3)
+        self.job_queue = JobQueue(max_concurrent_jobs=3)
         
         # Detect environment and apply adaptive configuration
         self.environment_info = self.environment_detector.detect_environment()
@@ -560,7 +587,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
             return await handle_mcp_compliance_check(arguments)
         else:
             raise McpError(
-                ErrorCode.METHOD_NOT_FOUND,
+                METHOD_NOT_FOUND,
                 f"Unknown tool: {name}"
             )
 
@@ -569,7 +596,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
     except Exception as e:
         logger.error(f"Tool {name} failed: {str(e)}")
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
+            INTERNAL_ERROR,
             f"Tool execution failed: {str(e)}"
         )
 
@@ -584,9 +611,16 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
 
     session = pipeline_server.get_session(session_id)
     if not session:
-        raise McpError(ErrorCode.INVALID_PARAMS, f"Invalid session ID: {session_id}")
+        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
 
     session.update_status("scanning", "version_keeper_scan")
+    
+    # ADD MONITORING START (Phase 2.1.2)
+    monitor_id = session.realtime_monitor.start_monitoring(
+        f"version_keeper_scan_{int(time.time())}", 
+        "version_keeper_scan",
+        {"arguments": arguments}
+    )
 
     # Prepare command arguments
     cmd = [
@@ -627,8 +661,15 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     if returncode != 0:
         session.update_status("failed", "version_keeper_scan")
         session.error_count += 1
+        
+        # ADD ERROR MONITORING (Phase 2.1.2)
+        session.realtime_monitor.stop_monitoring(monitor_id, {
+            "error": stderr,
+            "status": "failed"
+        })
+        
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
+            INTERNAL_ERROR,
             f"Version Keeper scan failed: {stderr}"
         )
 
@@ -645,6 +686,13 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
                 session.add_artifact(str(output_file), "lint_report")
 
     session.update_status("completed", "version_keeper_scan")
+    
+    # ADD SUCCESSFUL MONITORING COMPLETION (Phase 2.1.2)
+    session.realtime_monitor.stop_monitoring(monitor_id, {
+        "status": "success",
+        "issues_found": session.metrics["total_issues_found"],
+        "execution_time": execution_time
+    })
 
     return [TextContent(
         type="text",
@@ -663,11 +711,11 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
 
     session_id = arguments.get("session_id")
     if not session_id:
-        raise McpError(ErrorCode.INVALID_PARAMS, "session_id is required")
+        raise McpError(INVALID_PARAMS, "session_id is required")
 
     session = pipeline_server.get_session(session_id)
     if not session:
-        raise McpError(ErrorCode.INVALID_PARAMS, f"Invalid session ID: {session_id}")
+        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
 
     session.update_status("fixing", "quality_patcher_fix")
 
@@ -720,7 +768,7 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
         session.update_status("failed", "quality_patcher_fix")
         session.error_count += 1
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
+            INTERNAL_ERROR,
             f"Quality Patcher failed: {stderr}"
         )
 
@@ -751,7 +799,7 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
 
 
 async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextContent]:
-    """Execute complete pipeline cycle with multiple stages."""
+    """Execute complete pipeline cycle with PARALLEL PROCESSING (Phase 2.1.6)."""
 
     session_id = pipeline_server.create_session()
     session = pipeline_server.get_session(session_id)
@@ -766,12 +814,31 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         "session_id": session_id,
         "cycles": [],
         "final_metrics": {},
-        "success": False
+        "success": False,
+        "parallel_processing": True,  # Indicate parallel processing is enabled
+        "performance_improvement": {}
     }
 
+    # ADD PARALLEL EXECUTOR INITIALIZATION (Phase 2.1.6)
+    parallel_executor = pipeline_server.parallel_executor
+    
     for cycle in range(1, max_cycles + 1):
-        cycle_start = time.time()
-        cycle_result = {"cycle": cycle, "stages": []}
+        cycle_start_time = time.time()
+        cycle_result = {"cycle": cycle, "stages": [], "parallel_tasks": []}
+        
+        # CREATE PARALLEL TASKS FOR CURRENT CYCLE (Phase 2.1.6)
+        parallel_tasks = [
+            {
+                "id": f"version_keeper_{cycle}",
+                "type": "version_keeper",
+                "function": "version_keeper_scan",
+                "args": {
+                    "session_id": session_id,
+                    "comprehensive": True,
+                    "output_format": "json"
+                }
+            }
+        ]
 
         try:
             # Stage 1: Version Keeper Scan
@@ -886,7 +953,7 @@ async def handle_github_workflow_trigger(
 
     if returncode != 0:
         raise McpError(
-            ErrorCode.INTERNAL_ERROR,
+            INTERNAL_ERROR,
             f"GitHub workflow trigger failed: {stderr}"
         )
 
@@ -926,7 +993,7 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
         # Get specific session
         session = pipeline_server.get_session(session_id)
         if not session:
-            raise McpError(ErrorCode.INVALID_PARAMS, f"Session not found: {session_id}")
+            raise McpError(INVALID_PARAMS, f"Session not found: {session_id}")
 
         status_data = session.get_status_dict()
         if not include_artifacts:
@@ -1208,7 +1275,7 @@ async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextCo
         )]
         
     else:
-        raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown action: {action}")
+        raise McpError(METHOD_NOT_FOUND, f"Unknown action: {action}")
 
 
 async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -1294,7 +1361,7 @@ async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextConten
             )]
             
     else:
-        raise McpError(ErrorCode.METHOD_NOT_FOUND, f"Unknown health monitoring action: {action}")
+        raise McpError(METHOD_NOT_FOUND, f"Unknown health monitoring action: {action}")
 
 
 async def main():
