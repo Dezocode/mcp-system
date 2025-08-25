@@ -103,5 +103,13 @@
     "transport": "stdio",
     "env_file": ".env",
     "dependencies": {}
+  },
+  "pipeline-mcp": {
+    "name": "Pipeline MCP Server",
+    "path": "mcp-tools/pipeline-mcp", 
+    "command": "python src/main.py",
+    "transport": "stdio",
+    "env_file": ".env",
+    "dependencies": {}
   }
 }

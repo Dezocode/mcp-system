@@ -35,12 +35,12 @@ RUN useradd -m -u 1000 mcpuser && \
 USER mcpuser
 
 # Set up MCP system directories
-RUN mkdir -p cross_platform.get_path("mcp_home") / .mcp-system/{components,docs,templates,backups,logs} && \
-    mkdir -p cross_platform.get_path("mcp_home") / bin
+RUN mkdir -p ~/.mcp-system/{components,docs,templates,backups,logs} && \
+    mkdir -p ~/bin
 
 # Set environment variables
-ENV PATH="cross_platform.get_path("mcp_home") / bin:$PATH"
-ENV MCP_SYSTEM_PATH="cross_platform.get_path("mcp_home") / .mcp-system"
+ENV PATH="/home/mcpuser/bin:$PATH"
+ENV MCP_SYSTEM_PATH="/home/mcpuser/.mcp-system"
 ENV MCP_AUTO_DISCOVERY=true
 ENV MCP_SAFE_MODE=true
 

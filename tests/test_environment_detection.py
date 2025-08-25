@@ -207,7 +207,12 @@ class TestMCPServerIntegration(unittest.TestCase):
     
     def test_mcp_server_environment_integration(self):
         """Test that MCP server properly integrates environment detection"""
-        from pipeline_mcp_server import pipeline_server
+        # Import from new standardized location
+        import sys
+        from pathlib import Path
+        pipeline_path = Path(__file__).parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+        sys.path.insert(0, str(pipeline_path))
+        from main import pipeline_server
         
         # Test that environment detection is initialized
         self.assertIsNotNone(pipeline_server.environment_detector)
@@ -232,7 +237,12 @@ class TestMCPServerIntegration(unittest.TestCase):
     def test_environment_detection_tool_functionality(self):
         """Test the environment detection tool functionality"""
         # Import the handler
-        from pipeline_mcp_server import handle_environment_detection
+        # Import from new standardized location
+        import sys
+        from pathlib import Path
+        pipeline_path = Path(__file__).parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+        sys.path.insert(0, str(pipeline_path))
+        from main import handle_environment_detection
         
         # Test different actions
         actions_to_test = ["detect", "summary", "config", "validate", "optimize"]

@@ -68,7 +68,12 @@ async def demo_mcp_tools():
     print("\n\n🛠️ MCP Tools Demo")
     print("=" * 50)
     
-    from pipeline_mcp_server import handle_list_tools, handle_environment_detection, handle_health_monitoring
+    # Import from new standardized location
+    import sys
+    from pathlib import Path
+    pipeline_path = Path(__file__).parent / "mcp-tools" / "pipeline-mcp" / "src"
+    sys.path.insert(0, str(pipeline_path))
+    from main import handle_list_tools, handle_environment_detection, handle_health_monitoring
     
     # 1. List Available Tools
     print("\n1. 📋 Available Tools:")

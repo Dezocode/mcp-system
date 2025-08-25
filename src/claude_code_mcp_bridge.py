@@ -125,7 +125,7 @@ class ClaudeCodeMCPBridge:
             "mcpServers": {
                 "mcp-universal": {  # Changed to match test expectation
                     "command": "python",
-                    "args": ["-m", "src.pipeline_mcp_server"],
+                    "args": ["mcp-tools/pipeline-mcp/src/main.py"],
                     "env": {
                         "MCP_SYSTEM_PATH": str(self.mcp_system_path),
                         "MCP_AUTO_DISCOVERY": "true",

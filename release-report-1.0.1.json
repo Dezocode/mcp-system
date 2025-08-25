@@ -1,16 +1,13 @@
 {
   "version": "1.0.1",
-  "timestamp": "2025-08-23T23:04:31.874832",
-  "branch": "copilot/fix-780abdb2-ab45-44f3-87f2-74208213b0d3",
+  "timestamp": "2025-08-24T17:03:41.091028",
+  "branch": "version-0.2.2.2c",
   "quality_checks": {
     "black": false,
     "isort": false,
     "mypy": false,
-    "pylint": true,
     "flake8": false,
-    "bandit": false,
-    "safety": false,
-    "pip_audit": false
+    "pylint": false
   },
   "test_results": {
     "unit": false,
@@ -20,15 +17,40 @@
     "docs": false
   },
   "compatibility": {
-    "breaking_changes": [],
-    "api_changes": [],
+    "breaking_changes": [
+      "core/claude-code-mcp-bridge.py",
+      "installers/install-mcp-system.py",
+      "mcp-tools/final-demo/pyproject.toml",
+      "mcp-tools/standards-demo/pyproject.toml",
+      "mcp-tools/test-tool/pyproject.toml",
+      "mcp-tools/test-tool2/pyproject.toml"
+    ],
+    "api_changes": [
+      "Removed function: my_new_tool",
+      "Removed function: test_hello_world",
+      "Removed function: test_get_status",
+      "Removed function: create_python_fastmcp_template",
+      "Removed function: server_lifespan",
+      "Removed function: my_new_tool",
+      "Removed function: test_hello_world",
+      "Removed function: test_get_status",
+      "Removed function: create_python_fastmcp_template",
+      "Removed function: server_lifespan",
+      "Removed class: from",
+      "Removed class: class"
+    ],
     "template_changes": [],
-    "upgrade_module_changes": [],
-    "compatible": true
+    "upgrade_module_changes": [
+      "bin/claude-upgrade.sh",
+      "bin/claude-upgrade_1.sh"
+    ],
+    "compatible": false
   },
   "overall_status": "FAIL",
   "recommendations": [
     "Fix code quality issues before release",
-    "Fix failing tests before release"
+    "Fix failing tests before release",
+    "Review breaking changes and update documentation",
+    "Consider bumping major version for API changes"
   ]
 }

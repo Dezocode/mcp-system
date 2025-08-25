@@ -192,9 +192,9 @@ build-backend = "setuptools.build_meta"
         print("\n🧪 Test 3: Pipeline MCP Server")
 
         # Import the MCP server
-        server_path = self.test_dir / "src" / "pipeline_mcp_server.py"
+        server_path = self.test_dir / "mcp-tools" / "pipeline-mcp" / "src" / "main.py"
         if not server_path.exists():
-            self.skipTest("pipeline_mcp_server.py not found")
+            self.skipTest("pipeline-mcp server not found")
 
         # Add the src directory to path
         sys.path.insert(0, str(self.test_dir / "src"))
@@ -202,7 +202,7 @@ build-backend = "setuptools.build_meta"
         try:
             # Import server components
             spec = importlib.util.spec_from_file_location(
-                "pipeline_mcp_server", server_path)
+                "pipeline-mcp", server_path)
             server_module = importlib.util.module_from_spec(spec)
 
             # Mock MCP dependencies for testing
@@ -299,9 +299,9 @@ build-backend = "setuptools.build_meta"
         print("\n🧪 Test 5: MCP Compliance Check")
         # This test validates MCP compliance conceptually since we can't easily
         # run the full MCP server in test environment
-        server_path = self.test_dir / "src" / "pipeline_mcp_server.py"
+        server_path = self.test_dir / "mcp-tools" / "pipeline-mcp" / "src" / "main.py"
         if not server_path.exists():
-            self.skipTest("pipeline_mcp_server.py not found")
+            self.skipTest("pipeline-mcp server not found")
         # Read server source code for compliance checks
         with open(server_path, 'r') as f:
             server_code = f.read()

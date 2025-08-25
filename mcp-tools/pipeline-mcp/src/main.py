@@ -28,6 +28,10 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import asdict
 import logging
 
+# Add repository root to path for imports
+repo_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(repo_root))
+
 from src.mcp_local_types import ErrorCode
 
 # Environment Detection System
@@ -48,23 +52,18 @@ class McpError(Exception):
         super().__init__(message)
 
 # MCP Protocol Imports (MCP v1.0)
-try:
-    from mcp.server.models import InitializationOptions
-    from mcp.server import Server
-    from mcp.server.stdio import stdio_server
-    from mcp.types import (
-        Tool,
-        TextContent,
-        JSONRPCError,
-        ErrorData,
-        INVALID_PARAMS,
-        METHOD_NOT_FOUND,
-        INTERNAL_ERROR
-    )
-except ImportError as e:
-    print(f"ERROR: MCP dependencies not installed: {e}", file=sys.stderr)
-    print("Install with: pip install mcp", file=sys.stderr)
-    sys.exit(1)
+from mcp.server.models import InitializationOptions
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+from mcp.types import (
+    Tool,
+    TextContent,
+    JSONRPCError,
+    ErrorData,
+    INVALID_PARAMS,
+    METHOD_NOT_FOUND,
+    INTERNAL_ERROR
+)
 
 # Configure logging
 logging.basicConfig(

@@ -267,7 +267,12 @@ class DockerHealthCheck:
             
             # Check if we can access the pipeline server
             try:
-                from src.pipeline_mcp_server import pipeline_server
+                # Import from new standardized location
+                import sys
+                from pathlib import Path
+                pipeline_path = Path(__file__).parent.parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+                sys.path.insert(0, str(pipeline_path))
+                from main import pipeline_server
                 
                 # Check if server is initialized
                 if hasattr(pipeline_server, 'server'):

@@ -11,7 +11,16 @@ __email__ = "contact@dezocode.com"
 __description__ = "Universal MCP server management system with Claude Code integration"
 
 # Core system imports
-from . import pipeline_mcp_server
+# Pipeline MCP server moved to mcp-tools/pipeline-mcp/src/main.py
+# Import conditionally since it's now in standardized location
+try:
+    import sys
+    from pathlib import Path
+    pipeline_server_path = Path(__file__).parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+    sys.path.insert(0, str(pipeline_server_path))
+    import main as pipeline_mcp_server
+except ImportError:
+    pipeline_mcp_server = None
 from . import auto_discovery_system
 from . import claude_code_mcp_bridge
 from . import install_mcp_system
@@ -69,7 +78,7 @@ def get_system_info():
         "author": __author__,
         "description": __description__,
         "modules": {
-            "pipeline_mcp_server": True,
+            "pipeline_mcp_server": pipeline_mcp_server is not None,
             "auto_discovery": True,
             "claude_bridge": True,
             "installer": True,
