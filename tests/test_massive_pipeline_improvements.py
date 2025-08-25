@@ -115,7 +115,8 @@ class TestMassivePipelineImprovements:
         # Get enhanced status
         result = await handle_pipeline_status({"session_id": session_id})
         status_text = result[0].text
-        status_data = eval(status_text)  # Safe since we control the data
+        import json
+        status_data = json.loads(status_text)
         
         assert status_data["tool"] == "pipeline_status"
         assert status_data["status"] == "success"
@@ -181,7 +182,8 @@ class TestMassivePipelineImprovements:
         
         result = await handle_environment_detection({"action": "detect"})
         result_text = result[0].text
-        result_data = eval(result_text)  # Safe since we control the data
+        import json
+        result_data = json.loads(result_text)
         
         assert result_data["tool"] == "environment_detection"
         assert result_data["action"] == "detect"
@@ -194,7 +196,8 @@ class TestMassivePipelineImprovements:
         
         result = await handle_health_monitoring({"action": "health_check"})
         result_text = result[0].text
-        result_data = eval(result_text)  # Safe since we control the data
+        import json
+        result_data = json.loads(result_text)
         
         assert result_data["tool"] == "health_monitoring"
         assert result_data["action"] == "health_check"
