@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-orchestrator
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount Docker socket for Docker operations
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount workspace
+      - ${MCP_WORKSPACE_ROOT:-../../}:/workspace
+      # Mount session directory
+      - ${MCP_SESSION_DIR:-./pipeline-sessions}:/app/pipeline-sessions
+      # Mount logs
+      - ./logs:/app/logs
+    environment:
+      - MCP_WORKSPACE_ROOT=/workspace
+      - MCP_SESSION_DIR=/app/pipeline-sessions
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - WATCHDOG_ENABLED=${WATCHDOG_ENABLED:-true}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-orchestrator-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mcp-orchestrator-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - mcp-network
+    restart: unless-stopped
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
