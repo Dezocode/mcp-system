@@ -1,0 +1,21 @@
+#!/bin/bash
+# Enhanced MCP Crafter - Launcher Script
+# Provides easy access to the enhanced MCP crafter functionality
+
+# Get the directory of this script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+MCP_SYSTEM_ROOT="$(dirname "$DIR")"
+
+# Check if we're in the right directory
+if [ ! -f "$MCP_SYSTEM_ROOT/src/enhanced_mcp_crafter.py" ]; then
+    echo "❌ Error: Cannot find enhanced_mcp_crafter.py"
+    echo "   Make sure this script is in the bin/ directory of mcp-system"
+    exit 1
+fi
+
+# Set Python path
+export PYTHONPATH="$MCP_SYSTEM_ROOT:$MCP_SYSTEM_ROOT/src:$PYTHONPATH"
+
+# Run the enhanced crafter
+cd "$MCP_SYSTEM_ROOT"
+python src/enhanced_mcp_crafter.py "$@"
