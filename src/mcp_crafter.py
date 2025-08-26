@@ -2302,8 +2302,8 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
+      interval: "10s"
+      timeout: "5s"
       retries: 5
 {%- endif %}
 
@@ -2316,8 +2316,8 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
+      interval: "10s"
+      timeout: "3s"
       retries: 3
 {%- endif %}
 
@@ -2408,6 +2408,7 @@ WEBHOOK_RETRY_COUNT=3
 
 # Development Settings
 DEBUG=false
+'''
     
     def _create_custom_tool_template(self, tool_spec: Dict[str, Any]) -> str:
         """Create custom tool implementation"""
