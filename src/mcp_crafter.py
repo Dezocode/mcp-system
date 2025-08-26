@@ -1742,6 +1742,7 @@ class CachingModule:
             "cache_size_bytes": len(json.dumps(self.cache))
         }
         
+        return [types.TextContent(type="text", text=json.dumps(stats, indent=2))]
     
     def _create_webhooks_module(self) -> str:
         return '''"""
