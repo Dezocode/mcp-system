@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "enhanced_resume_mcp_demo"
+version = "1.0.0"
+description = "MCP Server - enhanced_resume_mcp_demo"
+authors = [{name = "MCP System", email = "admin@mcpsystem.dev"}]
+dependencies = [
+    "mcp>=1.0.0",
+    "fastmcp>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.9.0",
+    "isort>=5.12.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"

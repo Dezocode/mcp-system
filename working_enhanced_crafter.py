@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simplified Enhanced MCP Crafter - Working Version
-Direct integration of high-resolution steering with minimal dependencies
+Enhanced MCP Crafter - Production Working Version
+Integrates high-resolution steering with watchdog monitoring and MCP compliance
 """
 
 import asyncio
@@ -24,6 +24,14 @@ from high_res_crafter import (
     SteeringCommand
 )
 
+# Import enhanced watchdog system
+from enhanced_crafter_watchdog import (
+    EnhancedCrafterWatchdog,
+    CrafterPhase,
+    MCPComplianceValidator,
+    ContinuousImprovementLoop
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("working_enhanced_crafter")
@@ -31,48 +39,53 @@ logger = logging.getLogger("working_enhanced_crafter")
 
 class WorkingEnhancedMCPCrafter:
     """
-    Working Enhanced MCP Crafter with High-Resolution Steering
-    Simplified version that focuses on core functionality
+    Production Enhanced MCP Crafter with High-Resolution Steering and Watchdog Integration
+    Fully integrated version with MCP compliance, monitoring, and pause/resume capabilities
     """
     
-    def __init__(self, workspace_dir: Optional[Path] = None):
+    def __init__(self, workspace_dir: Optional[Path] = None, enable_watchdog: bool = True):
         self.workspace_dir = workspace_dir or Path.cwd() / "working-mcp-workspace"
         self.workspace_dir.mkdir(exist_ok=True)
         
-        # Initialize high-resolution steering system
-        self.high_res_crafter = HighResolutionCrafterSteering(
-            workspace_dir=self.workspace_dir
-        )
-        
-        # Initialize agent protocol
-        self.agent_protocol = AgentSteeringProtocol(self.high_res_crafter)
+        # Initialize watchdog integration if enabled
+        self.enable_watchdog = enable_watchdog
+        if enable_watchdog:
+            self.enhanced_crafter = EnhancedCrafterWatchdog(
+                workspace_dir=self.workspace_dir,
+                mcp_tools_dir=self.workspace_dir.parent / "mcp-tools"
+            )
+            self.compliance_validator = MCPComplianceValidator()
+        else:
+            # Fallback to basic high-resolution steering
+            self.high_res_crafter = HighResolutionCrafterSteering(
+                workspace_dir=self.workspace_dir
+            )
+            self.agent_protocol = AgentSteeringProtocol(self.high_res_crafter)
         
         # Build tracking
         self.build_history = []
+        self.active_sessions = {}
         
         logger.info(f"Working Enhanced MCP Crafter initialized at {self.workspace_dir}")
+        logger.info(f"Watchdog integration: {'Enabled' if enable_watchdog else 'Disabled'}")
     
-    async def create_resume_mcp_server(self) -> Dict[str, Any]:
+    async def create_resume_mcp_server(self, enable_monitoring: bool = True) -> Dict[str, Any]:
         """
-        Create the Resume MCP Server using high-resolution steering
-        Primary implementation of the mcp_resume_plan.md specifications
+        Create the Resume MCP Server using enhanced watchdog integration
+        Updated implementation with full monitoring and compliance validation
         """
         
-        logger.info("🎯 Building Resume MCP Server with High-Resolution Steering")
+        logger.info("🎯 Building Resume MCP Server with Enhanced Watchdog Integration")
         
-        # Start steering session
-        session_id = await self.agent_protocol.start_session("resume_mcp_server")
-        
-        # Define Resume MCP Server specifications based on mcp_resume_plan.md
+        # Define comprehensive Resume MCP Server specifications
         resume_specs = {
-            "server_name": "resume_mcp_server",
+            "server_name": "resume_mcp_server_enhanced",
             "architecture": "modular_pipeline",
-            "components": ["ingestion", "processing", "export"],
-            "output_path": str(self.workspace_dir / "resume_mcp_server"),
+            "components": ["ingestion", "processing", "export", "analytics"],
             "modules": [
                 {
                     "name": "ingestion",
-                    "path": str(self.workspace_dir / "resume_mcp_server" / "ingestion.py"),
+                    "path": "src/ingestion.py",
                     "type": "data_processor",
                     "classes": ["FormParser", "DataValidator", "SectionExtractor"],
                     "functions": ["parse_resume_form", "validate_input", "extract_sections"],
@@ -80,7 +93,7 @@ class WorkingEnhancedMCPCrafter:
                 },
                 {
                     "name": "processing",
-                    "path": str(self.workspace_dir / "resume_mcp_server" / "processing.py"),
+                    "path": "src/processing.py",
                     "type": "business_logic",
                     "classes": ["ResumeProcessor", "SkillsAnalyzer", "ContentEnhancer"],
                     "functions": ["process_resume", "analyze_skills", "enhance_content"],
@@ -88,37 +101,406 @@ class WorkingEnhancedMCPCrafter:
                 },
                 {
                     "name": "export",
-                    "path": str(self.workspace_dir / "resume_mcp_server" / "export.py"),
+                    "path": "src/export.py",
                     "type": "output_handler",
                     "classes": ["FormatConverter", "TemplateEngine", "BrandingManager"],
                     "functions": ["export_resume", "apply_template", "render_output"],
                     "dependencies": ["jinja2", "weasyprint", "reportlab"]
+                },
+                {
+                    "name": "analytics",
+                    "path": "src/analytics.py",
+                    "type": "insights_engine",
+                    "classes": ["MetricsCollector", "PerformanceAnalyzer", "TrendAnalyzer"],
+                    "functions": ["collect_metrics", "analyze_performance", "generate_insights"],
+                    "dependencies": ["pandas", "matplotlib"]
                 }
             ],
             "functions": [
                 {
                     "name": "setup_mcp_tools",
-                    "file_path": str(self.workspace_dir / "resume_mcp_server" / "main.py"),
-                    "signature": "def setup_mcp_tools(self):",
-                    "implementation": self._generate_resume_mcp_tools_implementation(),
-                    "async": False
+                    "file_path": "src/main.py",
+                    "signature": "async def setup_mcp_tools():",
+                    "implementation": '''"""Setup MCP tools for Resume Server with comprehensive functionality"""
+import mcp.types as types
+
+tools = []
+
+# Parse Resume Tool
+tools.append(types.Tool(
+    name="parse_resume",
+    description="Parse resume form data and extract structured information",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "resume_data": {
+                "type": "object",
+                "description": "Raw resume data from various sources"
+            },
+            "format": {
+                "type": "string", 
+                "enum": ["json", "form", "text", "pdf"],
+                "description": "Input format of the resume data"
+            },
+            "extraction_level": {
+                "type": "string",
+                "enum": ["basic", "detailed", "comprehensive"],
+                "default": "detailed"
+            }
+        },
+        "required": ["resume_data"]
+    }
+))
+
+# Process Resume Tool
+tools.append(types.Tool(
+    name="process_resume",
+    description="Process and enhance resume content with AI-powered improvements",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "parsed_resume": {
+                "type": "object",
+                "description": "Structured resume data from parsing"
+            },
+            "enhancement_level": {
+                "type": "string",
+                "enum": ["basic", "advanced", "professional"],
+                "default": "advanced"
+            },
+            "target_role": {
+                "type": "string",
+                "description": "Target job role for optimization"
+            },
+            "industry": {
+                "type": "string",
+                "description": "Target industry for customization"
+            }
+        },
+        "required": ["parsed_resume"]
+    }
+))
+
+# Export Resume Tool
+tools.append(types.Tool(
+    name="export_resume",
+    description="Export resume in various professional formats",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "processed_resume": {
+                "type": "object",
+                "description": "Enhanced resume content"
+            },
+            "output_format": {
+                "type": "string",
+                "enum": ["pdf", "html", "json", "latex", "docx"],
+                "description": "Desired output format"
+            },
+            "template": {
+                "type": "string",
+                "enum": ["modern", "classic", "creative", "ats-friendly"],
+                "default": "modern"
+            },
+            "branding": {
+                "type": "object",
+                "properties": {
+                    "color_scheme": {"type": "string"},
+                    "font_family": {"type": "string"},
+                    "layout_style": {"type": "string"}
+                }
+            }
+        },
+        "required": ["processed_resume", "output_format"]
+    }
+))
+
+# Analyze Skills Tool
+tools.append(types.Tool(
+    name="analyze_skills",
+    description="Analyze and categorize skills with market insights",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "resume_content": {
+                "type": "object",
+                "description": "Resume content for skills analysis"
+            },
+            "analysis_depth": {
+                "type": "string",
+                "enum": ["basic", "detailed", "comprehensive"],
+                "default": "detailed"
+            },
+            "market_analysis": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include market demand analysis"
+            },
+            "skill_gaps": {
+                "type": "boolean", 
+                "default": true,
+                "description": "Identify skill gaps for target role"
+            }
+        },
+        "required": ["resume_content"]
+    }
+))
+
+return tools''',
+                    "async": True
+                },
+                {
+                    "name": "create_mcp_handlers",
+                    "file_path": "src/main.py",
+                    "signature": "async def create_mcp_handlers():",
+                    "implementation": '''"""Create MCP request handlers with proper error handling"""
+import logging
+from typing import Any, Dict
+
+logger = logging.getLogger(__name__)
+
+async def handle_parse_resume(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle parse_resume tool requests"""
+    try:
+        resume_data = arguments.get("resume_data")
+        format_type = arguments.get("format", "json")
+        extraction_level = arguments.get("extraction_level", "detailed")
+        
+        # Import and use ingestion module
+        from .ingestion import parse_resume_form, validate_input, extract_sections
+        
+        # Validate input
+        validation_result = await validate_input(resume_data)
+        if not validation_result["valid"]:
+            return {"error": f"Invalid input: {validation_result['errors']}"}
+        
+        # Parse resume based on format
+        parsed_data = await parse_resume_form(resume_data, format_type)
+        
+        # Extract sections based on level
+        sections = await extract_sections(parsed_data, extraction_level)
+        
+        return {
+            "success": True,
+            "parsed_resume": parsed_data,
+            "sections": sections,
+            "format": format_type,
+            "extraction_level": extraction_level
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in parse_resume handler: {e}")
+        return {"error": f"Parse resume failed: {str(e)}"}
+
+async def handle_process_resume(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle process_resume tool requests"""
+    try:
+        parsed_resume = arguments.get("parsed_resume")
+        enhancement_level = arguments.get("enhancement_level", "advanced")
+        target_role = arguments.get("target_role")
+        industry = arguments.get("industry")
+        
+        # Import processing module
+        from .processing import process_resume, analyze_skills, enhance_content
+        
+        # Process resume
+        processed_data = await process_resume(
+            parsed_resume, 
+            enhancement_level,
+            target_role,
+            industry
+        )
+        
+        # Analyze skills
+        skills_analysis = await analyze_skills(processed_data)
+        
+        # Enhance content
+        enhanced_content = await enhance_content(
+            processed_data,
+            target_role,
+            industry
+        )
+        
+        return {
+            "success": True,
+            "processed_resume": enhanced_content,
+            "skills_analysis": skills_analysis,
+            "enhancement_level": enhancement_level,
+            "target_role": target_role,
+            "industry": industry
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in process_resume handler: {e}")
+        return {"error": f"Process resume failed: {str(e)}"}
+
+async def handle_export_resume(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle export_resume tool requests"""
+    try:
+        processed_resume = arguments.get("processed_resume")
+        output_format = arguments.get("output_format")
+        template = arguments.get("template", "modern")
+        branding = arguments.get("branding", {})
+        
+        # Import export module
+        from .export import export_resume, apply_template, render_output
+        
+        # Apply template
+        templated_resume = await apply_template(
+            processed_resume,
+            template,
+            branding
+        )
+        
+        # Render output
+        output_data = await render_output(
+            templated_resume,
+            output_format
+        )
+        
+        # Export resume
+        export_result = await export_resume(
+            output_data,
+            output_format,
+            template
+        )
+        
+        return {
+            "success": True,
+            "export_result": export_result,
+            "output_format": output_format,
+            "template": template,
+            "file_path": export_result.get("file_path"),
+            "file_size": export_result.get("file_size")
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in export_resume handler: {e}")
+        return {"error": f"Export resume failed: {str(e)}"}
+
+async def handle_analyze_skills(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle analyze_skills tool requests"""
+    try:
+        resume_content = arguments.get("resume_content")
+        analysis_depth = arguments.get("analysis_depth", "detailed")
+        market_analysis = arguments.get("market_analysis", True)
+        skill_gaps = arguments.get("skill_gaps", True)
+        
+        # Import analytics module
+        from .analytics import collect_metrics, analyze_performance, generate_insights
+        
+        # Collect metrics
+        metrics = await collect_metrics(resume_content)
+        
+        # Analyze performance
+        performance_data = await analyze_performance(
+            metrics,
+            analysis_depth
+        )
+        
+        # Generate insights
+        insights = await generate_insights(
+            performance_data,
+            market_analysis,
+            skill_gaps
+        )
+        
+        return {
+            "success": True,
+            "skills_analysis": insights,
+            "metrics": metrics,
+            "performance_data": performance_data,
+            "analysis_depth": analysis_depth,
+            "market_analysis": market_analysis,
+            "skill_gaps_identified": skill_gaps
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in analyze_skills handler: {e}")
+        return {"error": f"Analyze skills failed: {str(e)}"}
+
+# Return handler mapping
+return {
+    "parse_resume": handle_parse_resume,
+    "process_resume": handle_process_resume, 
+    "export_resume": handle_export_resume,
+    "analyze_skills": handle_analyze_skills
+}''',
+                    "async": True
                 }
             ]
         }
         
-        # Execute hierarchical build using high-resolution steering
-        build_result = await self.agent_protocol.build_complete_system(resume_specs)
+        build_result = {
+            "project_name": "enhanced_resume_mcp_server",
+            "started_at": datetime.now(timezone.utc),
+            "watchdog_enabled": self.enable_watchdog,
+            "success": False
+        }
         
-        # Apply Resume-specific enhancements
-        if build_result.get("success", False):
-            await self._apply_resume_server_enhancements(build_result)
+        try:
+            if self.enable_watchdog:
+                # Use enhanced crafter with full monitoring
+                logger.info("Using Enhanced Crafter with Watchdog Integration")
+                result = await self.enhanced_crafter.create_mcp_server_with_watchdog(
+                    resume_specs,
+                    enable_pause_resume=enable_monitoring
+                )
+                
+                # Add compliance validation results
+                if result.get("success"):
+                    server_path = self.enhanced_crafter.mcp_tools_dir / resume_specs["server_name"]
+                    compliance_results = await self.compliance_validator.validate_server(server_path)
+                    result["enhanced_compliance_validation"] = compliance_results
+                
+                build_result.update(result)
+                
+            else:
+                # Fallback to basic high-resolution steering  
+                logger.info("Using Basic High-Resolution Steering")
+                session_id = await self.agent_protocol.start_session("enhanced_resume_server")
+                basic_result = await self.agent_protocol.build_complete_system(resume_specs)
+                
+                build_result.update({
+                    "session_id": session_id,
+                    "build_result": basic_result,
+                    "success": basic_result.get("success", False)
+                })
+            
+            # Track build in history
+            self.build_history.append(build_result)
+            
+        except Exception as e:
+            logger.error(f"Error in create_resume_mcp_server: {e}")
+            build_result["error"] = str(e)
+            build_result["success"] = False
         
-        # Record build
-        build_record = {
-            "timestamp": datetime.now(timezone.utc),
-            "session_id": session_id,
-            "specifications": resume_specs,
-            "build_result": build_result,
+        build_result["completed_at"] = datetime.now(timezone.utc)
+        return build_result
+    
+    async def pause_active_session(self, session_id: str) -> Dict[str, Any]:
+        """Pause an active session if watchdog is enabled"""
+        if self.enable_watchdog and hasattr(self.enhanced_crafter, 'pause_session'):
+            return {"success": await self.enhanced_crafter.pause_session(session_id)}
+        return {"success": False, "error": "Watchdog not enabled or pause not supported"}
+    
+    async def resume_paused_session(self, session_id: str) -> Dict[str, Any]:
+        """Resume a paused session if watchdog is enabled"""
+        if self.enable_watchdog and hasattr(self.enhanced_crafter, 'resume_session'):
+            return await self.enhanced_crafter.resume_session(session_id)
+        return {"success": False, "error": "Watchdog not enabled or resume not supported"}
+    
+    async def get_session_status(self, session_id: str) -> Dict[str, Any]:
+        """Get status of a session"""
+        if self.enable_watchdog and hasattr(self.enhanced_crafter, 'get_session_status'):
+            return await self.enhanced_crafter.get_session_status(session_id)
+        return {"error": "Watchdog not enabled or status not supported"}
+    
+    async def validate_mcp_compliance(self, server_path: Path) -> Dict[str, Any]:
+        """Validate MCP compliance for a server"""
+        if self.enable_watchdog:
+            return await self.compliance_validator.validate_server(server_path)
+        return {"error": "Watchdog not enabled"}
             "success": build_result.get("success", False)
         }
         
