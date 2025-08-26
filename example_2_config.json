@@ -1,0 +1,144 @@
+{
+  "workflow_name": "ai-powered-data-pipeline",
+  "servers": [
+    {
+      "name": "data-ingestion",
+      "role": "Data ingestion and validation",
+      "capabilities": [
+        "tools",
+        "monitoring",
+        "persistence",
+        "webhooks"
+      ],
+      "custom_tools": [
+        {
+          "name": "ingest_data",
+          "description": "Ingest data from various sources",
+          "parameters": {
+            "source": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "dependencies": [
+        "sqlalchemy",
+        "pandas",
+        "requests"
+      ],
+      "connections": [
+        "data-processing",
+        "notification-service"
+      ]
+    },
+    {
+      "name": "data-processing",
+      "role": "ML processing and analysis",
+      "capabilities": [
+        "tools",
+        "monitoring",
+        "caching",
+        "streaming"
+      ],
+      "custom_tools": [
+        {
+          "name": "process_data",
+          "description": "Process data with ML models",
+          "parameters": {
+            "data_id": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "dependencies": [
+        "scikit-learn",
+        "numpy",
+        "redis"
+      ],
+      "connections": [
+        "data-ingestion",
+        "ml-inference",
+        "notification-service"
+      ]
+    },
+    {
+      "name": "ml-inference",
+      "role": "ML model inference and predictions",
+      "capabilities": [
+        "tools",
+        "monitoring",
+        "authentication",
+        "rate_limiting"
+      ],
+      "custom_tools": [
+        {
+          "name": "predict",
+          "description": "Make ML predictions",
+          "parameters": {
+            "input_data": {
+              "type": "object"
+            },
+            "model": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "dependencies": [
+        "torch",
+        "transformers",
+        "pyjwt"
+      ],
+      "connections": [
+        "data-processing",
+        "notification-service"
+      ]
+    },
+    {
+      "name": "notification-service",
+      "role": "Notifications and alerting",
+      "capabilities": [
+        "tools",
+        "webhooks",
+        "rate_limiting"
+      ],
+      "custom_tools": [
+        {
+          "name": "send_notification",
+          "description": "Send notifications via various channels",
+          "parameters": {
+            "message": {
+              "type": "string"
+            },
+            "channel": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "dependencies": [
+        "httpx",
+        "email-validator"
+      ],
+      "connections": [
+        "data-ingestion",
+        "data-processing",
+        "ml-inference"
+      ]
+    }
+  ],
+  "orchestration": {
+    "type": "microservices",
+    "auto_deploy": true,
+    "kubernetes": true,
+    "monitoring": true,
+    "service_mesh": true
+  }
+}

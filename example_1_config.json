@@ -1,0 +1,74 @@
+{
+  "server_name": "advanced-weather-api",
+  "description": "Advanced weather MCP server with caching and monitoring",
+  "complexity": "advanced",
+  "capabilities": [
+    "tools",
+    "monitoring",
+    "caching",
+    "rate_limiting"
+  ],
+  "template_base": "enterprise-python",
+  "custom_tools": [
+    {
+      "name": "get_current_weather",
+      "description": "Get current weather for a city",
+      "parameters": {
+        "city": {
+          "type": "string",
+          "required": true
+        },
+        "units": {
+          "type": "string",
+          "enum": [
+            "metric",
+            "imperial"
+          ],
+          "default": "metric"
+        }
+      },
+      "implementation": "\n# Get weather from API\nimport httpx\napi_key = os.getenv(\"WEATHER_API_KEY\")\nurl = f\"https://api.openweathermap.org/data/2.5/weather?q={kwargs['city']}&appid={api_key}&units={kwargs.get('units', 'metric')}\"\nasync with httpx.AsyncClient() as client:\n    response = await client.get(url)\n    return response.json()\n"
+    },
+    {
+      "name": "get_forecast",
+      "description": "Get weather forecast for a city",
+      "parameters": {
+        "city": {
+          "type": "string",
+          "required": true
+        },
+        "days": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 7
+        }
+      },
+      "implementation": "\n# Get forecast from API\nimport httpx\napi_key = os.getenv(\"WEATHER_API_KEY\") \nurl = f\"https://api.openweathermap.org/data/2.5/forecast?q={kwargs['city']}&appid={api_key}&cnt={kwargs.get('days', 5) * 8}\"\nasync with httpx.AsyncClient() as client:\n    response = await client.get(url)\n    return response.json()\n"
+    }
+  ],
+  "dependencies": [
+    "httpx",
+    "redis"
+  ],
+  "environment_vars": {
+    "WEATHER_API_KEY": "your-openweathermap-api-key",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "CACHE_TTL": "3600"
+  },
+  "deployment_config": {
+    "docker": true,
+    "compose": true,
+    "kubernetes": false,
+    "git": true
+  },
+  "metadata": {
+    "author": "Enhanced MCP Crafter",
+    "version": "1.0.0",
+    "tags": [
+      "weather",
+      "api",
+      "caching"
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "server_name": "iot-streaming-hub",
+  "description": "Real-time IoT data streaming and analytics hub",
+  "complexity": "enterprise",
+  "capabilities": [
+    "tools",
+    "streaming",
+    "monitoring",
+    "persistence",
+    "authentication"
+  ],
+  "template_base": "streaming-websocket",
+  "custom_tools": [
+    {
+      "name": "register_device",
+      "description": "Register new IoT device",
+      "parameters": {
+        "device_id": {
+          "type": "string",
+          "required": true
+        },
+        "device_type": {
+          "type": "string",
+          "required": true
+        },
+        "location": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "name": "stream_sensor_data",
+      "description": "Stream sensor data in real-time",
+      "parameters": {
+        "device_id": {
+          "type": "string",
+          "required": true
+        },
+        "sensor_data": {
+          "type": "object",
+          "required": true
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "name": "get_analytics",
+      "description": "Get real-time analytics for devices",
+      "parameters": {
+        "device_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "time_range": {
+          "type": "string",
+          "default": "1h"
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    "websockets",
+    "sqlalchemy",
+    "pandas",
+    "redis"
+  ],
+  "environment_vars": {
+    "DATABASE_URL": "postgresql://user:pass@localhost:5432/iot_hub",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "WEBSOCKET_PORT": "8765",
+    "JWT_SECRET": "your-jwt-secret"
+  },
+  "deployment_config": {
+    "docker": true,
+    "compose": true,
+    "kubernetes": true,
+    "scaling": {
+      "min_replicas": 2,
+      "max_replicas": 10,
+      "cpu_threshold": 70
+    }
+  }
+}

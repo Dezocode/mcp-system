@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""
+MCP Crafter CLI
+Enhanced command-line interface for the MCP Crafter system
+"""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from mcp_crafter import EnhancedMCPCrafter, ServerComplexity, ServerCapability
+
+def main():
+    """Main CLI entry point"""
+    if len(sys.argv) < 2:
+        print_help()
+        return
+    
+    command = sys.argv[1]
+    
+    if command == "create":
+        handle_create()
+    elif command == "status":
+        handle_status()
+    elif command == "list":
+        handle_list()
+    elif command == "delete":
+        handle_delete()
+    elif command == "watch":
+        handle_watch()
+    elif command == "help":
+        print_help()
+    else:
+        print(f"Unknown command: {command}")
+        print_help()
+
+def handle_create():
+    """Handle server creation"""
+    if len(sys.argv) < 3:
+        print("Usage: mcp-crafter create <server-name> [options]")
+        return
+    
+    server_name = sys.argv[2]
+    
+    # Parse options
+    options = parse_options(sys.argv[3:])
+    
+    # Build form data
+    form_data = {
+        "server_name": server_name,
+        "description": options.get("description", f"MCP server: {server_name}"),
+        "complexity": options.get("complexity", "standard"),
+        "capabilities": options.get("capabilities", ["tools", "monitoring"]),
+        "template_base": options.get("template", "enterprise-python"),
+        "custom_tools": options.get("tools", []),
+        "dependencies": options.get("deps", []),
+        "environment_vars": options.get("env", {}),
+        "deployment_config": options.get("deploy", {"docker": True, "compose": True}),
+        "metadata": options.get("meta", {})
+    }
+    
+    async def _create():
+        crafter = EnhancedMCPCrafter()
+        await crafter.start_watching()
+        
+        try:
+            build_id = await crafter.process_claude_form(form_data)
+            print(f"✅ Build started with ID: {build_id}")
+            
+            # Wait for completion and show progress
+            while True:
+                await asyncio.sleep(1)
+                status = await crafter.get_build_status(build_id)
+                
+                if status.get("status") == "in_progress":
+                    progress = status.get("progress", 0)
+                    print(f"🔄 Building... {progress}%", end="\r")
+                elif status.get("status") == "success":
+                    print(f"\n🎉 Server '{server_name}' created successfully!")
+                    print(f"📁 Location: {crafter.servers_dir / server_name}")
+                    break
+                elif status.get("status") == "failed":
+                    print(f"\n❌ Build failed: {status.get('error', 'Unknown error')}")
+                    break
+                
+        except KeyboardInterrupt:
+            print("\n⏹️  Build cancelled by user")
+        finally:
+            await crafter.stop_watching()
+    
+    asyncio.run(_create())
+
+def handle_status():
+    """Handle status checking"""
+    if len(sys.argv) < 3:
+        print("Usage: mcp-crafter status <build-id>")
+        return
+    
+    build_id = sys.argv[2]
+    
+    async def _status():
+        crafter = EnhancedMCPCrafter()
+        status = await crafter.get_build_status(build_id)
+        
+        if status.get("status") == "not_found":
+            print(f"❌ Build ID '{build_id}' not found")
+            return
+        
+        print("📊 Build Status:")
+        print(json.dumps(status, indent=2, default=str))
+    
+    asyncio.run(_status())
+
+def handle_list():
+    """Handle server listing"""
+    crafter = EnhancedMCPCrafter()
+    servers = crafter.list_servers()
+    
+    if not servers:
+        print("📭 No servers found")
+        return
+    
+    print("📋 Registered Servers:")
+    for name, info in servers.items():
+        status = info.get("status", "unknown")
+        created = info.get("created_at", "unknown")
+        print(f"  🔧 {name} - {status} (created: {created})")
+
+def handle_delete():
+    """Handle server deletion"""
+    if len(sys.argv) < 3:
+        print("Usage: mcp-crafter delete <server-name>")
+        return
+    
+    server_name = sys.argv[2]
+    
+    # Confirm deletion
+    response = input(f"⚠️  Are you sure you want to delete '{server_name}'? (y/N): ")
+    if response.lower() != 'y':
+        print("❌ Deletion cancelled")
+        return
+    
+    async def _delete():
+        crafter = EnhancedMCPCrafter()
+        success = await crafter.delete_server(server_name)
+        
+        if success:
+            print(f"✅ Server '{server_name}' deleted successfully")
+        else:
+            print(f"❌ Server '{server_name}' not found")
+    
+    asyncio.run(_delete())
+
+def handle_watch():
+    """Handle continuous watching mode"""
+    print("👁️  Starting MCP Crafter in watch mode...")
+    print("🔄 Monitoring for file changes and Claude forms...")
+    print("⏹️  Press Ctrl+C to stop")
+    
+    async def _watch():
+        crafter = EnhancedMCPCrafter()
+        await crafter.start_watching()
+        
+        try:
+            # Keep running and processing forms
+            while True:
+                await asyncio.sleep(1)
+                # Process any queued forms
+                if not crafter.form_queue.empty():
+                    await crafter._process_build_queue()
+                    
+        except KeyboardInterrupt:
+            print("\n⏹️  Stopping watch mode...")
+        finally:
+            await crafter.stop_watching()
+    
+    asyncio.run(_watch())
+
+def parse_options(args):
+    """Parse command line options"""
+    options = {}
+    i = 0
+    
+    while i < len(args):
+        arg = args[i]
+        
+        if arg.startswith("--"):
+            key = arg[2:]
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                value = args[i + 1]
+                
+                # Parse specific option types
+                if key == "capabilities":
+                    options["capabilities"] = value.split(",")
+                elif key == "deps":
+                    options["deps"] = value.split(",")
+                elif key == "env":
+                    # Parse environment variables: KEY=VALUE,KEY2=VALUE2
+                    env_vars = {}
+                    for pair in value.split(","):
+                        if "=" in pair:
+                            k, v = pair.split("=", 1)
+                            env_vars[k] = v
+                    options["env"] = env_vars
+                elif key == "tools":
+                    # Parse custom tools (JSON format)
+                    try:
+                        options["tools"] = json.loads(value)
+                    except json.JSONDecodeError:
+                        print(f"⚠️  Invalid JSON for tools: {value}")
+                        options["tools"] = []
+                else:
+                    options[key] = value
+                i += 1
+            else:
+                options[key] = True
+        i += 1
+    
+    return options
+
+def print_help():
+    """Print help information"""
+    help_text = """
+🚀 Enhanced MCP Crafter CLI
+
+USAGE:
+    mcp-crafter <command> [options]
+
+COMMANDS:
+    create <name>     Create a new MCP server
+    status <id>       Check build status
+    list              List all servers
+    delete <name>     Delete a server
+    watch             Start continuous watching mode
+    help              Show this help
+
+CREATE OPTIONS:
+    --description <desc>          Server description
+    --complexity <level>          simple|standard|advanced|enterprise
+    --capabilities <caps>         Comma-separated capabilities
+    --template <template>         Base template to use
+    --deps <deps>                 Comma-separated dependencies
+    --env <vars>                  Environment variables (KEY=VALUE,KEY2=VALUE2)
+    --tools <json>                Custom tools specification (JSON)
+
+CAPABILITIES:
+    tools, resources, prompts, monitoring, persistence, authentication,
+    rate_limiting, caching, webhooks, streaming
+
+EXAMPLES:
+    # Simple server
+    mcp-crafter create my-server
+
+    # Advanced server with specific capabilities
+    mcp-crafter create weather-api \\
+        --description "Weather API MCP Server" \\
+        --complexity advanced \\
+        --capabilities tools,monitoring,caching \\
+        --deps requests,redis \\
+        --env API_KEY=your-key
+
+    # Enterprise server with custom tools
+    mcp-crafter create enterprise-server \\
+        --complexity enterprise \\
+        --capabilities tools,monitoring,persistence,authentication \\
+        --tools '[{"name": "process_data", "description": "Process data"}]'
+
+    # Check build status
+    mcp-crafter status build-12345
+
+    # Start watching mode for continuous development
+    mcp-crafter watch
+
+For more information, visit: https://github.com/dezocode/mcp-system
+"""
+    print(help_text)
+
+if __name__ == "__main__":
+    main()
