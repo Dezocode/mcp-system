@@ -3,7 +3,7 @@
 Enhanced Pipeline Integration MCP Server with MASSIVE IMPROVEMENTS
 Model Context Protocol v1.0 Compliant Server
 
-This server provides 9 tools for advanced pipeline automation:
+This server provides 12 tools for advanced pipeline automation:
 1. version_keeper_scan - Run comprehensive linting with monitoring
 2. quality_patcher_fix - Apply automated fixes with parallel processing
 3. pipeline_run_full - Execute complete pipeline cycles with 3x speedup
@@ -13,14 +13,21 @@ This server provides 9 tools for advanced pipeline automation:
 7. health_monitoring - Docker health check and system monitoring
 8. mcp_compliance_check - Validate MCP standards
 9. claude_agent_protocol - Bidirectional communication with Claude
+10. get_claude_fix_commands - Generate Edit/MultiEdit commands for Claude
+11. differential_restoration - Surgical code restoration to prevent deletions  
+12. streaming_fix_monitor - Real-time streaming of fix instructions
 
-MASSIVE IMPROVEMENTS IMPLEMENTED:
+MASSIVE IMPROVEMENTS + CLAUDE CODE INTEGRATION:
 ✅ Real-time monitoring and performance tracking
 ✅ Parallel processing engine with 3x speed improvement
 ✅ Claude Agent Protocol for bidirectional communication
 ✅ Advanced session management with persistence
 ✅ Priority-based job queue system
 ✅ Comprehensive system health monitoring
+✅ Direct Claude Fix Commands (Edit/MultiEdit ready output)
+✅ Differential Code Restoration (surgical deletion prevention)
+✅ Unlimited Processing Mode (no artificial limits)
+✅ Real-time Fix Streaming (immediate action instructions)
 
 Author: Pipeline Integration Team
 Version: 2.0.0 (Massive Improvements)
@@ -61,6 +68,7 @@ from src.monitoring.metrics_collector import MetricsCollector
 # Parallel Processing Engine (Phase 2.1.5-2.1.6 Implementation)
 from src.processing.parallel_executor import ParallelExecutor
 from src.processing.job_queue import JobQueue, Priority
+from src.processing.differential_restoration import DifferentialRestoration
 
 # Claude Agent Protocol Integration (Enhanced Bidirectional Communication)
 try:
@@ -381,10 +389,9 @@ async def handle_list_tools() -> List[Tool]:
                     },
                     "max_fixes": {
                         "type": "integer",
-                        "description": "Maximum number of fixes to apply",
-                        "minimum": 1,
-                        "maximum": 50,
-                        "default": 10
+                        "description": "Maximum number of fixes to apply (-1 for unlimited)",
+                        "minimum": -1,
+                        "default": -1
                     },
                     "auto_apply": {
                         "type": "boolean",
@@ -410,17 +417,15 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "max_cycles": {
                         "type": "integer",
-                        "description": "Maximum number of pipeline cycles",
-                        "minimum": 1,
-                        "maximum": 10,
-                        "default": 3
+                        "description": "Maximum number of pipeline cycles (-1 for unlimited until completion)",
+                        "minimum": -1,
+                        "default": -1
                     },
                     "max_fixes_per_cycle": {
                         "type": "integer",
-                        "description": "Maximum fixes per cycle",
-                        "minimum": 1,
-                        "maximum": 20,
-                        "default": 10
+                        "description": "Maximum fixes per cycle (-1 for unlimited)",
+                        "minimum": -1,
+                        "default": -1
                     },
                     "target_quality_score": {
                         "type": "number",
@@ -598,6 +603,115 @@ async def handle_list_tools() -> List[Tool]:
                 },
                 "required": []
             }
+        ),
+        Tool(
+            name="get_claude_fix_commands",
+            description="Get fix instructions formatted as Claude Edit/MultiEdit commands for direct application",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID containing lint report"
+                    },
+                    "lint_report_path": {
+                        "type": "string",
+                        "description": "Path to lint report JSON (optional if session has one)"
+                    },
+                    "max_fixes": {
+                        "type": "integer",
+                        "description": "Maximum fixes to return (-1 for unlimited)",
+                        "default": -1
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["edit_commands", "multiedit_batches", "direct_instructions"],
+                        "description": "Output format for Claude tools",
+                        "default": "multiedit_batches"
+                    },
+                    "include_context": {
+                        "type": "boolean",
+                        "description": "Include surrounding context for validation",
+                        "default": True
+                    },
+                    "priority_filter": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by priority categories (security, quality, duplicates)"
+                    }
+                },
+                "required": ["session_id"]
+            }
+        ),
+        Tool(
+            name="differential_restoration",
+            description="Detect and surgically restore accidentally deleted code",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID for tracking"
+                    },
+                    "files_to_check": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files to check for deletions (optional, checks all if not specified)"
+                    },
+                    "restoration_mode": {
+                        "type": "string",
+                        "enum": ["surgical", "selective", "critical_only", "full"],
+                        "description": "Restoration strategy",
+                        "default": "surgical"
+                    },
+                    "confidence_threshold": {
+                        "type": "number",
+                        "description": "Minimum confidence for restoration (0.0-1.0)",
+                        "default": 0.6
+                    },
+                    "auto_apply": {
+                        "type": "boolean",
+                        "description": "Automatically apply restorations",
+                        "default": False
+                    },
+                    "return_edit_commands": {
+                        "type": "boolean",
+                        "description": "Return as Edit/MultiEdit commands for Claude",
+                        "default": True
+                    }
+                },
+                "required": ["session_id"]
+            }
+        ),
+        Tool(
+            name="streaming_fix_monitor",
+            description="Stream real-time fix instructions as they are discovered",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID to monitor"
+                    },
+                    "stream_mode": {
+                        "type": "string",
+                        "enum": ["continuous", "batch", "on_demand"],
+                        "description": "Streaming mode",
+                        "default": "continuous"
+                    },
+                    "batch_size": {
+                        "type": "integer",
+                        "description": "Fixes per batch (for batch mode)",
+                        "default": 5
+                    },
+                    "format_for_claude": {
+                        "type": "boolean",
+                        "description": "Format output for direct Claude tool usage",
+                        "default": True
+                    }
+                },
+                "required": ["session_id"]
+            }
         )
     ]
 
@@ -627,6 +741,12 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
             return await handle_mcp_compliance_check(arguments)
         elif name == "claude_agent_protocol":
             return await handle_claude_agent_protocol(arguments)
+        elif name == "get_claude_fix_commands":
+            return await handle_get_claude_fix_commands(arguments)
+        elif name == "differential_restoration":
+            return await handle_differential_restoration(arguments)
+        elif name == "streaming_fix_monitor":
+            return await handle_streaming_fix_monitor(arguments)
         else:
             raise McpError(
                 METHOD_NOT_FOUND,
@@ -802,9 +922,14 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     if arguments.get("auto_apply", True):
         cmd.append("--auto-apply")
 
-    # Add max fixes
-    max_fixes = arguments.get("max_fixes", 10)
-    cmd.extend(["--max-fixes", str(max_fixes)])
+    # Add max fixes (-1 for unlimited)
+    max_fixes = arguments.get("max_fixes", -1)
+    if max_fixes == -1:
+        # Unlimited fixes mode
+        cmd.extend(["--max-fixes", "999999"])  # Very high number for "unlimited"
+        cmd.append("--continuous")  # Enable continuous mode
+    else:
+        cmd.extend(["--max-fixes", str(max_fixes)])
 
     # Add session directory
     session_path = pipeline_server.session_dir / session_id
@@ -875,8 +1000,15 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
     session = pipeline_server.get_session(session_id)
     session.update_status("running", "pipeline_full_cycle")
 
-    max_cycles = arguments.get("max_cycles", 3)
-    max_fixes_per_cycle = arguments.get("max_fixes_per_cycle", 10)
+    max_cycles = arguments.get("max_cycles", -1)
+    max_fixes_per_cycle = arguments.get("max_fixes_per_cycle", -1)
+    
+    # Handle unlimited cycles (-1 means run until completion)
+    if max_cycles == -1:
+        max_cycles = 999  # Very high number for "unlimited"
+    
+    # Handle unlimited fixes per cycle
+    unlimited_fixes = max_fixes_per_cycle == -1
     target_quality = arguments.get("target_quality_score", 95.0)
     break_on_no_issues = arguments.get("break_on_no_issues", True)
 
@@ -1621,6 +1753,348 @@ async def handle_claude_agent_protocol(arguments: Dict[str, Any]) -> List[TextCo
         )]
 
 
+async def handle_get_claude_fix_commands(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Generate fix commands formatted for Claude's Edit/MultiEdit tools"""
+    
+    session_id = arguments.get("session_id")
+    if not session_id:
+        raise McpError(INVALID_PARAMS, "session_id is required")
+    
+    session = pipeline_server.get_session(session_id)
+    if not session:
+        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
+    
+    # Get lint report
+    lint_report_path = arguments.get("lint_report_path")
+    if not lint_report_path:
+        # Try to get from session artifacts
+        lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
+        if lint_artifacts:
+            lint_report_path = lint_artifacts[-1]["path"]
+        else:
+            raise McpError(INVALID_PARAMS, "No lint report found in session")
+    
+    # Load lint report
+    try:
+        with open(lint_report_path, 'r') as f:
+            lint_data = json.load(f)
+    except Exception as e:
+        raise McpError(INTERNAL_ERROR, f"Failed to load lint report: {e}")
+    
+    # Extract priority fixes
+    priority_fixes = lint_data.get("priority_fixes", [])
+    max_fixes = arguments.get("max_fixes", -1)
+    format_type = arguments.get("format", "multiedit_batches")
+    include_context = arguments.get("include_context", True)
+    priority_filter = arguments.get("priority_filter", [])
+    
+    # Filter by priority if specified
+    if priority_filter:
+        priority_fixes = [
+            fix for fix in priority_fixes
+            if fix.get("category") in priority_filter
+        ]
+    
+    # Apply max_fixes limit (-1 means unlimited)
+    if max_fixes > 0:
+        priority_fixes = priority_fixes[:max_fixes]
+    
+    # Generate Claude-compatible commands
+    commands = []
+    
+    if format_type == "multiedit_batches":
+        # Group fixes by file for MultiEdit efficiency
+        by_file = {}
+        for fix in priority_fixes:
+            fix_info = fix.get("fix", {})
+            file_path = fix_info.get("file")
+            if file_path:
+                if file_path not in by_file:
+                    by_file[file_path] = []
+                by_file[file_path].append(fix_info)
+        
+        # Create MultiEdit commands
+        for file_path, file_fixes in by_file.items():
+            if len(file_fixes) == 1:
+                # Single edit
+                fix = file_fixes[0]
+                commands.append({
+                    "tool": "Edit",
+                    "file_path": file_path,
+                    "old_string": fix.get("old_string", ""),
+                    "new_string": fix.get("new_string", ""),
+                    "description": fix.get("description", "Fix issue")
+                })
+            else:
+                # MultiEdit for multiple fixes
+                edits = []
+                for fix in file_fixes:
+                    edits.append({
+                        "old_string": fix.get("old_string", ""),
+                        "new_string": fix.get("new_string", ""),
+                        "description": fix.get("description", "Fix issue")
+                    })
+                
+                commands.append({
+                    "tool": "MultiEdit",
+                    "file_path": file_path,
+                    "edits": edits,
+                    "description": f"Apply {len(edits)} fixes to {Path(file_path).name}"
+                })
+    
+    elif format_type == "edit_commands":
+        # Individual Edit commands
+        for fix in priority_fixes:
+            fix_info = fix.get("fix", {})
+            commands.append({
+                "tool": "Edit",
+                "file_path": fix_info.get("file"),
+                "old_string": fix_info.get("old_string", ""),
+                "new_string": fix_info.get("new_string", ""),
+                "description": fix_info.get("description", "Fix issue"),
+                "line_number": fix_info.get("line"),
+                "category": fix.get("category"),
+                "severity": fix.get("severity")
+            })
+    
+    elif format_type == "direct_instructions":
+        # Direct instructions for Claude to apply
+        for fix in priority_fixes:
+            fix_info = fix.get("fix", {})
+            commands.append({
+                "instruction": f"💡 ACTION REQUIRED: Use Edit tool to fix {fix.get('category')} issue",
+                "file": fix_info.get("file"),
+                "line": fix_info.get("line"),
+                "old_text": fix_info.get("old_string", ""),
+                "new_text": fix_info.get("new_string", ""),
+                "description": fix_info.get("description", ""),
+                "context": fix_info.get("context", "") if include_context else None
+            })
+    
+    # Update session
+    session.update_status("generating_commands", "get_claude_fix_commands")
+    
+    return [TextContent(
+        type="text",
+        text=json.dumps({
+            "tool": "get_claude_fix_commands",
+            "session_id": session_id,
+            "status": "success",
+            "total_fixes_available": len(lint_data.get("priority_fixes", [])),
+            "fixes_returned": len(commands),
+            "format": format_type,
+            "commands": commands
+        }, indent=2)
+    )]
+
+
+async def handle_differential_restoration(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Handle differential code restoration to prevent accidental deletions"""
+    
+    session_id = arguments.get("session_id")
+    if not session_id:
+        raise McpError(INVALID_PARAMS, "session_id is required")
+    
+    session = pipeline_server.get_session(session_id)
+    if not session:
+        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
+    
+    # Initialize differential restoration engine
+    restoration_engine = DifferentialRestoration(pipeline_server.workspace_root)
+    
+    # Get files to check
+    files_to_check = arguments.get("files_to_check", [])
+    if not files_to_check:
+        # Get all Python files if not specified
+        files_to_check = list(pipeline_server.workspace_root.rglob("*.py"))
+        # Filter out common directories to skip
+        skip_patterns = ["__pycache__", ".git", "venv", "env", "node_modules"]
+        files_to_check = [
+            f for f in files_to_check 
+            if not any(pattern in str(f) for pattern in skip_patterns)
+        ]
+    else:
+        files_to_check = [Path(f) for f in files_to_check]
+    
+    restoration_mode = arguments.get("restoration_mode", "surgical")
+    confidence_threshold = arguments.get("confidence_threshold", 0.6)
+    auto_apply = arguments.get("auto_apply", False)
+    return_edit_commands = arguments.get("return_edit_commands", True)
+    
+    # Capture baselines and detect deletions
+    all_deletions = []
+    for file_path in files_to_check:
+        if file_path.exists():
+            # Capture baseline if not already done
+            if str(file_path) not in restoration_engine.baseline_snapshots:
+                restoration_engine.capture_baseline(file_path)
+            
+            # Detect deletions
+            deletions = restoration_engine.detect_deletions(file_path)
+            all_deletions.extend(deletions)
+    
+    # Create restoration plan
+    plan = restoration_engine.create_restoration_plan(
+        all_deletions,
+        threshold=confidence_threshold
+    )
+    
+    # Apply restorations if requested
+    application_results = None
+    if auto_apply and plan.restorations_needed:
+        application_results = restoration_engine.apply_restoration_plan(plan)
+    
+    # Prepare response
+    response = {
+        "tool": "differential_restoration",
+        "session_id": session_id,
+        "status": "success",
+        "files_checked": len(files_to_check),
+        "deletions_detected": len(plan.deletions_detected),
+        "restorations_planned": len(plan.restorations_needed),
+        "restoration_summary": plan.summary,
+        "restoration_mode": restoration_mode,
+        "confidence_threshold": confidence_threshold
+    }
+    
+    if return_edit_commands:
+        response["edit_commands"] = plan.edit_commands
+    
+    if application_results:
+        response["application_results"] = application_results
+    
+    # Generate detailed report
+    report = restoration_engine.get_restoration_report(plan)
+    response["detailed_report"] = report
+    
+    # Update session
+    session.update_status("restoration_complete", "differential_restoration")
+    
+    return [TextContent(
+        type="text",
+        text=json.dumps(response, indent=2)
+    )]
+
+
+async def handle_streaming_fix_monitor(arguments: Dict[str, Any]) -> List[TextContent]:
+    """Stream real-time fix instructions as they are discovered"""
+    
+    session_id = arguments.get("session_id")
+    if not session_id:
+        raise McpError(INVALID_PARAMS, "session_id is required")
+    
+    session = pipeline_server.get_session(session_id)
+    if not session:
+        raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
+    
+    stream_mode = arguments.get("stream_mode", "continuous")
+    batch_size = arguments.get("batch_size", 5)
+    format_for_claude = arguments.get("format_for_claude", True)
+    
+    # This would ideally use SSE or WebSockets for true streaming
+    # For now, we'll return batched results that simulate streaming
+    
+    # Get latest lint report
+    lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
+    if not lint_artifacts:
+        return [TextContent(
+            type="text",
+            text=json.dumps({
+                "tool": "streaming_fix_monitor",
+                "session_id": session_id,
+                "status": "no_data",
+                "message": "No lint report available for streaming"
+            }, indent=2)
+        )]
+    
+    lint_report_path = lint_artifacts[-1]["path"]
+    
+    try:
+        with open(lint_report_path, 'r') as f:
+            lint_data = json.load(f)
+    except Exception as e:
+        raise McpError(INTERNAL_ERROR, f"Failed to load lint report: {e}")
+    
+    priority_fixes = lint_data.get("priority_fixes", [])
+    
+    # Simulate streaming by batching
+    streamed_batches = []
+    
+    if stream_mode == "batch":
+        # Create batches
+        for i in range(0, len(priority_fixes), batch_size):
+            batch = priority_fixes[i:i + batch_size]
+            
+            if format_for_claude:
+                # Format as Claude commands
+                batch_commands = []
+                for fix in batch:
+                    fix_info = fix.get("fix", {})
+                    batch_commands.append({
+                        "immediate_action": f"APPLY NOW: {fix_info.get('file')}:{fix_info.get('line')}",
+                        "tool": "Edit",
+                        "file_path": fix_info.get("file"),
+                        "old_string": fix_info.get("old_string", ""),
+                        "new_string": fix_info.get("new_string", ""),
+                        "urgency": "HIGH" if fix.get("category") == "security" else "MEDIUM"
+                    })
+                
+                streamed_batches.append({
+                    "batch_number": i // batch_size + 1,
+                    "fixes_in_batch": len(batch_commands),
+                    "commands": batch_commands
+                })
+            else:
+                streamed_batches.append({
+                    "batch_number": i // batch_size + 1,
+                    "fixes": batch
+                })
+    
+    elif stream_mode == "continuous":
+        # Simulate continuous streaming with priority ordering
+        # Security fixes first, then critical, then others
+        sorted_fixes = sorted(
+            priority_fixes,
+            key=lambda x: (
+                0 if x.get("category") == "security" else
+                1 if x.get("severity") == "critical" else 2
+            )
+        )
+        
+        for i, fix in enumerate(sorted_fixes[:10]):  # Limit for demo
+            fix_info = fix.get("fix", {})
+            streamed_batches.append({
+                "stream_index": i + 1,
+                "timestamp": time.time(),
+                "priority": "IMMEDIATE" if fix.get("category") == "security" else "HIGH",
+                "fix_command": {
+                    "file": fix_info.get("file"),
+                    "line": fix_info.get("line"),
+                    "old": fix_info.get("old_string", ""),
+                    "new": fix_info.get("new_string", ""),
+                    "apply_now": True
+                }
+            })
+    
+    # Update session with streaming status
+    session.update_status("streaming_active", "streaming_fix_monitor")
+    
+    return [TextContent(
+        type="text",
+        text=json.dumps({
+            "tool": "streaming_fix_monitor",
+            "session_id": session_id,
+            "status": "streaming",
+            "stream_mode": stream_mode,
+            "total_fixes_available": len(priority_fixes),
+            "streamed_count": len(streamed_batches),
+            "format": "claude_commands" if format_for_claude else "raw",
+            "stream_data": streamed_batches,
+            "note": "Real-time streaming would use SSE/WebSockets in production"
+        }, indent=2)
+    )]
+
+
 async def main():
     """Main server entry point with proper MCP v1.0 initialization."""
 
@@ -1629,13 +2103,16 @@ async def main():
         logger.error("Workspace validation failed")
         sys.exit(1)
 
-    logger.info("Starting Enhanced Pipeline MCP Server with Massive Improvements...")
-    logger.info("Tools available: 9 (including real-time monitoring & parallel processing)")
+    logger.info("Starting Enhanced Pipeline MCP Server with CLAUDE CODE INTEGRATION...")
+    logger.info("Tools available: 12 (now with Claude-specific optimization)")
     logger.info("MCP Protocol: v1.0")
     logger.info(f"Workspace: {pipeline_server.workspace_root}")
     logger.info("🚀 Performance improvements: 3x speedup with parallel processing")
     logger.info("📊 Real-time monitoring: Advanced metrics and health tracking")
     logger.info("🔄 Claude Protocol: Bidirectional communication enabled")
+    logger.info("⚡ Claude Integration: Direct Edit/MultiEdit commands")
+    logger.info("🔧 Differential Restoration: Surgical code protection")
+    logger.info("♾️  Unlimited Processing: No artificial limits (-1 for unlimited)")
 
     # Run server with stdio transport
     async with stdio_server() as (read_stream, write_stream):

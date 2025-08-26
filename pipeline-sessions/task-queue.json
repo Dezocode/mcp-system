@@ -1,0 +1,26 @@
+[
+  {
+    "task_id": "13ae73a4-6aa3-4db4-9c08-d36329bf4c08",
+    "task_type": "lint_fix",
+    "status": "pending",
+    "priority": 1,
+    "context": {
+      "cycle": 4,
+      "mode": "continuous",
+      "batch_size": 5
+    },
+    "expected_actions": [
+      "read_file",
+      "edit_file",
+      "validate"
+    ],
+    "constraints": {},
+    "created_at": "2025-08-24T21:17:58.057415",
+    "updated_at": "2025-08-24T21:17:58.057425",
+    "attempts": 0,
+    "max_attempts": 3,
+    "success_criteria": {},
+    "observations": [],
+    "result": null
+  }
+]

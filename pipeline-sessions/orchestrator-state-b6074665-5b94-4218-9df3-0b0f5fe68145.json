@@ -1,0 +1,75 @@
+{
+  "session_id": "b6074665-5b94-4218-9df3-0b0f5fe68145",
+  "current_state": "failed",
+  "state_history": [
+    [
+      "initializing",
+      1756088276.6752522
+    ],
+    [
+      "protocol_setup",
+      1756088276.676706
+    ],
+    [
+      "environment_analysis",
+      1756088276.6772974
+    ],
+    [
+      "pipeline_execution",
+      1756088276.9059343
+    ],
+    [
+      "error_recovery",
+      1756088276.907815
+    ],
+    [
+      "pipeline_execution",
+      1756088277.3696122
+    ],
+    [
+      "error_recovery",
+      1756088277.3708205
+    ],
+    [
+      "pipeline_execution",
+      1756088277.831469
+    ],
+    [
+      "error_recovery",
+      1756088277.8325553
+    ],
+    [
+      "pipeline_execution",
+      1756088278.2883277
+    ]
+  ],
+  "start_time": 1756088276.6737285,
+  "current_time": 1756088278.2889206,
+  "config": {
+    "max_cycles": 10,
+    "target_issues": 0,
+    "execution_mode": "ExecutionMode.CONTINUOUS",
+    "enable_protocol": true,
+    "enable_monitoring": true,
+    "performance_tracking": true,
+    "auto_recovery": true,
+    "session_dir": null,
+    "log_level": "INFO",
+    "timeout_per_cycle": 600,
+    "batch_size": 10,
+    "adaptive_batch_sizing": true
+  },
+  "performance_metrics": {
+    "total_cycles": 4,
+    "successful_cycles": 0,
+    "failed_cycles": 4,
+    "total_execution_time": 0.9219999313354492,
+    "average_cycle_time": 0.2304999828338623,
+    "issues_resolved": 0,
+    "issues_remaining": 0,
+    "success_rate": 0.0,
+    "adaptive_batch_size": 3
+  },
+  "recovery_attempts": 3,
+  "is_running": false
+}

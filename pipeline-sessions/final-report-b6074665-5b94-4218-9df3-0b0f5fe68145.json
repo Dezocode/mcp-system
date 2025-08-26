@@ -1,0 +1,36 @@
+{
+  "session_id": "b6074665-5b94-4218-9df3-0b0f5fe68145",
+  "execution_summary": {
+    "start_time": "2025-08-24T21:17:56.673728",
+    "end_time": "2025-08-24T21:17:58.290906",
+    "total_duration_seconds": 1.6171772480010986,
+    "final_state": "failed"
+  },
+  "performance_metrics": {
+    "total_cycles": 4,
+    "successful_cycles": 0,
+    "failed_cycles": 4,
+    "total_execution_time": 0.9219999313354492,
+    "average_cycle_time": 0.2304999828338623,
+    "issues_resolved": 0,
+    "issues_remaining": 0,
+    "success_rate": 0.0,
+    "adaptive_batch_size": 3
+  },
+  "configuration": {
+    "max_cycles": 10,
+    "target_issues": 0,
+    "execution_mode": "ExecutionMode.CONTINUOUS",
+    "enable_protocol": true,
+    "enable_monitoring": true,
+    "performance_tracking": true,
+    "auto_recovery": true,
+    "session_dir": null,
+    "log_level": "INFO",
+    "timeout_per_cycle": 600,
+    "batch_size": 10,
+    "adaptive_batch_sizing": true
+  },
+  "state_transitions": 10,
+  "recovery_attempts": 3
+}

@@ -1,0 +1,14 @@
+{
+    "session_id": "direct-1756086929",
+    "mode": "direct",
+    "start_time": "1756086929",
+    "protocol_enabled": true,
+    "real_time_instructions": true,
+    "performance_tracking": true,
+    "direct_features": {
+        "bypasses_orchestrator": true,
+        "protocol_integration": true,
+        "performance_optimized": true,
+        "real_time_feedback": true
+    }
+}
