@@ -13,9 +13,15 @@ echo ""
 detect_duplicate_functions() {
     echo "🔍 SCANNING FOR DUPLICATE FUNCTIONS:"
     
+    # Use Python version_keeper for more accurate duplicate detection
+    echo "   🐍 Running Python duplicate analysis..."
+    if [[ -f "scripts/version_keeper.py" ]]; then
+        python3 scripts/version_keeper.py --detect-duplicates 2>/dev/null | grep -E "duplicate_functions|Duplicate functions|•"
+    fi
+    
     # Find JavaScript files and extract function names
     find "$PROJECT_DIR" -name "*.js" -not -path "*/node_modules/*" -exec grep -l "function\|const.*=\|class\|module.exports" {} \; | while read -r file; do
-        echo "   📄 Analyzing: $(basename "$file")"
+        echo "   📄 Analyzing JS: $(basename "$file")"
         
         # Extract function names and their line numbers
         grep -n "function\s\+\w\+\|const\s\+\w\+\s*=\|class\s\+\w\+\|module\.exports\s*=" "$file" | while IFS=':' read -r line_num content; do
@@ -27,6 +33,21 @@ detect_duplicate_functions() {
             fi
         done
         echo ""
+    done
+    
+    # Find Python files with potential duplicates
+    echo "   🐍 Analyzing Python files..."
+    find "$PROJECT_DIR" -name "*.py" -not -path "*/.*" -not -path "*/__pycache__/*" | while read -r file; do
+        # Skip files with template syntax that would break parsing
+        if grep -q "{%" "$file" 2>/dev/null; then
+            continue
+        fi
+        
+        # Look for function definitions
+        func_count=$(grep -c "^def " "$file" 2>/dev/null || echo "0")
+        if [[ "$func_count" -gt 0 ]]; then
+            echo "      📄 $(basename "$file"): $func_count functions"
+        fi
     done
 }
 
