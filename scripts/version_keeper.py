@@ -791,6 +791,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 else:
                     file_hashes[file_hash] = py_file
 
+                # Skip files that contain template content (Jinja2, etc.) that would break AST parsing
+                if any(template_marker in content for template_marker in ['{%', '{{', '%}', '}}']):
+                    print(f"  ⏭️ Skipping template file {py_file.name} (contains Jinja2 syntax)")
+                    continue
+
                 # Parse AST to find functions and classes with proper context
                 tree = ast.parse(content)
 
@@ -865,18 +870,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                             if str(py_file) != str(
                                 functions_map[func_signature]["file"]
                             ):
-                                duplicates["duplicate_functions"].append(
-                                    {
-                                        "function": node.name,
-                                        "signature": func_signature,
-                                        "file1": str(
-                                            functions_map[func_signature]["file"]
-                                        ),
-                                        "file2": str(py_file),
-                                        "line1": functions_map[func_signature]["line"],
-                                        "line2": node.lineno,
-                                    }
-                                )
+                                # Apply the same filtering logic for module-level functions
+                                func1_info = {
+                                    "function": node.name,
+                                    "file": str(functions_map[func_signature]["file"]),
+                                    "line": functions_map[func_signature]["line"]
+                                }
+                                func2_info = {
+                                    "function": node.name,
+                                    "file": str(py_file),
+                                    "line": node.lineno
+                                }
+                                
+                                # Only add to duplicates if it's legacy code, not legitimate different implementations
+                                if not self.is_legitimate_duplicate_vs_legacy(func1_info, func2_info):
+                                    duplicates["duplicate_functions"].append(
+                                        {
+                                            "function": node.name,
+                                            "signature": func_signature,
+                                            "file1": str(
+                                                functions_map[func_signature]["file"]
+                                            ),
+                                            "file2": str(py_file),
+                                            "line1": functions_map[func_signature]["line"],
+                                            "line2": node.lineno,
+                                        }
+                                    )
                         else:
                             functions_map[func_signature] = {
                                 "file": py_file,
@@ -1073,39 +1092,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         file2 = Path(func2_info["file"])
         func_name = func1_info["function"]
         
-        # LEGITIMATE DUPLICATES: Different classes with same method names
-        # These are NOT duplicates - they're legitimate implementations
-        if func_name in ["__init__", "__str__", "__repr__", "run", "execute", "process"]:
-            # Common method names that legitimately appear in multiple classes
+        # ALWAYS LEGITIMATE: Common method names that appear across different classes/modules
+        if func_name in ["__init__", "__str__", "__repr__", "__enter__", "__exit__", 
+                        "run", "execute", "process", "main", "start", "stop", 
+                        "setup", "cleanup", "init", "handle", "validate"]:
+            # These are legitimate different implementations
             return True
             
-        # LEGACY CODE PATTERNS: These indicate real duplicates to remove
-        legacy_patterns = [
-            # Backup/versioned file patterns
-            ("backup", "original"), ("_v1", "_v2"), ("enhanced", ""),
-            ("-old", ""), ("_original", "_updated"), ("legacy", "new"),
+        # ALWAYS LEGITIMATE: Different top-level directories (different modules)
+        if len(file1.parts) > 1 and len(file2.parts) > 1:
+            # Check if in completely different top-level modules
+            if file1.parts[0] != file2.parts[0]:
+                return True
+                
+        # LEGACY PATTERNS: Clear indicators of old/backup code
+        legacy_indicators = [
+            "_backup", "_old", "_legacy", "_v1", "_v2", "_copy", 
+            "_original", "_working", "_1", "_2", "backup/", "old/"
         ]
         
-        for pattern1, pattern2 in legacy_patterns:
-            if (pattern1 in str(file1) and pattern2 in str(file2)) or \
-               (pattern2 in str(file1) and pattern1 in str(file2)):
+        file1_str = str(file1).lower()
+        file2_str = str(file2).lower()
+        
+        for indicator in legacy_indicators:
+            if indicator in file1_str or indicator in file2_str:
                 # One file is clearly a backup/old version
                 return False
                 
-        # Check if files are in different logical modules/purposes
-        file1_parts = file1.parts
-        file2_parts = file2.parts
-        
-        # Different high-level modules with same function name = legitimate
-        if len(file1_parts) > 1 and len(file2_parts) > 1:
-            if file1_parts[-2] != file2_parts[-2]:  # Different parent directories
-                return True
+        # SPECIFIC PATTERNS: Check for version keeper duplicates
+        if func_name == "detect_duplicate_implementations":
+            # Multiple version keeper files - check which is the main one
+            if "version_keeper_1.py" in file1_str or "version_keeper_1.py" in file2_str:
+                return False  # version_keeper_1.py is legacy
                 
-        # Same directory, same function name with similar signatures = likely legacy
-        if file1.parent == file2.parent and func_name not in ["__init__"]:
+        # Same directory with similar function names = likely legacy
+        if file1.parent == file2.parent:
+            # Check if one file is clearly newer/enhanced version
+            enhanced_indicators = ["enhanced", "improved", "new", "updated"]
+            for indicator in enhanced_indicators:
+                if indicator in file1_str and indicator not in file2_str:
+                    return False  # file2 is legacy
+                if indicator in file2_str and indicator not in file1_str:
+                    return False  # file1 is legacy
+            
+            # Same directory, same function name, no clear enhancement pattern
+            # This is likely a real duplicate that needs attention
             return False
             
-        # Default: assume legitimate unless proven otherwise
+        # Different directories, different purposes = legitimate
         return True
 
     def get_function_signature(
