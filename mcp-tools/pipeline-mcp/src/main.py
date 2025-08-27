@@ -786,6 +786,13 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "boolean",
                         "description": "Enable GitHub API integration for remote branch creation",
                         "default": False
+                    },
+                    "operation_timeout": {
+                        "type": "integer",
+                        "description": "Operation timeout in seconds for long-running operations",
+                        "default": 1800,
+                        "minimum": 60,
+                        "maximum": 3600
                     }
                 },
                 "required": ["session_id"]
@@ -2206,8 +2213,13 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
     auto_fix_enabled = arguments.get("auto_fix", False)
     communicate_to_claude = arguments.get("communicate_to_claude", False)
     github_integration = arguments.get("github_integration", False)
+    operation_timeout = arguments.get("operation_timeout", 1800)  # 30 minutes default
     
     session.update_status("semantic_catalog_review", f"semantic_catalog_{action}")
+    
+    # Async operation management - Add cancellation tokens for long-running operations
+    cancellation_token = asyncio.Event()
+    operation_task = None
     
     # Initialize semantic catalog results
     catalog_results = {
@@ -2216,6 +2228,8 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
         "action": action,
         "timestamp": time.time(),
         "status": "processing",
+        "operation_timeout": operation_timeout,
+        "cancellation_available": True,
         "config": {
             "version_bump_type": version_bump_type,
             "base_branch": base_branch,
@@ -2227,55 +2241,84 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
     }
     
     try:
-        # Step 1: High-resolution execution and analysis
-        if high_resolution_mode:
-            execution_results = await perform_high_resolution_execution(session_id)
-            catalog_results["results"]["high_resolution_execution"] = execution_results
+        # Wrap the main operation in a task with timeout and cancellation support
+        async def main_operation():
+            # Step 1: High-resolution execution and analysis
+            if high_resolution_mode:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before high-resolution execution")
+                execution_results = await perform_high_resolution_execution(session_id)
+                catalog_results["results"]["high_resolution_execution"] = execution_results
+            
+            # Step 2: Version branch creation (if requested or full review)
+            if action in ["create_version_branch", "full_review"]:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before version branch creation")
+                branch_results = await create_version_bumped_branch(
+                    session_id, version_bump_type, base_branch, target_branch, github_integration
+                )
+                catalog_results["results"]["version_branch"] = branch_results
+                target_branch = branch_results.get("branch_name", target_branch)
+            
+            # Step 3: Diff analysis between branches
+            if action in ["diff_analysis", "full_review"] and target_branch:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before diff analysis")
+                diff_results = await perform_semantic_diff_analysis(
+                    session_id, base_branch, target_branch, hierarchical_protection
+                )
+                catalog_results["results"]["diff_analysis"] = diff_results
+            
+            # Step 4: Semantic function analysis
+            if action in ["semantic_analysis", "full_review"]:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before semantic analysis")
+                semantic_results = await perform_semantic_function_analysis(
+                    session_id, include_function_review, hierarchical_protection
+                )
+                catalog_results["results"]["semantic_analysis"] = semantic_results
+            
+            # Step 5: Watchdog compliance review
+            if action in ["compliance_check", "full_review"] and include_watchdog_compliance:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before compliance review")
+                compliance_results = await perform_watchdog_compliance_review(
+                    session_id, hierarchical_protection
+                )
+                catalog_results["results"]["compliance_review"] = compliance_results
+            
+            # Step 6: Auto-fix capability (NEW FEATURE)
+            if auto_fix_enabled and action in ["auto_fix", "full_review"]:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before auto-fix")
+                autofix_results = await perform_semantic_auto_fix(
+                    session_id, hierarchical_protection
+                )
+                catalog_results["results"]["auto_fix"] = autofix_results
+            
+            # Step 7: Communicate to Claude with diffs and version keeper issues (NEW FEATURE)
+            if communicate_to_claude:
+                if cancellation_token.is_set():
+                    raise asyncio.CancelledError("Operation cancelled before Claude communication")
+                claude_communication = await communicate_results_to_claude(
+                    session_id, catalog_results
+                )
+                catalog_results["results"]["claude_communication"] = claude_communication
         
-        # Step 2: Version branch creation (if requested or full review)
-        if action in ["create_version_branch", "full_review"]:
-            branch_results = await create_version_bumped_branch(
-                session_id, version_bump_type, base_branch, target_branch, github_integration
-            )
-            catalog_results["results"]["version_branch"] = branch_results
-            target_branch = branch_results.get("branch_name", target_branch)
+        # Execute with timeout and cancellation support
+        operation_task = asyncio.create_task(main_operation())
         
-        # Step 3: Diff analysis between branches
-        if action in ["diff_analysis", "full_review"] and target_branch:
-            diff_results = await perform_semantic_diff_analysis(
-                session_id, base_branch, target_branch, hierarchical_protection
-            )
-            catalog_results["results"]["diff_analysis"] = diff_results
-        
-        # Step 4: Semantic function analysis
-        if action in ["semantic_analysis", "full_review"]:
-            semantic_results = await perform_semantic_function_analysis(
-                session_id, include_function_review, hierarchical_protection
-            )
-            catalog_results["results"]["semantic_analysis"] = semantic_results
-        
-        # Step 5: Watchdog compliance review
-        if action in ["compliance_check", "full_review"] and include_watchdog_compliance:
-            compliance_results = await perform_watchdog_compliance_review(
-                session_id, hierarchical_protection
-            )
-            catalog_results["results"]["compliance_review"] = compliance_results
-        
-        # Step 6: Auto-fix capability (NEW FEATURE)
-        auto_fix_enabled = arguments.get("auto_fix", False)
-        if auto_fix_enabled and action in ["auto_fix", "full_review"]:
-            autofix_results = await perform_semantic_auto_fix(
-                session_id, hierarchical_protection
-            )
-            catalog_results["results"]["auto_fix"] = autofix_results
-        
-        # Step 7: Communicate to Claude with diffs and version keeper issues (NEW FEATURE)
-        communicate_to_claude = arguments.get("communicate_to_claude", False)
-        if communicate_to_claude:
-            claude_communication = await communicate_results_to_claude(
-                session_id, catalog_results
-            )
-            catalog_results["results"]["claude_communication"] = claude_communication
+        try:
+            await asyncio.wait_for(operation_task, timeout=operation_timeout)
+        except asyncio.TimeoutError:
+            cancellation_token.set()
+            if operation_task and not operation_task.done():
+                operation_task.cancel()
+                try:
+                    await operation_task
+                except asyncio.CancelledError:
+                    pass
+            raise Exception(f"Operation timed out after {operation_timeout} seconds")
         
         # Step 8: Generate MCP/React compatible response
         formatted_response = await format_semantic_catalog_response(
@@ -2292,8 +2335,26 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
             text=json.dumps(catalog_results, indent=2)
         )]
         
+    except asyncio.CancelledError:
+        logger.warning(f"Semantic catalog review cancelled for session {session_id}")
+        catalog_results["status"] = "cancelled"
+        catalog_results["error"] = "Operation was cancelled"
+        session.update_status("cancelled", "semantic_catalog_review")
+        return [TextContent(
+            type="text",
+            text=json.dumps(catalog_results, indent=2)
+        )]
     except Exception as e:
         logger.error(f"Semantic catalog review failed: {e}")
+        # Cancel ongoing operation if it exists
+        if operation_task and not operation_task.done():
+            cancellation_token.set()
+            operation_task.cancel()
+            try:
+                await operation_task
+            except asyncio.CancelledError:
+                pass
+        
         catalog_results["status"] = "failed"
         catalog_results["error"] = str(e)
         session.update_status("failed", "semantic_catalog_review")
@@ -2905,21 +2966,30 @@ def calculate_overall_compliance_score(compliance_checks: List[Dict[str, Any]]) 
 # NEW ENHANCED FEATURES IMPLEMENTATION
 
 async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bool) -> Dict[str, Any]:
-    """Perform automatic fixing of detected issues (NEW FEATURE)"""
+    """Perform automatic fixing of detected issues with enhanced validation (NEW FEATURE)"""
     
     autofix_results = {
         "start_time": time.time(),
         "session_id": session_id,
         "hierarchical_protection": hierarchical_protection,
         "auto_fixes_applied": 0,
-        "issues_resolved": []
+        "issues_resolved": [],
+        "max_fixes_limit": 100,  # Prevent runaway operations
+        "validation_passed": False
     }
     
     try:
+        # Configuration validation - Add stricter validation for auto-fix limits
+        max_fixes = autofix_results["max_fixes_limit"]
+        if max_fixes <= 0 or max_fixes > 1000:
+            raise ValueError(f"Invalid auto-fix limit: {max_fixes}. Must be between 1 and 1000.")
+        
         # Get session and check for existing lint report
         session = pipeline_server.get_session(session_id)
         if not session:
             raise Exception(f"Session {session_id} not found")
+        
+        autofix_results["validation_passed"] = True
         
         # Find lint report
         lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
@@ -2957,18 +3027,38 @@ async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bo
 
 
 async def communicate_results_to_claude(session_id: str, catalog_results: Dict[str, Any]) -> Dict[str, Any]:
-    """Communicate results including diffs and version keeper issues to Claude (NEW FEATURE)"""
+    """Communicate results including diffs and version keeper issues to Claude with endpoint validation (NEW FEATURE)"""
     
     communication_results = {
         "start_time": time.time(),
         "session_id": session_id,
-        "communication_status": "processing"
+        "communication_status": "processing",
+        "endpoint_validated": False
     }
     
     try:
         session = pipeline_server.get_session(session_id)
         if not session:
             raise Exception(f"Session {session_id} not found")
+        
+        # Claude communication - Validate Claude endpoint availability before attempting communication
+        if not CLAUDE_PROTOCOL_AVAILABLE:
+            logger.warning(f"Claude protocol not available: {CLAUDE_PROTOCOL_ERROR}")
+            communication_results["communication_status"] = "claude_protocol_unavailable"
+            communication_results["error"] = f"Claude Agent Protocol not available: {CLAUDE_PROTOCOL_ERROR}"
+            return communication_results
+        
+        # Test Claude endpoint availability
+        try:
+            protocol = get_protocol()
+            if not protocol:
+                raise Exception("Claude protocol instance not available")
+            communication_results["endpoint_validated"] = True
+        except Exception as endpoint_error:
+            logger.error(f"Claude endpoint validation failed: {endpoint_error}")
+            communication_results["communication_status"] = "endpoint_validation_failed"
+            communication_results["error"] = f"Claude endpoint validation failed: {str(endpoint_error)}"
+            return communication_results
         
         # Prepare communication payload for Claude
         claude_payload = {
@@ -3056,36 +3146,68 @@ async def communicate_results_to_claude(session_id: str, catalog_results: Dict[s
 
 
 async def push_branch_to_github(branch_name: str, version: str) -> Dict[str, Any]:
-    """Push branch to GitHub using API integration (NEW FEATURE)"""
+    """Push branch to GitHub with enhanced error handling for API failures (NEW FEATURE)"""
     
     github_results = {
         "start_time": time.time(),
         "branch_name": branch_name,
         "version": version,
-        "github_integration": True
+        "github_integration": True,
+        "retry_attempts": 0,
+        "max_retries": 3
     }
     
     try:
-        # First, push the branch to remote
-        push_cmd = ["git", "push", "-u", "origin", branch_name]
-        returncode, stdout, stderr = await pipeline_server.run_command(push_cmd)
+        # Error handling - More robust error handling for GitHub API failures
+        max_retries = github_results["max_retries"]
         
-        if returncode != 0:
-            # Try to create the remote branch if it doesn't exist
-            if "does not exist" in stderr or "no upstream" in stderr:
-                create_cmd = ["git", "push", "--set-upstream", "origin", branch_name]
-                returncode, stdout, stderr = await pipeline_server.run_command(create_cmd)
-        
-        if returncode == 0:
-            github_results["push_status"] = "success"
-            github_results["remote_url"] = await get_remote_url()
+        for attempt in range(max_retries + 1):
+            github_results["retry_attempts"] = attempt
             
-            # Try to create a pull request using GitHub CLI if available
-            pr_result = await create_github_pull_request(branch_name, version)
-            if pr_result:
-                github_results["pull_request"] = pr_result
+            try:
+                # First, push the branch to remote
+                push_cmd = ["git", "push", "-u", "origin", branch_name]
+                returncode, stdout, stderr = await pipeline_server.run_command(push_cmd)
                 
-        else:
+                if returncode != 0:
+                    # Try to create the remote branch if it doesn't exist
+                    if "does not exist" in stderr or "no upstream" in stderr:
+                        create_cmd = ["git", "push", "--set-upstream", "origin", branch_name]
+                        returncode, stdout, stderr = await pipeline_server.run_command(create_cmd)
+                
+                if returncode == 0:
+                    github_results["push_status"] = "success"
+                    github_results["remote_url"] = await get_remote_url()
+                    
+                    # Try to create a pull request using GitHub CLI if available
+                    try:
+                        pr_result = await create_github_pull_request(branch_name, version)
+                        if pr_result:
+                            github_results["pull_request"] = pr_result
+                    except Exception as pr_error:
+                        logger.warning(f"Pull request creation failed (non-critical): {pr_error}")
+                        github_results["pull_request_error"] = str(pr_error)
+                    
+                    break  # Success, exit retry loop
+                
+                else:
+                    # GitHub API failure - implement retry logic
+                    if attempt < max_retries:
+                        wait_time = 2 ** attempt  # Exponential backoff
+                        logger.warning(f"GitHub push failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {stderr}")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        raise Exception(f"GitHub push failed after {max_retries + 1} attempts: {stderr}")
+                        
+            except Exception as github_error:
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt
+                    logger.warning(f"GitHub operation failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {github_error}")
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    raise github_error
             github_results["push_status"] = "failed"
             github_results["error"] = stderr
         
