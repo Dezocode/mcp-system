@@ -253,14 +253,6 @@ class PlatformAdapter:
             
         return None
         
-    def get_path_separator(self) -> str:
-        """Get appropriate path separator for current platform"""
-        return os.sep
-        
-    def normalize_path(self, path: str) -> str:
-        """Normalize path for current platform"""
-        return os.path.normpath(path)
-        
     def get_case_sensitive_filesystem(self) -> bool:
         """Check if filesystem is case-sensitive"""
         if self.system == 'windows':
