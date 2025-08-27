@@ -717,7 +717,7 @@ async def handle_list_tools() -> List[Tool]:
         ),
         Tool(
             name="semantic_catalog_review",
-            description="Advanced semantic catalog tool for high-resolution code execution, version branch creation, diff analysis, and compliance review",
+            description="Advanced semantic catalog tool for high-resolution code execution, auto-fix capability, GitHub branch creation, diff analysis, compliance review, and Claude communication",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -727,7 +727,7 @@ async def handle_list_tools() -> List[Tool]:
                     },
                     "action": {
                         "type": "string",
-                        "enum": ["full_review", "create_version_branch", "diff_analysis", "semantic_analysis", "compliance_check"],
+                        "enum": ["full_review", "create_version_branch", "diff_analysis", "semantic_analysis", "compliance_check", "auto_fix"],
                         "description": "Action to perform",
                         "default": "full_review"
                     },
@@ -771,6 +771,21 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "boolean",
                         "description": "Enable hierarchical protection for 100% reliability",
                         "default": True
+                    },
+                    "auto_fix": {
+                        "type": "boolean",
+                        "description": "Enable automatic fixing of detected issues",
+                        "default": False
+                    },
+                    "communicate_to_claude": {
+                        "type": "boolean",
+                        "description": "Communicate results including diffs and version keeper issues to Claude",
+                        "default": False
+                    },
+                    "github_integration": {
+                        "type": "boolean",
+                        "description": "Enable GitHub API integration for remote branch creation",
+                        "default": False
                     }
                 },
                 "required": ["session_id"]
@@ -2188,6 +2203,9 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
     response_format = arguments.get("response_format", "mcp_compatible")
     high_resolution_mode = arguments.get("high_resolution_mode", True)
     hierarchical_protection = arguments.get("hierarchical_protection", True)
+    auto_fix_enabled = arguments.get("auto_fix", False)
+    communicate_to_claude = arguments.get("communicate_to_claude", False)
+    github_integration = arguments.get("github_integration", False)
     
     session.update_status("semantic_catalog_review", f"semantic_catalog_{action}")
     
@@ -2217,7 +2235,7 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
         # Step 2: Version branch creation (if requested or full review)
         if action in ["create_version_branch", "full_review"]:
             branch_results = await create_version_bumped_branch(
-                session_id, version_bump_type, base_branch, target_branch
+                session_id, version_bump_type, base_branch, target_branch, github_integration
             )
             catalog_results["results"]["version_branch"] = branch_results
             target_branch = branch_results.get("branch_name", target_branch)
@@ -2243,7 +2261,23 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
             )
             catalog_results["results"]["compliance_review"] = compliance_results
         
-        # Step 6: Generate MCP/React compatible response
+        # Step 6: Auto-fix capability (NEW FEATURE)
+        auto_fix_enabled = arguments.get("auto_fix", False)
+        if auto_fix_enabled and action in ["auto_fix", "full_review"]:
+            autofix_results = await perform_semantic_auto_fix(
+                session_id, hierarchical_protection
+            )
+            catalog_results["results"]["auto_fix"] = autofix_results
+        
+        # Step 7: Communicate to Claude with diffs and version keeper issues (NEW FEATURE)
+        communicate_to_claude = arguments.get("communicate_to_claude", False)
+        if communicate_to_claude:
+            claude_communication = await communicate_results_to_claude(
+                session_id, catalog_results
+            )
+            catalog_results["results"]["claude_communication"] = claude_communication
+        
+        # Step 8: Generate MCP/React compatible response
         formatted_response = await format_semantic_catalog_response(
             catalog_results, response_format
         )
@@ -2313,7 +2347,8 @@ async def create_version_bumped_branch(
     session_id: str, 
     version_bump_type: str, 
     base_branch: str, 
-    target_branch: Optional[str]
+    target_branch: Optional[str],
+    github_integration: bool = False
 ) -> Dict[str, Any]:
     """Create a version-bumped branch"""
     
@@ -2354,6 +2389,11 @@ async def create_version_bumped_branch(
         
         if returncode != 0:
             logger.warning(f"Commit failed (may be no changes): {stderr}")
+        
+        # 7. GitHub integration (NEW FEATURE)
+        if github_integration:
+            github_result = await push_branch_to_github(target_branch, new_version)
+            branch_results["github_push"] = github_result
         
         branch_results["status"] = "completed"
         branch_results["execution_time"] = time.time() - branch_results["start_time"]
@@ -2860,6 +2900,259 @@ def calculate_overall_compliance_score(compliance_checks: List[Dict[str, Any]]) 
     
     total_score = sum(check.get("score", 100) for check in compliance_checks)
     return total_score / len(compliance_checks)
+
+
+# NEW ENHANCED FEATURES IMPLEMENTATION
+
+async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bool) -> Dict[str, Any]:
+    """Perform automatic fixing of detected issues (NEW FEATURE)"""
+    
+    autofix_results = {
+        "start_time": time.time(),
+        "session_id": session_id,
+        "hierarchical_protection": hierarchical_protection,
+        "auto_fixes_applied": 0,
+        "issues_resolved": []
+    }
+    
+    try:
+        # Get session and check for existing lint report
+        session = pipeline_server.get_session(session_id)
+        if not session:
+            raise Exception(f"Session {session_id} not found")
+        
+        # Find lint report
+        lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
+        if not lint_artifacts:
+            # Run version keeper scan first
+            scan_result = await handle_version_keeper_scan({
+                "session_id": session_id,
+                "output_format": "json"
+            })
+            lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
+        
+        if lint_artifacts:
+            # Apply quality patcher fixes automatically
+            fix_result = await handle_quality_patcher_fix({
+                "session_id": session_id,
+                "auto_apply": True,
+                "max_fixes": -1,  # Unlimited fixes
+                "claude_agent": True
+            })
+            
+            fix_data = json.loads(fix_result[0].text)
+            autofix_results["auto_fixes_applied"] = session.metrics.get("fixes_applied", 0)
+            autofix_results["issues_resolved"] = fix_data.get("results", {}).get("summary", {})
+        
+        autofix_results["status"] = "completed"
+        autofix_results["execution_time"] = time.time() - autofix_results["start_time"]
+        
+        return autofix_results
+        
+    except Exception as e:
+        autofix_results["status"] = "failed"
+        autofix_results["error"] = str(e)
+        autofix_results["execution_time"] = time.time() - autofix_results["start_time"]
+        return autofix_results
+
+
+async def communicate_results_to_claude(session_id: str, catalog_results: Dict[str, Any]) -> Dict[str, Any]:
+    """Communicate results including diffs and version keeper issues to Claude (NEW FEATURE)"""
+    
+    communication_results = {
+        "start_time": time.time(),
+        "session_id": session_id,
+        "communication_status": "processing"
+    }
+    
+    try:
+        session = pipeline_server.get_session(session_id)
+        if not session:
+            raise Exception(f"Session {session_id} not found")
+        
+        # Prepare communication payload for Claude
+        claude_payload = {
+            "type": "semantic_catalog_results",
+            "session_id": session_id,
+            "timestamp": catalog_results["timestamp"],
+            "summary": {
+                "action_performed": catalog_results["action"],
+                "status": catalog_results["status"],
+                "execution_time": time.time() - catalog_results["timestamp"]
+            }
+        }
+        
+        # Include version keeper issues if available
+        if session.metrics.get("total_issues_found", 0) > 0:
+            claude_payload["version_keeper_issues"] = {
+                "total_issues": session.metrics["total_issues_found"],
+                "fixes_applied": session.metrics.get("fixes_applied", 0),
+                "remaining_issues": session.metrics.get("remaining_issues", 0)
+            }
+        
+        # Include diff analysis if available
+        if "diff_analysis" in catalog_results.get("results", {}):
+            diff_data = catalog_results["results"]["diff_analysis"]
+            claude_payload["diff_summary"] = {
+                "changed_files": diff_data.get("changed_files", []),
+                "change_summary": diff_data.get("change_summary", {}),
+                "risk_assessment": diff_data.get("risk_assessment", {})
+            }
+        
+        # Include branch information if available
+        if "version_branch" in catalog_results.get("results", {}):
+            branch_data = catalog_results["results"]["version_branch"]
+            claude_payload["branch_info"] = {
+                "branch_name": branch_data.get("branch_name"),
+                "version_bump": f"{branch_data.get('current_version')} → {branch_data.get('new_version')}",
+                "github_pushed": branch_data.get("github_push", {}).get("status") == "success"
+            }
+        
+        # Include compliance scores
+        compliance_scores = []
+        for result_key, result_data in catalog_results.get("results", {}).items():
+            if "compliance" in result_key and isinstance(result_data, dict):
+                if "overall_compliance_score" in result_data:
+                    compliance_scores.append({
+                        "category": result_key,
+                        "score": result_data["overall_compliance_score"]
+                    })
+        
+        if compliance_scores:
+            claude_payload["compliance_summary"] = compliance_scores
+        
+        # Use Claude Agent Protocol if available
+        if session.claude_protocol and CLAUDE_PROTOCOL_AVAILABLE:
+            task = session.claude_protocol.create_task(
+                TaskType.LINT_FIX,
+                context=claude_payload,
+                priority=1
+            )
+            
+            session.claude_protocol.record_observation(
+                task.task_id,
+                {
+                    "semantic_catalog_results": claude_payload,
+                    "communication_timestamp": time.time()
+                }
+            )
+            
+            communication_results["claude_protocol_task_id"] = task.task_id
+            communication_results["communication_method"] = "claude_agent_protocol"
+        else:
+            communication_results["communication_method"] = "direct_payload"
+        
+        communication_results["payload_sent"] = claude_payload
+        communication_results["communication_status"] = "success"
+        communication_results["execution_time"] = time.time() - communication_results["start_time"]
+        
+        return communication_results
+        
+    except Exception as e:
+        communication_results["communication_status"] = "failed"
+        communication_results["error"] = str(e)
+        communication_results["execution_time"] = time.time() - communication_results["start_time"]
+        return communication_results
+
+
+async def push_branch_to_github(branch_name: str, version: str) -> Dict[str, Any]:
+    """Push branch to GitHub using API integration (NEW FEATURE)"""
+    
+    github_results = {
+        "start_time": time.time(),
+        "branch_name": branch_name,
+        "version": version,
+        "github_integration": True
+    }
+    
+    try:
+        # First, push the branch to remote
+        push_cmd = ["git", "push", "-u", "origin", branch_name]
+        returncode, stdout, stderr = await pipeline_server.run_command(push_cmd)
+        
+        if returncode != 0:
+            # Try to create the remote branch if it doesn't exist
+            if "does not exist" in stderr or "no upstream" in stderr:
+                create_cmd = ["git", "push", "--set-upstream", "origin", branch_name]
+                returncode, stdout, stderr = await pipeline_server.run_command(create_cmd)
+        
+        if returncode == 0:
+            github_results["push_status"] = "success"
+            github_results["remote_url"] = await get_remote_url()
+            
+            # Try to create a pull request using GitHub CLI if available
+            pr_result = await create_github_pull_request(branch_name, version)
+            if pr_result:
+                github_results["pull_request"] = pr_result
+                
+        else:
+            github_results["push_status"] = "failed"
+            github_results["error"] = stderr
+        
+        github_results["execution_time"] = time.time() - github_results["start_time"]
+        
+        return github_results
+        
+    except Exception as e:
+        github_results["push_status"] = "failed"
+        github_results["error"] = str(e)
+        github_results["execution_time"] = time.time() - github_results["start_time"]
+        return github_results
+
+
+async def get_remote_url() -> Optional[str]:
+    """Get the remote GitHub URL"""
+    try:
+        cmd = ["git", "remote", "get-url", "origin"]
+        returncode, stdout, stderr = await pipeline_server.run_command(cmd)
+        if returncode == 0:
+            return stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+async def create_github_pull_request(branch_name: str, version: str) -> Optional[Dict[str, Any]]:
+    """Create a GitHub pull request for the version branch"""
+    try:
+        # Check if GitHub CLI is available
+        check_cmd = ["gh", "--version"]
+        returncode, stdout, stderr = await pipeline_server.run_command(check_cmd)
+        
+        if returncode != 0:
+            return {"status": "gh_cli_not_available", "message": "GitHub CLI not installed"}
+        
+        # Create pull request
+        pr_cmd = [
+            "gh", "pr", "create",
+            "--title", f"Version bump to {version}",
+            "--body", f"Automated version bump to {version} via semantic catalog tool",
+            "--base", "main",
+            "--head", branch_name
+        ]
+        
+        returncode, stdout, stderr = await pipeline_server.run_command(pr_cmd)
+        
+        if returncode == 0:
+            pr_url = stdout.strip()
+            return {
+                "status": "created",
+                "url": pr_url,
+                "title": f"Version bump to {version}",
+                "branch": branch_name
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": stderr,
+                "attempted_command": " ".join(pr_cmd)
+            }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 async def main():

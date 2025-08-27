@@ -46,6 +46,24 @@ The **Semantic Catalog Review Tool** is an advanced MCP (Model Context Protocol)
    - Structured data for easy integration
    - Real-time progress tracking
 
+7. **Auto-Fix Capability (NEW)**
+   - Automatic detection and fixing of code issues
+   - Integration with quality patcher for unlimited fixes
+   - Hierarchical protection during fix application
+   - Real-time fix monitoring and reporting
+
+8. **Claude Communication Integration (NEW)**
+   - Direct communication of results to Claude upon completion
+   - Includes diff summaries and version keeper issue totals
+   - Claude Agent Protocol integration for bidirectional communication
+   - Structured payload with compliance scores and branch information
+
+9. **GitHub API Integration (NEW)**
+   - Remote branch creation and pushing to GitHub
+   - Automatic pull request creation using GitHub CLI
+   - Remote repository URL detection
+   - Integration with existing git workflows
+
 ## Tool Interface
 
 ### Tool Name
@@ -64,7 +82,7 @@ The **Semantic Catalog Review Tool** is an advanced MCP (Model Context Protocol)
     },
     "action": {
       "type": "string",
-      "enum": ["full_review", "create_version_branch", "diff_analysis", "semantic_analysis", "compliance_check"],
+      "enum": ["full_review", "create_version_branch", "diff_analysis", "semantic_analysis", "compliance_check", "auto_fix"],
       "description": "Action to perform",
       "default": "full_review"
     },
@@ -108,6 +126,21 @@ The **Semantic Catalog Review Tool** is an advanced MCP (Model Context Protocol)
       "type": "boolean",
       "description": "Enable hierarchical protection for 100% reliability",
       "default": true
+    },
+    "auto_fix": {
+      "type": "boolean",
+      "description": "Enable automatic fixing of detected issues (NEW)",
+      "default": false
+    },
+    "communicate_to_claude": {
+      "type": "boolean", 
+      "description": "Communicate results including diffs and version keeper issues to Claude (NEW)",
+      "default": false
+    },
+    "github_integration": {
+      "type": "boolean",
+      "description": "Enable GitHub API integration for remote branch creation (NEW)",
+      "default": false
     }
   },
   "required": ["session_id"]
