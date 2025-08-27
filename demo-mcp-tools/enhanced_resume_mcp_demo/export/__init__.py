@@ -1,1 +1,0 @@
-"""\nExport component\n"""\n

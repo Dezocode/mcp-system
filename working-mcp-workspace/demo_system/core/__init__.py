@@ -1,1 +1,0 @@
-# Fixed syntax error\nCore component\n"""\n

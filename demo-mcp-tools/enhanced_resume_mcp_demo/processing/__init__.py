@@ -1,1 +1,0 @@
-"""\nProcessing component\n"""\n
