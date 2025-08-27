@@ -88,9 +88,7 @@ def nodejs_project_dir():
 
         import json
 
-        (project_path / "package.json").write_text(
-            json.dumps(package_json, indent=2)
-        )
+        (project_path / "package.json").write_text(json.dumps(package_json, indent=2))
         (project_path / "index.js").write_text("console.log('Hello, World!');")
 
         yield project_path

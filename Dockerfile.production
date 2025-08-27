@@ -1,0 +1,96 @@
+# Production Dockerfile for MCP System
+# Multi-stage build for optimized production image
+
+# Build stage
+FROM python:3.12-slim as builder
+
+# Set working directory
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js for TypeScript templates
+RUN apt-get update && apt-get install -y nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and build wheels with all dependencies
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+# Production stage
+FROM python:3.12-slim as production
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install Node.js (needed for runtime)  
+RUN apt-get update && apt-get install -y nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN useradd -m -u 1000 mcpuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy wheels from builder stage and install
+COPY --from=builder /build/wheels /wheels
+COPY requirements.txt .
+# Install from wheels but allow fetching missing dependencies from PyPI
+RUN pip install --no-cache-dir --find-links /wheels -r requirements.txt \
+    && rm -rf /wheels
+
+# Copy application code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY bin/ ./bin/
+COPY pyproject.toml .
+
+# Install the package with updated build system
+RUN pip install --upgrade pip && \
+    pip install --upgrade "hatchling>=1.18.0" && \
+    pip install --no-cache-dir -e .
+
+# Set ownership and switch to non-root user
+RUN chown -R mcpuser:mcpuser /app
+USER mcpuser
+
+# Set up MCP system directories
+RUN mkdir -p /home/mcpuser/.mcp-system/{components,docs,templates,backups,logs} && \
+    mkdir -p /home/mcpuser/bin
+
+# Set environment variables
+ENV PATH="/home/mcpuser/bin:$PATH"
+ENV MCP_SYSTEM_PATH="/home/mcpuser/.mcp-system"
+ENV MCP_AUTO_DISCOVERY=true
+ENV MCP_SAFE_MODE=true
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install MCP system
+RUN chmod +x bin/install.sh && ./bin/install.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import src; print('Health check passed')" || exit 1
+
+# Default command
+CMD ["mcp-universal", "--help"]
+
+# Production labels
+LABEL org.opencontainers.image.title="MCP System Production"
+LABEL org.opencontainers.image.description="Universal MCP server management system - Production build"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.vendor="DezoCode"
+LABEL org.opencontainers.image.source="https://github.com/dezocode/mcp-system"
+LABEL org.opencontainers.image.documentation="https://github.com/dezocode/mcp-system/blob/main/README.md"
+LABEL org.opencontainers.image.licenses="MIT"

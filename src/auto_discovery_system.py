@@ -4,10 +4,10 @@ MCP Auto Discovery System
 Automatically discover and manage MCP servers
 """
 
-import json
 import asyncio
+import json
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 class MCPAutoDiscovery:
@@ -15,8 +15,9 @@ class MCPAutoDiscovery:
 
     def __init__(self, system_path: str = None):
         self.home = Path.home()
-        self.system_path = (Path(system_path) if system_path
-                            else self.home / ".mcp-system")
+        self.system_path = (
+            Path(system_path) if system_path else self.home / ".mcp-system"
+        )
         self.discovery_cache = self.system_path / "discovery_cache.json"
 
     def discover_project_type(self, path: Path = None) -> List[str]:
@@ -27,8 +28,10 @@ class MCPAutoDiscovery:
         project_types = []
 
         # Python project indicators
-        if any(path.glob(pattern) for pattern in
-                ["*.py", "pyproject.toml", "setup.py", "requirements.txt"]):
+        if any(
+            path.glob(pattern)
+            for pattern in ["*.py", "pyproject.toml", "setup.py", "requirements.txt"]
+        ):
             project_types.append("python")
 
         # Node.js project indicators
@@ -40,8 +43,9 @@ class MCPAutoDiscovery:
             project_types.append("typescript")
 
         # Claude project indicators
-        if any(path.glob(pattern) for pattern in
-                [".claude", "CLAUDE.md", "claude.json"]):
+        if any(
+            path.glob(pattern) for pattern in [".claude", "CLAUDE.md", "claude.json"]
+        ):
             project_types.append("claude")
 
         # MCP server indicators
@@ -57,13 +61,20 @@ class MCPAutoDiscovery:
 
         for file in mcp_files:
             try:
-                with open(file, 'r') as f:
+                with open(file, "r") as f:
                     content = f.read()
-                    if any(indicator in content for indicator in [
-                        "from mcp", "import mcp", "fastmcp", "@mcp.tool"
-                    ]):
+                    if any(
+                        indicator in content
+                        for indicator in [
+                            "from mcp",
+                            "import mcp",
+                            "fastmcp",
+                            "@mcp.tool",
+                        ]
+                    ):
                         return True
-            except Exception:
+            except (IOError, OSError, PermissionError):
+                # Log specific file access errors but continue processing
                 continue
 
         return False
@@ -78,53 +89,63 @@ class MCPAutoDiscovery:
         # Look for Python MCP servers
         for py_file in path.glob("**/*.py"):
             if self._is_mcp_server(py_file):
-                servers.append({
-                    "name": py_file.stem,
-                    "path": str(py_file),
-                    "type": "python",
-                    "auto_discovered": True
-                })
+                servers.append(
+                    {
+                        "name": py_file.stem,
+                        "path": str(py_file),
+                        "type": "python",
+                        "auto_discovered": True,
+                    }
+                )
 
         # Look for Node.js MCP servers
         for js_file in path.glob("**/*.js"):
             if self._is_mcp_server_js(js_file):
-                servers.append({
-                    "name": js_file.stem,
-                    "path": str(js_file),
-                    "type": "nodejs",
-                    "auto_discovered": True
-                })
+                servers.append(
+                    {
+                        "name": js_file.stem,
+                        "path": str(js_file),
+                        "type": "nodejs",
+                        "auto_discovered": True,
+                    }
+                )
 
         return servers
 
     def _is_mcp_server(self, file_path: Path) -> bool:
         """Check if a Python file is an MCP server"""
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
-                return any(pattern in content for pattern in [
-                    "from mcp",
-                    "import mcp",
-                    "fastmcp",
-                    "@mcp.tool",
-                    "mcp.server",
-                    "MCPServer"
-                ])
+                return any(
+                    pattern in content
+                    for pattern in [
+                        "from mcp",
+                        "import mcp",
+                        "fastmcp",
+                        "@mcp.tool",
+                        "mcp.server",
+                        "MCPServer",
+                    ]
+                )
         except Exception:
             return False
 
     def _is_mcp_server_js(self, file_path: Path) -> bool:
         """Check if a JavaScript file is an MCP server"""
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
-                return any(pattern in content for pattern in [
-                    "@modelcontextprotocol/sdk",
-                    "McpServer",
-                    "createMcpServer",
-                    "tool:",
-                    "resource:"
-                ])
+                return any(
+                    pattern in content
+                    for pattern in [
+                        "@modelcontextprotocol/sdk",
+                        "McpServer",
+                        "createMcpServer",
+                        "tool:",
+                        "resource:",
+                    ]
+                )
         except Exception:
             return False
 
@@ -132,7 +153,7 @@ class MCPAutoDiscovery:
         """Save discovery results to cache"""
         try:
             self.system_path.mkdir(parents=True, exist_ok=True)
-            with open(self.discovery_cache, 'w') as f:
+            with open(self.discovery_cache, "w") as f:
                 json.dump(data, f, indent=2)
             return True
         except Exception as e:
@@ -143,7 +164,7 @@ class MCPAutoDiscovery:
         """Load discovery results from cache"""
         try:
             if self.discovery_cache.exists():
-                with open(self.discovery_cache, 'r') as f:
+                with open(self.discovery_cache, "r") as f:
                     return json.load(f)
         except Exception as e:
             print(f"Failed to load discovery cache: {e}")
@@ -159,7 +180,7 @@ class MCPAutoDiscovery:
             "path": str(path),
             "project_types": self.discover_project_type(path),
             "mcp_servers": self.discover_mcp_servers(path),
-            "recommendations": self._generate_recommendations(path)
+            "recommendations": self._generate_recommendations(path),
         }
 
         self.save_discovery_cache(results)
@@ -180,7 +201,7 @@ class MCPAutoDiscovery:
             "existing_servers": existing_servers,
             "suggested_servers": [],
             "opportunities": [],
-            "complexity": "simple"
+            "complexity": "simple",
         }
 
         # Generate suggested servers based on project types
@@ -243,14 +264,14 @@ def main():
     print(f"Project types: {', '.join(results['project_types'])}")
     print(f"MCP servers found: {len(results['mcp_servers'])}")
 
-    if results['mcp_servers']:
+    if results["mcp_servers"]:
         print("\nDiscovered MCP servers:")
-        for server in results['mcp_servers']:
+        for server in results["mcp_servers"]:
             print(f"  • {server['name']} ({server['type']}) - {server['path']}")
 
-    if results['recommendations']:
+    if results["recommendations"]:
         print("\nRecommendations:")
-        for rec in results['recommendations']:
+        for rec in results["recommendations"]:
             print(f"  💡 {rec}")
 
     print(f"\n✅ Discovery complete! Results cached in {discovery.discovery_cache}")

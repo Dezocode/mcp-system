@@ -1,0 +1,392 @@
+name: Automated Version Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Custom version (optional, overrides version_type)'
+        required: false
+        type: string
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        default: true
+        type: boolean
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'requirements.txt'
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  detect-version-bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      should_bump: ${{ steps.check.outputs.should_bump }}
+      version_type: ${{ steps.check.outputs.version_type }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      current_version: ${{ steps.check.outputs.current_version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install version management tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install packaging toml
+
+    - name: Detect version bump requirements
+      id: check
+      run: |
+        set -e  # Exit on any error
+        
+        # Get current version from pyproject.toml
+        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])" 2>/dev/null || echo "1.0.0")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Check if this is a manual trigger
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "should_bump=true" >> $GITHUB_OUTPUT
+          
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            echo "new_version=${{ inputs.custom_version }}" >> $GITHUB_OUTPUT
+            echo "version_type=custom" >> $GITHUB_OUTPUT
+          else
+            echo "version_type=${{ inputs.version_type }}" >> $GITHUB_OUTPUT
+            
+            # Calculate new version based on type
+            NEW_VERSION=$(CURRENT_VERSION="$CURRENT_VERSION" BUMP_TYPE="${{ inputs.version_type }}" python3 << 'EOF'
+        import os
+        import sys
+        from packaging.version import Version
+        
+        current = Version(os.environ['CURRENT_VERSION'])
+        bump_type = os.environ['BUMP_TYPE']
+        
+        if bump_type == "major":
+            new = Version(f"{current.major + 1}.0.0")
+        elif bump_type == "minor":
+            new = Version(f"{current.major}.{current.minor + 1}.0")
+        else:  # patch
+            new = Version(f"{current.major}.{current.minor}.{current.micro + 1}")
+        
+        print(str(new))
+        EOF
+            )
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          fi
+        else
+          # Auto-detect based on commit messages since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            # No tags yet, check if significant changes warrant initial bump
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            if [ "$COMMIT_COUNT" -gt 5 ]; then
+              echo "should_bump=true" >> $GITHUB_OUTPUT
+              echo "version_type=patch" >> $GITHUB_OUTPUT
+            else
+              echo "should_bump=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Check commits since last tag for breaking changes, features, or fixes
+            COMMITS_SINCE_TAG=$(git rev-list ${LAST_TAG}..HEAD --pretty=format:"%s")
+            
+            if echo "$COMMITS_SINCE_TAG" | grep -qi "BREAKING\|breaking change\|major:"; then
+              echo "should_bump=true" >> $GITHUB_OUTPUT
+              echo "version_type=major" >> $GITHUB_OUTPUT
+            elif echo "$COMMITS_SINCE_TAG" | grep -qi "feat:\|feature:\|minor:"; then
+              echo "should_bump=true" >> $GITHUB_OUTPUT
+              echo "version_type=minor" >> $GITHUB_OUTPUT
+            elif echo "$COMMITS_SINCE_TAG" | grep -qi "fix:\|patch:\|security:"; then
+              echo "should_bump=true" >> $GITHUB_OUTPUT
+              echo "version_type=patch" >> $GITHUB_OUTPUT
+            else
+              # Check if enough commits for automatic patch bump
+              COMMIT_COUNT=$(echo "$COMMITS_SINCE_TAG" | wc -l)
+              if [ "$COMMIT_COUNT" -gt 10 ]; then
+                echo "should_bump=true" >> $GITHUB_OUTPUT
+                echo "version_type=patch" >> $GITHUB_OUTPUT
+              else
+                echo "should_bump=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          fi
+          
+          # Calculate new version if bump needed
+          if [ "$(cat $GITHUB_OUTPUT | grep should_bump=true)" ]; then
+            VERSION_TYPE=$(cat $GITHUB_OUTPUT | grep version_type | cut -d'=' -f2)
+            NEW_VERSION=$(CURRENT_VERSION="$CURRENT_VERSION" VERSION_TYPE="$VERSION_TYPE" python3 << 'EOF'
+        import os
+        import sys
+        from packaging.version import Version
+        
+        current = Version(os.environ['CURRENT_VERSION'])
+        bump_type = os.environ['VERSION_TYPE']
+        
+        if bump_type == "major":
+            new = Version(f"{current.major + 1}.0.0")
+        elif bump_type == "minor":
+            new = Version(f"{current.major}.{current.minor + 1}.0")
+        else:  # patch
+            new = Version(f"{current.major}.{current.minor}.{current.micro + 1}")
+        
+        print(str(new))
+        EOF
+            )
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+        echo "🔍 Version Check Results:"
+        echo "  Current Version: $CURRENT_VERSION"
+        echo "  Should Bump: $(cat $GITHUB_OUTPUT | grep should_bump | cut -d'=' -f2)"
+        if [ "$(cat $GITHUB_OUTPUT | grep should_bump=true)" ]; then
+          echo "  Version Type: $(cat $GITHUB_OUTPUT | grep version_type | cut -d'=' -f2)"
+          echo "  New Version: $(cat $GITHUB_OUTPUT | grep new_version | cut -d'=' -f2)"
+        fi
+
+  create-version-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: detect-version-bump
+    if: needs.detect-version-bump.outputs.should_bump == 'true'
+    outputs:
+      branch_name: ${{ steps.create.outputs.branch_name }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Create version branch and update files
+      id: create
+      run: |
+        NEW_VERSION="${{ needs.detect-version-bump.outputs.new_version }}"
+        BRANCH_NAME="version-${NEW_VERSION}"
+        
+        echo "🌿 Creating version branch: $BRANCH_NAME"
+        
+        # Create and switch to version branch
+        git checkout -b "$BRANCH_NAME"
+        
+        # Update pyproject.toml version (in-place, no local files added to user's workspace)
+        NEW_VERSION="$NEW_VERSION" python3 << 'EOF'
+        import toml
+        import sys
+        import os
+        
+        try:
+            new_version = os.environ['NEW_VERSION']
+            
+            # Load pyproject.toml
+            with open('pyproject.toml', 'r') as f:
+                data = toml.load(f)
+            
+            # Update version
+            data['project']['version'] = new_version
+            
+            # Save back to file
+            with open('pyproject.toml', 'w') as f:
+                toml.dump(data, f)
+            
+            print(f"✅ Updated pyproject.toml version to {new_version}")
+        except Exception as e:
+            print(f"❌ Failed to update pyproject.toml: {e}")
+            sys.exit(1)
+        EOF
+        
+        # Update __init__.py version if it exists
+        if [ -f "src/__init__.py" ]; then
+          sed -i "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" src/__init__.py
+          echo "✅ Updated src/__init__.py version to $NEW_VERSION"
+        fi
+        
+        # Commit changes
+        git add pyproject.toml
+        if [ -f "src/__init__.py" ]; then
+          git add src/__init__.py
+        fi
+        
+        git commit -m "🚀 Bump version to $NEW_VERSION
+
+        - Version type: ${{ needs.detect-version-bump.outputs.version_type }}
+        - Previous version: ${{ needs.detect-version-bump.outputs.current_version }}
+        - Auto-generated by GitHub Actions
+
+        🤖 Generated with [Claude Code](https://claude.ai/code)
+
+        Co-Authored-By: Claude <noreply@anthropic.com>"
+        
+        # Push version branch
+        git push origin "$BRANCH_NAME"
+        
+        echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+        echo "✅ Version branch $BRANCH_NAME created and pushed"
+
+  create-tag-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect-version-bump, create-version-branch]
+    if: needs.detect-version-bump.outputs.should_bump == 'true'
+    
+    steps:
+    - name: Checkout version branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.create-version-branch.outputs.branch_name }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Create and push tag
+      run: |
+        NEW_VERSION="${{ needs.detect-version-bump.outputs.new_version }}"
+        TAG_NAME="v${NEW_VERSION}"
+        
+        echo "🏷️ Creating tag: $TAG_NAME"
+        
+        # Create annotated tag
+        git tag -a "$TAG_NAME" -m "Release $TAG_NAME
+
+        📦 Version $NEW_VERSION release
+        🔄 Version type: ${{ needs.detect-version-bump.outputs.version_type }}
+        📅 Release date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+        ## Automated Release
+        This release was automatically created by GitHub Actions based on:
+        - Detected changes requiring ${{ needs.detect-version-bump.outputs.version_type }} version bump
+        - Previous version: ${{ needs.detect-version-bump.outputs.current_version }}
+        - New version: $NEW_VERSION
+        
+        See [CHANGELOG.md](https://github.com/dezocode/mcp-system/blob/main/CHANGELOG.md) for detailed changes.
+        
+        🤖 Generated with [Claude Code](https://claude.ai/code)"
+        
+        # Push tag (this will trigger the release.yml workflow)
+        git push origin "$TAG_NAME"
+        
+        echo "✅ Tag $TAG_NAME created and pushed"
+
+    - name: Create GitHub Release
+      if: ${{ inputs.create_release != false }}
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ needs.detect-version-bump.outputs.new_version }}
+        release_name: Release v${{ needs.detect-version-bump.outputs.new_version }}
+        body: |
+          ## 🚀 MCP System v${{ needs.detect-version-bump.outputs.new_version }}
+          
+          **Version Type:** ${{ needs.detect-version-bump.outputs.version_type }}  
+          **Previous Version:** ${{ needs.detect-version-bump.outputs.current_version }}
+          
+          ### 🔄 Automated Release
+          This release was automatically created based on detected changes requiring a ${{ needs.detect-version-bump.outputs.version_type }} version bump.
+          
+          ### 📋 Changes
+          See [CHANGELOG.md](https://github.com/dezocode/mcp-system/blob/main/CHANGELOG.md) for detailed changes since the last release.
+          
+          ### 🛠️ Installation
+          
+          #### One-Click Installation
+          ```bash
+          curl -sSL https://raw.githubusercontent.com/dezocode/mcp-system/main/install.sh | bash
+          ```
+          
+          #### Docker
+          ```bash
+          docker run --rm -it dezocode/mcp-system:v${{ needs.detect-version-bump.outputs.new_version }} mcp-universal --help
+          ```
+          
+          #### PyPI
+          ```bash
+          pip install mcp-system==${{ needs.detect-version-bump.outputs.new_version }}
+          ```
+          
+          ### 🔗 Links
+          - [📦 PyPI Package](https://pypi.org/project/mcp-system/${{ needs.detect-version-bump.outputs.new_version }}/)
+          - [🐳 Docker Image](https://hub.docker.com/r/dezocode/mcp-system/tags)
+          - [📚 Documentation](https://github.com/dezocode/mcp-system/blob/main/README.md)
+          - [🐛 Report Issues](https://github.com/dezocode/mcp-system/issues)
+          
+          ---
+          🤖 *This release was automatically generated by GitHub Actions*
+        draft: false
+        prerelease: false
+
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [detect-version-bump, create-version-branch, create-tag-and-release]
+    if: always() && needs.detect-version-bump.outputs.should_bump == 'true'
+    
+    steps:
+    - name: Cleanup summary
+      run: |
+        echo "## 🎯 Version Management Complete"
+        echo ""
+        
+        if [ "${{ needs.create-tag-and-release.result }}" = "success" ]; then
+          echo "✅ **Success**: Version ${{ needs.detect-version-bump.outputs.new_version }} released"
+          echo "🌿 **Branch**: ${{ needs.create-version-branch.outputs.branch_name }}"
+          echo "🏷️ **Tag**: v${{ needs.detect-version-bump.outputs.new_version }}"
+          echo "📦 **Type**: ${{ needs.detect-version-bump.outputs.version_type }} release"
+          echo ""
+          echo "### 🚀 What Happened:"
+          echo "1. Detected need for ${{ needs.detect-version-bump.outputs.version_type }} version bump"
+          echo "2. Created version branch: ${{ needs.create-version-branch.outputs.branch_name }}"
+          echo "3. Updated pyproject.toml version (server-side only)"
+          echo "4. Created and pushed git tag: v${{ needs.detect-version-bump.outputs.new_version }}"
+          echo "5. Triggered release workflow for PyPI/Docker publishing"
+          echo ""
+          echo "### 📋 Next Steps:"
+          echo "- Monitor release.yml workflow for PyPI/Docker publishing"
+          echo "- Check GitHub Releases page for the new release"
+          echo "- Version branch available for review: ${{ needs.create-version-branch.outputs.branch_name }}"
+          echo ""
+          echo "### 🔗 Important Links:"
+          echo "- [📦 PyPI Package](https://pypi.org/project/mcp-system/)"
+          echo "- [🐳 Docker Hub](https://hub.docker.com/r/dezocode/mcp-system)"
+          echo "- [🎯 GitHub Releases](https://github.com/dezocode/mcp-system/releases)"
+        else
+          echo "❌ **Failed**: Version release process encountered errors"
+          echo "🔍 Check the workflow logs for details"
+        fi

@@ -9,25 +9,26 @@ import json
 import time
 from pathlib import Path
 
+
 def main():
     """Main health check function"""
     try:
         # Add src to path
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        
+
         # Import and run health check
         from docker.health_check import docker_health_check
         from config.config_manager import config_manager
-        
+
         # Set config manager for health check
         docker_health_check.config_manager = config_manager
-        
+
         # Perform health check
         response = docker_health_check.get_health_check_endpoint_response()
-        
+
         # Print JSON response
         print(json.dumps(response, indent=2))
-        
+
         # Exit with appropriate code
         if response["status"] == "healthy":
             sys.exit(0)
@@ -35,7 +36,6 @@ def main():
             sys.exit(1)  # Warning state
         else:
             sys.exit(2)  # Critical state
-            
     except Exception as e:
         # Health check itself failed
         error_response = {
@@ -46,6 +46,7 @@ def main():
         }
         print(json.dumps(error_response, indent=2))
         sys.exit(2)
+
 
 if __name__ == "__main__":
     main()

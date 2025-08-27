@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js for TypeScript templates
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+RUN apt-get update && apt-get install -y nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -22,12 +22,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 COPY scripts/ ./scripts/
-COPY templates/ ./templates/
-COPY install.sh .
+COPY bin/ ./bin/
 COPY pyproject.toml .
 
-# Install the package
-RUN pip install -e .
+# Install the package with updated build system
+RUN pip install --upgrade pip && \
+    pip install --upgrade "hatchling>=1.18.0" && \
+    pip install -e .
 
 # Create non-root user
 RUN useradd -m -u 1000 mcpuser && \
@@ -45,7 +46,7 @@ ENV MCP_AUTO_DISCOVERY=true
 ENV MCP_SAFE_MODE=true
 
 # Install MCP system
-RUN ./install.sh
+RUN chmod +x bin/install.sh && ./bin/install.sh
 
 # Default command
 CMD ["mcp-universal", "--help"]

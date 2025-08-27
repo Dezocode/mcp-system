@@ -4,10 +4,10 @@ Claude Code MCP Bridge
 Bridge between Claude Code and MCP servers
 """
 
-import os
 import json
+import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class ClaudeCodeMCPBridge:
@@ -15,17 +15,20 @@ class ClaudeCodeMCPBridge:
 
     def __init__(self, config_path: str = None):
         self.home = Path.home()
-        self.claude_config_path = (Path(config_path) if config_path
-                                   else self.home / ".claude" /
-                                   "claude_desktop_config.json")
-        self.mcp_system_path = (Path(os.getenv("MCP_SYSTEM_PATH",
-                                               self.home / ".mcp-system")))
+        self.claude_config_path = (
+            Path(config_path)
+            if config_path
+            else self.home / ".claude" / "claude_desktop_config.json"
+        )
+        self.mcp_system_path = Path(
+            os.getenv("MCP_SYSTEM_PATH", self.home / ".mcp-system")
+        )
 
     def load_claude_config(self) -> Dict[str, Any]:
         """Load Claude configuration"""
         try:
             if self.claude_config_path.exists():
-                with open(self.claude_config_path, 'r') as f:
+                with open(self.claude_config_path, "r") as f:
                     return json.load(f)
             return {}
         except Exception as e:
@@ -36,7 +39,7 @@ class ClaudeCodeMCPBridge:
         """Save Claude configuration"""
         try:
             self.claude_config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.claude_config_path, 'w') as f:
+            with open(self.claude_config_path, "w") as f:
                 json.dump(config, f, indent=2)
             return True
         except Exception as e:
@@ -65,8 +68,9 @@ class ClaudeCodeMCPBridge:
             print(f"Error merging Claude config: {e}")
             return False
 
-    def register_mcp_server(self, server_name: str, command: str,
-                            args: list = None, env: dict = None) -> bool:
+    def register_mcp_server(
+        self, server_name: str, command: str, args: list = None, env: dict = None
+    ) -> bool:
         """Register an MCP server with Claude"""
         config = self.load_claude_config()
 
@@ -76,7 +80,7 @@ class ClaudeCodeMCPBridge:
         config["mcpServers"][server_name] = {
             "command": command,
             "args": args or [],
-            "env": env or {}
+            "env": env or {},
         }
 
         return self.save_claude_config(config)
@@ -112,7 +116,7 @@ class ClaudeCodeMCPBridge:
                         server_name,
                         "python",
                         [str(py_file)],
-                        {"PYTHONPATH": str(current_dir)}
+                        {"PYTHONPATH": str(current_dir)},
                     ):
                         print(f"✅ Registered MCP server: {server_name}")
                         registered += 1
@@ -129,29 +133,27 @@ class ClaudeCodeMCPBridge:
                     "env": {
                         "MCP_SYSTEM_PATH": str(self.mcp_system_path),
                         "MCP_AUTO_DISCOVERY": "true",
-                        "MCP_SAFE_MODE": "true"
-                    }
+                        "MCP_SAFE_MODE": "true",
+                    },
                 }
             },
             "security": {
                 "safe_mode": True,
                 "auto_discovery": True,
-                "rate_limiting": True
-            }
+                "rate_limiting": True,
+            },
         }
 
     def _is_mcp_server_file(self, file_path: Path) -> bool:
         """Check if a Python file is an MCP server"""
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 content = f.read()
                 # Simple heuristic - look for MCP-related imports
-                return any(pattern in content for pattern in [
-                    "from mcp",
-                    "import mcp",
-                    "fastmcp",
-                    "@mcp.tool"
-                ])
+                return any(
+                    pattern in content
+                    for pattern in ["from mcp", "import mcp", "fastmcp", "@mcp.tool"]
+                )
         except Exception:
             return False
 
@@ -198,7 +200,7 @@ def main():
         if servers:
             print("Registered MCP servers:")
             for name, config in servers.items():
-                args_str = ' '.join(config.get('args', []))
+                args_str = " ".join(config.get("args", []))
                 print(f"  {name}: {config['command']} {args_str}")
         else:
             print("No MCP servers registered")

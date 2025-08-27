@@ -163,6 +163,9 @@ Dockerfile.*
 /.mcp-pipeline-logs/
 *.log
 
+# Security scan reports
+bandit-report.json
+
 # Backup and trash directories
 /.mcp-system-backups-disconnected/
 /.mcp-system-trash-internal/
