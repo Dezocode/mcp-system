@@ -501,14 +501,6 @@ return {
         if self.enable_watchdog:
             return await self.compliance_validator.validate_server(server_path)
         return {"error": "Watchdog not enabled"}
-            "success": build_result.get("success", False)
-        }
-        
-        self.build_history.append(build_record)
-        
-        logger.info(f"Resume MCP Server build: {'✅ SUCCESS' if build_record['success'] else '❌ FAILED'}")
-        
-        return build_record
     
     def _generate_resume_mcp_tools_implementation(self) -> str:
         """Generate MCP tools implementation for resume server"""
