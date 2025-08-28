@@ -1500,26 +1500,196 @@ def {func_call.name}(*args, **kwargs):
         }
     
     def generate_report(self) -> Dict:
-        """Generate comprehensive autofix report"""
-        self.log("Generating autofix report...")
+        """
+        Generate comprehensive autofix report with detailed analytics
         
+        Returns:
+            Complete report dictionary
+        """
+        self.log("Generating comprehensive autofix report...")
+        
+        execution_time = time.time() - self.start_time
+        
+        # Build comprehensive report
         report = {
-            'timestamp': str(Path.cwd()),
-            'summary': {
-                'fixes_applied': self.fixes_applied,
-                'issues_found': self.issues_found,
-                'dry_run': self.dry_run
+            'metadata': {
+                'session_id': self.session_id,
+                'timestamp': datetime.now().isoformat(),
+                'execution_time_seconds': round(execution_time, 2),
+                'repository_path': str(self.repo_path),
+                'dry_run_mode': self.dry_run,
+                'verbose_mode': self.verbose,
+                'autofix_version': '2.0.0'
             },
-            'results': self.results
+            'summary': {
+                'total_fixes_applied': self.fixes_applied,
+                'total_issues_found': self.issues_found,
+                'completion_status': 'completed',
+                'phases_executed': len(self.results)
+            },
+            'phase_results': self.results,
+            'recommendations': [],
+            'next_steps': []
         }
         
-        # Save report
-        report_file = self.repo_path / "autofix-report.json"
-        with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
+        # Calculate detailed statistics
+        stats = {
+            'files_processed': 0,
+            'files_modified': 0,
+            'security_issues': 0,
+            'quality_issues': 0,
+            'type_errors': 0,
+            'test_failures': 0
+        }
         
-        self.log(f"Report saved: {report_file}", "success")
+        # Aggregate statistics from phase results
+        for phase_name, phase_result in self.results.items():
+            if isinstance(phase_result, dict):
+                # Count files processed
+                if 'files_processed' in phase_result:
+                    stats['files_processed'] += phase_result.get('files_processed', 0)
+                if 'files_modified' in phase_result:
+                    stats['files_modified'] += phase_result.get('files_modified', 0)
+                
+                # Count specific issue types
+                if 'issues_found' in phase_result:
+                    if 'security' in phase_name:
+                        stats['security_issues'] += phase_result.get('issues_found', 0)
+                    elif 'type' in phase_name:
+                        stats['type_errors'] += phase_result.get('issues_found', 0)
+                    elif 'test' in phase_name:
+                        stats['test_failures'] += phase_result.get('issues_found', 0)
+                    else:
+                        stats['quality_issues'] += phase_result.get('issues_found', 0)
+        
+        report['statistics'] = stats
+        
+        # Generate recommendations based on results
+        recommendations = []
+        
+        if stats['security_issues'] > 0:
+            recommendations.append({
+                'category': 'security',
+                'priority': 'high',
+                'message': f"Found {stats['security_issues']} security issues. Review and address remaining vulnerabilities.",
+                'action': 'Review security scan report and implement additional security measures.'
+            })
+        
+        if stats['type_errors'] > 0:
+            recommendations.append({
+                'category': 'typing',
+                'priority': 'medium',
+                'message': f"Found {stats['type_errors']} type-related issues. Consider adding more type annotations.",
+                'action': 'Run mypy with stricter settings and add missing type annotations.'
+            })
+        
+        if self.fixes_applied == 0:
+            recommendations.append({
+                'category': 'maintenance',
+                'priority': 'low',
+                'message': 'No fixes were applied. Code appears to be in good condition.',
+                'action': 'Continue regular maintenance and periodic autofix runs.'
+            })
+        elif self.fixes_applied > 50:
+            recommendations.append({
+                'category': 'maintenance',
+                'priority': 'medium',
+                'message': f'Applied {self.fixes_applied} fixes. Consider implementing pre-commit hooks.',
+                'action': 'Set up automated code formatting and linting in your development workflow.'
+            })
+        
+        report['recommendations'] = recommendations
+        
+        # Generate next steps
+        next_steps = [
+            'Review the detailed phase results for any remaining issues',
+            'Run tests to ensure all fixes are working correctly',
+            'Consider implementing pre-commit hooks for continuous code quality',
+            'Schedule regular autofix runs as part of maintenance workflow'
+        ]
+        
+        if self.dry_run:
+            next_steps.insert(0, 'Run autofix without --dry-run flag to apply the suggested changes')
+        
+        report['next_steps'] = next_steps
+        
+        # Save comprehensive report
+        report_file = self.report_dir / f"autofix-report-{self.session_id}.json"
+        
+        try:
+            with open(report_file, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            
+            # Also save a human-readable summary
+            summary_file = self.report_dir / f"autofix-summary-{self.session_id}.txt"
+            self._generate_text_summary(report, summary_file)
+            
+            self.log(f"Comprehensive report saved: {report_file}", "success")
+            self.log(f"Human-readable summary: {summary_file}", "success")
+            
+        except Exception as e:
+            self.log(f"Failed to save report: {e}", "error")
+            # Return report anyway so caller can still use it
+        
         return report
+    
+    def _generate_text_summary(self, report: Dict, output_file: Path) -> None:
+        """Generate human-readable text summary of the autofix results"""
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write("="*60 + "\n")
+                f.write("MCP Autofix - Execution Summary\n")
+                f.write("="*60 + "\n\n")
+                
+                # Metadata
+                metadata = report.get('metadata', {})
+                f.write(f"Session ID: {metadata.get('session_id', 'N/A')}\n")
+                f.write(f"Timestamp: {metadata.get('timestamp', 'N/A')}\n")
+                f.write(f"Execution Time: {metadata.get('execution_time_seconds', 0)} seconds\n")
+                f.write(f"Repository: {metadata.get('repository_path', 'N/A')}\n")
+                f.write(f"Mode: {'DRY RUN' if metadata.get('dry_run_mode') else 'LIVE EXECUTION'}\n\n")
+                
+                # Summary
+                summary = report.get('summary', {})
+                f.write("SUMMARY\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Total Fixes Applied: {summary.get('total_fixes_applied', 0)}\n")
+                f.write(f"Total Issues Found: {summary.get('total_issues_found', 0)}\n")
+                f.write(f"Phases Executed: {summary.get('phases_executed', 0)}\n")
+                f.write(f"Status: {summary.get('completion_status', 'unknown').upper()}\n\n")
+                
+                # Statistics
+                stats = report.get('statistics', {})
+                f.write("STATISTICS\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Files Processed: {stats.get('files_processed', 0)}\n")
+                f.write(f"Files Modified: {stats.get('files_modified', 0)}\n")
+                f.write(f"Security Issues: {stats.get('security_issues', 0)}\n")
+                f.write(f"Quality Issues: {stats.get('quality_issues', 0)}\n")
+                f.write(f"Type Errors: {stats.get('type_errors', 0)}\n")
+                f.write(f"Test Failures: {stats.get('test_failures', 0)}\n\n")
+                
+                # Recommendations
+                recommendations = report.get('recommendations', [])
+                if recommendations:
+                    f.write("RECOMMENDATIONS\n")
+                    f.write("-" * 20 + "\n")
+                    for i, rec in enumerate(recommendations, 1):
+                        f.write(f"{i}. [{rec.get('priority', 'medium').upper()}] {rec.get('message', 'N/A')}\n")
+                        f.write(f"   Action: {rec.get('action', 'N/A')}\n\n")
+                
+                # Next steps
+                next_steps = report.get('next_steps', [])
+                if next_steps:
+                    f.write("NEXT STEPS\n")
+                    f.write("-" * 20 + "\n")
+                    for i, step in enumerate(next_steps, 1):
+                        f.write(f"{i}. {step}\n")
+                
+                f.write("\n" + "="*60 + "\n")
+                
+        except Exception as e:
+            self.log(f"Failed to generate text summary: {e}", "error")
     
     def parse_mypy_errors(self, mypy_report: str) -> List[Dict]:
         """Parse mypy errors for type-related issues"""
@@ -1800,59 +1970,132 @@ def {func_call.name}(*args, **kwargs):
             'remaining_failures': 'unknown'
         }
     
+    def _validate_environment(self) -> bool:
+        """Validate that the environment is suitable for autofix operations"""
+        try:
+            # Check Python version
+            if sys.version_info < (3, 6):
+                self.log("Python 3.6 or higher is required", "error")
+                return False
+            
+            # Check repository path exists and is writable
+            if not self.repo_path.exists():
+                self.log(f"Repository path does not exist: {self.repo_path}", "error")
+                return False
+            
+            if not os.access(self.repo_path, os.W_OK):
+                self.log(f"Repository path is not writable: {self.repo_path}", "error")
+                return False
+            
+            # Check if we have Python files to process
+            python_files = list(self.repo_path.rglob("*.py"))
+            if not python_files:
+                self.log("No Python files found in repository", "warning")
+                return True  # Not an error, just nothing to do
+            
+            self.log(f"Environment validation passed - found {len(python_files)} Python files", "verbose")
+            return True
+            
+        except Exception as e:
+            self.log(f"Environment validation failed: {e}", "error")
+            return False
+    
+    def _execute_phase(self, phase_name: str, phase_func: callable, description: str) -> bool:
+        """
+        Execute a single autofix phase with error handling
+        
+        Args:
+            phase_name: Name of the phase for tracking
+            phase_func: Function to execute
+            description: Human-readable description
+            
+        Returns:
+            True if phase completed successfully
+        """
+        try:
+            self.log(f"Starting {description}...")
+            phase_start = time.time()
+            
+            result = phase_func()
+            
+            phase_duration = time.time() - phase_start
+            self.results[phase_name] = result
+            
+            if isinstance(result, dict) and result.get('error'):
+                self.log(f"{description} completed with errors: {result['error']}", "warning")
+                return False
+            else:
+                self.log(f"{description} completed successfully in {phase_duration:.2f}s", "success")
+                return True
+                
+        except Exception as e:
+            error_msg = f"{description} failed with exception: {e}"
+            self.log(error_msg, "error")
+            self.logger.exception(f"Exception in phase {phase_name}")
+            self.results[phase_name] = {'error': str(e)}
+            return False
+    
     def run_complete_autofix(self) -> Dict:
-        """Run complete autofix process with enhanced capabilities"""
+        """
+        Run complete autofix process with enhanced capabilities and better error handling
+        
+        Returns:
+            Comprehensive report dictionary
+        """
         self.log("🛠️ Starting Enhanced MCP Autofix Process...")
+        self.log(f"Session ID: {self.session_id}")
+        self.log(f"Repository: {self.repo_path}")
+        self.log(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE EXECUTION'}")
         
-        # Install tools first
+        # Environment validation
+        if not self._validate_environment():
+            return {'error': 'environment_validation_failed', 'session_id': self.session_id}
+        
+        # Tool installation and verification
         if not self.install_tools():
-            self.log("Failed to install required tools", "error")
-            return {'error': 'tool_installation_failed'}
+            return {'error': 'tool_installation_failed', 'session_id': self.session_id}
         
-        # Phase 1: Code formatting (existing)
-        self.log("Phase 1: Code formatting...")
-        self.results['formatting'] = self.fix_code_formatting()
+        # Define autofix phases
+        phases = [
+            ('formatting', self.fix_code_formatting, 'Code formatting with Black and isort'),
+            ('whitespace', self.fix_whitespace_issues, 'Whitespace and basic formatting cleanup'),
+            ('security_fixes', self.fix_security_issues, 'Security vulnerability fixes'),
+            ('undefined_fixes', self.fix_undefined_functions, 'Undefined function resolution'),
+            ('duplicate_fixes', self.fix_duplicate_functions, 'Duplicate function consolidation'),
+            ('type_fixes', self.fix_type_errors, 'Type error corrections'),
+            ('test_fixes', self.fix_test_failures, 'Test failure repairs'),
+        ]
         
-        # Phase 2: Whitespace cleanup (existing)
-        self.log("Phase 2: Whitespace cleanup...")
-        self.results['whitespace'] = self.fix_whitespace_issues()
+        # Analysis phases (run after fixes)
+        analysis_phases = [
+            ('security_scan', self.run_security_scan, 'Final security analysis'),
+            ('quality_analysis', self.run_quality_analysis, 'Final quality analysis'),
+            ('test_run', self.run_tests, 'Final test execution'),
+        ]
         
-        # Phase 3: Security fixes (enhanced)
-        self.log("Phase 3: Security fixes...")
-        self.results['security_fixes'] = self.fix_security_issues()
+        # Execute fix phases
+        successful_phases = 0
+        total_phases = len(phases) + len(analysis_phases)
         
-        # Phase 4: Undefined function resolution (new)
-        self.log("Phase 4: Undefined function resolution...")
-        self.results['undefined_fixes'] = self.fix_undefined_functions()
+        for phase_name, phase_func, description in phases:
+            if self._execute_phase(phase_name, phase_func, description):
+                successful_phases += 1
         
-        # Phase 5: Duplicate function consolidation (new)
-        self.log("Phase 5: Duplicate function consolidation...")
-        self.results['duplicate_fixes'] = self.fix_duplicate_functions()
-        
-        # Phase 6: Type error fixes (new)
-        self.log("Phase 6: Type error fixes...")
-        self.results['type_fixes'] = self.fix_type_errors()
-        
-        # Phase 7: Test failure repairs (new)
-        self.log("Phase 7: Test failure repairs...")
-        self.results['test_fixes'] = self.fix_test_failures()
-        
-        # Phase 8: Security scan (existing)
-        self.log("Phase 8: Final security scan...")
-        self.results['security'] = self.run_security_scan()
-        
-        # Phase 9: Quality analysis (existing)
-        self.log("Phase 9: Final quality analysis...")
-        self.results['quality'] = self.run_quality_analysis()
-        
-        # Phase 10: Final test run (existing)
-        self.log("Phase 10: Final test run...")
-        self.results['tests'] = self.run_tests()
+        # Execute analysis phases
+        for phase_name, phase_func, description in analysis_phases:
+            if self._execute_phase(phase_name, phase_func, description):
+                successful_phases += 1
         
         # Generate comprehensive report
-        report = self.generate_report()
+        try:
+            report = self.generate_report()
+        except Exception as e:
+            self.log(f"Report generation failed: {e}", "error")
+            report = {'error': 'report_generation_failed', 'details': str(e)}
         
-        # Enhanced summary
+        # Calculate and display summary
+        execution_time = time.time() - self.start_time
+        
         total_issues_found = sum([
             self.results.get('security_fixes', {}).get('issues_found', 0),
             self.results.get('undefined_fixes', {}).get('undefined_calls', 0),
@@ -1860,56 +2103,192 @@ def {func_call.name}(*args, **kwargs):
             self.results.get('type_fixes', {}).get('type_errors', 0),
         ])
         
-        self.log(f"🎉 Enhanced Autofix completed!", "success")
-        self.log(f"📊 Applied {self.fixes_applied} fixes across {total_issues_found} issues found")
-        self.log("📄 Check autofix-report.json for detailed results")
+        # Enhanced completion summary
+        self.log("="*60, "info")
+        self.log("🎉 Enhanced MCP Autofix Process Completed!", "success")
+        self.log(f"📊 Execution Summary:", "info")
+        self.log(f"  • Session ID: {self.session_id}", "info")
+        self.log(f"  • Execution time: {execution_time:.2f} seconds", "info")
+        self.log(f"  • Successful phases: {successful_phases}/{total_phases}", "info")
+        self.log(f"  • Total fixes applied: {self.fixes_applied}", "info")
+        self.log(f"  • Total issues found: {total_issues_found}", "info")
+        self.log(f"📄 Detailed report: autofix-reports/autofix-report-{self.session_id}.json", "info")
         
-        # Print summary by category
-        if self.verbose:
-            self.log("📋 Summary by category:", "info")
-            self.log(f"  Security: {self.results.get('security_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Undefined Functions: {self.results.get('undefined_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Duplicates: {self.results.get('duplicate_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Type Errors: {self.results.get('type_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Test Failures: {self.results.get('test_fixes', {}).get('fixes_applied', 0)} fixes", "info")
+        # Category breakdown if verbose
+        if self.verbose and total_issues_found > 0:
+            self.log("📋 Fixes by category:", "info")
+            categories = [
+                ('Security', 'security_fixes'),
+                ('Undefined Functions', 'undefined_fixes'),
+                ('Duplicates', 'duplicate_fixes'),
+                ('Type Errors', 'type_fixes'),
+                ('Test Failures', 'test_fixes'),
+            ]
+            
+            for category, key in categories:
+                fixes = self.results.get(key, {}).get('fixes_applied', 0)
+                if fixes > 0:
+                    self.log(f"  • {category}: {fixes} fixes", "info")
+        
+        self.log("="*60, "info")
+        
+        # Add execution metadata to report
+        if isinstance(report, dict):
+            report.update({
+                'session_id': self.session_id,
+                'execution_time': execution_time,
+                'successful_phases': successful_phases,
+                'total_phases': total_phases,
+                'completion_status': 'success' if successful_phases == total_phases else 'partial'
+            })
         
         return report
 
 
-@click.command()
-@click.option('--repo-path', type=click.Path(exists=True), help='Repository path')
-@click.option('--dry-run', is_flag=True, help='Show what would be fixed without applying changes')
-@click.option('--verbose', is_flag=True, help='Show detailed output')
-@click.option('--format-only', is_flag=True, help='Only run code formatting')
-@click.option('--scan-only', is_flag=True, help='Only run analysis without fixes')
-def main(repo_path, dry_run, verbose, format_only, scan_only):
-    """MCP Autofix Tool - Consolidated automated fixing system"""
+@click.command(context_settings={'help_option_names': ['-h', '--help']})
+@click.option('--repo-path', 
+              type=click.Path(exists=True), 
+              help='Repository path to process (default: current directory)')
+@click.option('--config-file', 
+              type=click.Path(exists=True), 
+              help='Configuration file path (JSON format)')
+@click.option('--dry-run', 
+              is_flag=True, 
+              help='Show what would be fixed without applying changes')
+@click.option('--verbose', '-v', 
+              is_flag=True, 
+              help='Show detailed output and debug information')
+@click.option('--format-only', 
+              is_flag=True, 
+              help='Only run code formatting (Black + isort)')
+@click.option('--security-only', 
+              is_flag=True, 
+              help='Only run security analysis and fixes')
+@click.option('--scan-only', 
+              is_flag=True, 
+              help='Only run analysis without applying any fixes')
+@click.option('--no-backup', 
+              is_flag=True, 
+              help='Disable backup file creation')
+@click.option('--session-id', 
+              help='Custom session ID for tracking (default: auto-generated)')
+@click.version_option(version='2.0.0', prog_name='MCP Autofix')
+def main(repo_path, config_file, dry_run, verbose, format_only, security_only, scan_only, no_backup, session_id):
+    """
+    MCP Autofix Tool - Consolidated automated fixing system
     
-    autofix = MCPAutofix(
-        repo_path=Path(repo_path) if repo_path else None,
-        dry_run=dry_run,
-        verbose=verbose
-    )
+    This tool provides comprehensive automated code fixing capabilities using
+    industry-standard tools including Black, isort, Bandit, Flake8, and MyPy.
     
-    if format_only:
-        # Only run formatting
-        autofix.log("🎨 Running code formatting only...")
-        results = autofix.fix_code_formatting()
-        autofix.log(f"Formatting completed: {results}")
+    Examples:
+    
+        # Run complete autofix process
+        python autofix.py
         
-    elif scan_only:
-        # Only run analysis
-        autofix.log("🔍 Running analysis only...")
-        security_results = autofix.run_security_scan()
-        quality_results = autofix.run_quality_analysis()
-        autofix.log(f"Analysis completed - Security: {security_results}, Quality: {quality_results}")
+        # Preview changes without applying them
+        python autofix.py --dry-run --verbose
         
-    else:
-        # Run complete autofix
-        results = autofix.run_complete_autofix()
+        # Only format code
+        python autofix.py --format-only
         
-        if 'error' in results:
-            sys.exit(1)
+        # Only security analysis and fixes
+        python autofix.py --security-only
+        
+        # Analysis only (no fixes applied)
+        python autofix.py --scan-only
+        
+        # Use custom configuration
+        python autofix.py --config-file config.json
+    """
+    
+    # Validate mutually exclusive options
+    exclusive_options = [format_only, security_only, scan_only]
+    if sum(exclusive_options) > 1:
+        click.echo("Error: --format-only, --security-only, and --scan-only are mutually exclusive", err=True)
+        sys.exit(1)
+    
+    try:
+        # Initialize autofix with configuration
+        autofix = MCPAutofix(
+            repo_path=Path(repo_path) if repo_path else None,
+            dry_run=dry_run,
+            verbose=verbose,
+            config_file=Path(config_file) if config_file else None
+        )
+        
+        # Override session ID if provided
+        if session_id:
+            autofix.session_id = session_id
+        
+        # Override backup setting if requested
+        if no_backup:
+            autofix.config.backup_enabled = False
+        
+        # Execute based on selected mode
+        if format_only:
+            autofix.log("🎨 Running code formatting only...")
+            results = autofix.fix_code_formatting()
+            
+            if results.get('black') and results.get('isort'):
+                autofix.log("Code formatting completed successfully", "success")
+                sys.exit(0)
+            else:
+                autofix.log("Code formatting completed with issues", "warning")
+                sys.exit(1)
+                
+        elif security_only:
+            autofix.log("🛡️ Running security analysis and fixes only...")
+            
+            # First scan for issues
+            scan_results = autofix.run_security_scan()
+            autofix.log(f"Security scan found {scan_results.get('issues_found', 0)} issues")
+            
+            # Apply fixes if issues found
+            if scan_results.get('issues_found', 0) > 0:
+                fix_results = autofix.fix_security_issues()
+                autofix.log(f"Applied {fix_results.get('fixes_applied', 0)} security fixes")
+            
+            sys.exit(0)
+            
+        elif scan_only:
+            autofix.log("🔍 Running analysis only...")
+            
+            # Run all analysis tools
+            security_results = autofix.run_security_scan()
+            quality_results = autofix.run_quality_analysis()
+            
+            # Display summary
+            autofix.log("Analysis Summary:", "info")
+            autofix.log(f"  Security issues: {security_results.get('issues_found', 0)}", "info")
+            autofix.log(f"  Security scan: {'✓' if security_results.get('scan_completed') else '✗'}", "info")
+            autofix.log(f"  Quality analysis: {'✓' if quality_results.get('flake8') and quality_results.get('mypy') else '✗'}", "info")
+            
+            sys.exit(0)
+            
+        else:
+            # Run complete autofix process
+            results = autofix.run_complete_autofix()
+            
+            # Determine exit code based on results
+            if isinstance(results, dict) and results.get('error'):
+                autofix.log(f"Autofix failed: {results['error']}", "error")
+                sys.exit(1)
+            elif isinstance(results, dict) and results.get('completion_status') == 'success':
+                autofix.log("Autofix completed successfully", "success")
+                sys.exit(0)
+            else:
+                autofix.log("Autofix completed with some issues", "warning")
+                sys.exit(2)
+    
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Unexpected error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
