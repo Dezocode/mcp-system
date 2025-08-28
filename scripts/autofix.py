@@ -121,16 +121,16 @@ class MCPAutofix:
         self.results = {}
         self.start_time = time.time()
         
-        # Load configuration
-        self.config = AutofixConfig(config_file)
-        
-        # Setup logging
-        self._setup_logging()
-        
-        # Initialize session info
+        # Initialize session info early
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.report_dir = self.repo_path / "autofix-reports"
         self.report_dir.mkdir(exist_ok=True)
+        
+        # Load configuration
+        self.config = AutofixConfig(config_file)
+        
+        # Setup logging (requires session_id to be set)
+        self._setup_logging()
         
         self.logger.info(f"MCPAutofix initialized - Session ID: {self.session_id}")
         self.logger.info(f"Repository: {self.repo_path}")
