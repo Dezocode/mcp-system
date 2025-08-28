@@ -1,20 +1,42 @@
 #!/usr/bin/env python3
 """
 MCP Autofix Tool - Consolidated automated fixing system
-Integrates proven tools: black, isort, flake8, mypy, bandit
+
+This tool provides comprehensive automated code fixing capabilities using
+industry-standard tools. It integrates black, isort, flake8, mypy, and bandit
+to deliver reliable code improvements with safety validations.
+
+Features:
+    - Code formatting with black and isort
+    - Security vulnerability detection and fixes
+    - Quality analysis and improvements
+    - Undefined function resolution
+    - Duplicate code elimination
+    - Type error corrections
+    - Test failure repairs
+
+Best Practices Implemented:
+    - AST validation for all code changes
+    - Comprehensive error handling and logging
+    - Configurable operation modes
+    - Detailed progress reporting
+    - Safe rollback capabilities
 """
 
 import ast
 import difflib
 import importlib.util
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, NamedTuple
+from typing import Dict, List, Optional, Tuple, NamedTuple, Union
 
 import click
 
@@ -36,39 +58,165 @@ class SecurityIssue(NamedTuple):
     severity: str
 
 
+class AutofixConfig:
+    """Configuration class for autofix operations"""
+    
+    def __init__(self, config_file: Optional[Path] = None):
+        """Initialize configuration with defaults and optional config file"""
+        # Default configuration
+        self.black_line_length = 88
+        self.target_python_version = "py38"
+        self.max_line_length = 88
+        self.command_timeout = 300
+        self.max_cycles = 10
+        self.skip_hidden_files = True
+        self.backup_enabled = True
+        self.tools_required = ['black', 'isort', 'flake8', 'mypy', 'bandit']
+        
+        # Load from config file if provided
+        if config_file and config_file.exists():
+            self._load_config(config_file)
+    
+    def _load_config(self, config_file: Path) -> None:
+        """Load configuration from JSON file"""
+        try:
+            with open(config_file, 'r') as f:
+                config_data = json.load(f)
+            
+            # Update attributes from config
+            for key, value in config_data.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+        except Exception as e:
+            logging.warning(f"Failed to load config from {config_file}: {e}")
+
+
 class MCPAutofix:
     """
     Consolidated autofix system that delivers real results using proven tools
+    
+    This class provides comprehensive automated code fixing capabilities with
+    safety validations, detailed logging, and configurable operation modes.
     """
     
-    def __init__(self, repo_path: Path = None, dry_run: bool = False, verbose: bool = False):
+    def __init__(self, 
+                 repo_path: Optional[Path] = None, 
+                 dry_run: bool = False, 
+                 verbose: bool = False,
+                 config_file: Optional[Path] = None):
+        """
+        Initialize the autofix system
+        
+        Args:
+            repo_path: Repository path to process (default: current directory)
+            dry_run: If True, show what would be fixed without applying changes
+            verbose: If True, show detailed output
+            config_file: Optional configuration file path
+        """
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
         self.verbose = verbose
         self.fixes_applied = 0
         self.issues_found = 0
         self.results = {}
+        self.start_time = time.time()
         
-    def log(self, message: str, level: str = "info"):
-        """Log message with optional verbosity control"""
-        if level == "verbose" and not self.verbose:
-            return
+        # Load configuration
+        self.config = AutofixConfig(config_file)
         
-        prefixes = {
-            "info": "ℹ️",
-            "success": "✅", 
-            "warning": "⚠️",
-            "error": "❌",
-            "verbose": "🔍"
+        # Setup logging
+        self._setup_logging()
+        
+        # Initialize session info
+        self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.report_dir = self.repo_path / "autofix-reports"
+        self.report_dir.mkdir(exist_ok=True)
+        
+        self.logger.info(f"MCPAutofix initialized - Session ID: {self.session_id}")
+        self.logger.info(f"Repository: {self.repo_path}")
+        self.logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
+    
+    def _setup_logging(self) -> None:
+        """Setup logging configuration"""
+        log_level = logging.DEBUG if self.verbose else logging.INFO
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        
+        # Create logger
+        self.logger = logging.getLogger('mcp.autofix')
+        self.logger.setLevel(log_level)
+        
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+        self.logger.addHandler(console_handler)
+        
+        # File handler for detailed logs
+        log_file = self.repo_path / f"autofix-{self.session_id}.log"
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG)
+        file_formatter = logging.Formatter(log_format)
+        file_handler.setFormatter(file_formatter)
+        self.logger.addHandler(file_handler)
+        
+    def log(self, message: str, level: str = "info") -> None:
+        """
+        Log message with appropriate level and format
+        
+        Args:
+            message: Message to log
+            level: Log level (info, success, warning, error, verbose, debug)
+        """
+        # Map custom levels to standard logging levels
+        level_mapping = {
+            'info': logging.INFO,
+            'success': logging.INFO,
+            'warning': logging.WARNING,
+            'error': logging.ERROR,
+            'verbose': logging.DEBUG,
+            'debug': logging.DEBUG
         }
-        prefix = prefixes.get(level, "•")
-        print(f"{prefix} {message}")
+        
+        log_level = level_mapping.get(level, logging.INFO)
+        
+        # Use logger for file logging
+        self.logger.log(log_level, message)
+        
+        # Console output with colors and emojis (if not in verbose mode for logger)
+        if not self.verbose or level != "verbose":
+            prefixes = {
+                "info": "ℹ️",
+                "success": "✅", 
+                "warning": "⚠️",
+                "error": "❌",
+                "verbose": "🔍",
+                "debug": "🐛"
+            }
+            prefix = prefixes.get(level, "•")
+            
+            # Only print to console if appropriate level
+            if level != "verbose" or self.verbose:
+                print(f"{prefix} {message}")
     
     def run_command(self, cmd: List[str], description: str = "") -> Tuple[bool, str, str]:
-        """Run command and return success, stdout, stderr"""
+        """
+        Run command with enhanced error handling and logging
+        
+        Args:
+            cmd: Command and arguments to run
+            description: Human-readable description of the command
+            
+        Returns:
+            Tuple of (success, stdout, stderr)
+        """
         if self.dry_run:
             self.log(f"[DRY RUN] Would run: {' '.join(cmd)}", "verbose")
             return True, "", ""
+        
+        self.logger.debug(f"Running command: {' '.join(cmd)}")
+        if description:
+            self.log(f"Running: {description}", "verbose")
         
         try:
             result = subprocess.run(
@@ -76,104 +224,250 @@ class MCPAutofix:
                 capture_output=True, 
                 text=True, 
                 cwd=self.repo_path,
-                timeout=300  # 5 minute timeout
+                timeout=self.config.command_timeout
             )
             
             success = result.returncode == 0
-            if not success and self.verbose:
-                self.log(f"Command failed: {' '.join(cmd)}", "error")
-                self.log(f"Error: {result.stderr}", "verbose")
+            
+            if success:
+                self.logger.debug(f"Command succeeded: {' '.join(cmd)}")
+                if result.stdout.strip():
+                    self.logger.debug(f"STDOUT: {result.stdout}")
+            else:
+                self.logger.error(f"Command failed: {' '.join(cmd)}")
+                self.logger.error(f"Return code: {result.returncode}")
+                if result.stderr:
+                    self.logger.error(f"STDERR: {result.stderr}")
+                    
+                if self.verbose:
+                    self.log(f"Command failed with code {result.returncode}: {' '.join(cmd)}", "error")
+                    if result.stderr:
+                        self.log(f"Error details: {result.stderr.strip()}", "verbose")
             
             return success, result.stdout, result.stderr
             
         except subprocess.TimeoutExpired:
-            self.log(f"Command timed out: {' '.join(cmd)}", "error")
+            error_msg = f"Command timed out after {self.config.command_timeout}s: {' '.join(cmd)}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
             return False, "", "Command timed out"
+            
+        except FileNotFoundError:
+            error_msg = f"Command not found: {cmd[0]}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
+            return False, "", "Command not found"
+            
         except Exception as e:
-            self.log(f"Command error: {e}", "error")
+            error_msg = f"Unexpected error running command: {e}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
             return False, "", str(e)
     
     def install_tools(self) -> bool:
-        """Install required tools if not available"""
-        tools = ['black', 'isort', 'flake8', 'mypy', 'bandit']
-        missing_tools = []
+        """
+        Install required tools if not available
         
-        for tool in tools:
-            success, _, _ = self.run_command(['python3', '-m', tool, '--version'])
-            if not success:
+        Returns:
+            True if all tools are available, False otherwise
+        """
+        self.log("Checking required tools availability...")
+        missing_tools = []
+        available_tools = []
+        
+        for tool in self.config.tools_required:
+            success, _, _ = self.run_command([sys.executable, '-m', tool, '--version'])
+            if success:
+                available_tools.append(tool)
+                self.log(f"✓ {tool} is available", "verbose")
+            else:
                 missing_tools.append(tool)
+                self.log(f"✗ {tool} is missing", "verbose")
+        
+        if available_tools:
+            self.log(f"Available tools: {', '.join(available_tools)}", "success")
         
         if missing_tools:
-            self.log(f"Installing tools: {', '.join(missing_tools)}")
-            success, stdout, stderr = self.run_command([
-                sys.executable, '-m', 'pip', 'install'
-            ] + missing_tools)
+            self.log(f"Missing tools: {', '.join(missing_tools)}", "warning")
             
-            if not success:
+            if self.dry_run:
+                self.log("[DRY RUN] Would install missing tools", "info")
+                return True
+            
+            self.log(f"Installing missing tools: {', '.join(missing_tools)}")
+            
+            # Try to install missing tools
+            install_cmd = [sys.executable, '-m', 'pip', 'install'] + missing_tools
+            success, stdout, stderr = self.run_command(
+                install_cmd, 
+                f"Installing {', '.join(missing_tools)}"
+            )
+            
+            if success:
+                self.log(f"Successfully installed: {', '.join(missing_tools)}", "success")
+                
+                # Verify installation
+                still_missing = []
+                for tool in missing_tools:
+                    verify_success, _, _ = self.run_command([sys.executable, '-m', tool, '--version'])
+                    if not verify_success:
+                        still_missing.append(tool)
+                
+                if still_missing:
+                    self.log(f"Failed to verify installation of: {', '.join(still_missing)}", "error")
+                    return False
+                    
+            else:
                 self.log(f"Failed to install tools: {stderr}", "error")
                 return False
         
+        self.log("All required tools are available", "success")
         return True
     
     def fix_code_formatting(self) -> Dict:
-        """Fix code formatting using black and isort"""
+        """
+        Fix code formatting using black and isort with enhanced configuration
+        
+        Returns:
+            Dictionary with formatting results
+        """
         self.log("Fixing code formatting...")
         
-        results = {'black': False, 'isort': False}
+        results = {'black': False, 'isort': False, 'files_processed': 0}
         
-        # Run black
-        success, stdout, stderr = self.run_command([
+        # Count Python files to process
+        python_files = list(self.repo_path.rglob("*.py"))
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        results['files_found'] = len(python_files)
+        self.log(f"Found {len(python_files)} Python files to format", "verbose")
+        
+        if not python_files:
+            self.log("No Python files found to format", "warning")
+            return results
+        
+        # Run black formatting
+        self.log("Running Black code formatter...", "verbose")
+        black_cmd = [
             sys.executable, '-m', 'black', 
-            '--line-length', '88',
-            '--target-version', 'py38',
-            str(self.repo_path)
-        ])
+            '--line-length', str(self.config.black_line_length),
+            '--target-version', self.config.target_python_version,
+            '--quiet'  # Reduce output noise
+        ]
+        
+        if self.dry_run:
+            black_cmd.append('--diff')  # Show diff in dry run mode
+        
+        black_cmd.append(str(self.repo_path))
+        
+        success, stdout, stderr = self.run_command(
+            black_cmd,
+            "Black code formatting"
+        )
+        
         results['black'] = success
         
         if success:
             self.fixes_applied += 1
-            self.log("Code formatted with black", "success")
+            results['files_processed'] += len(python_files)
+            self.log("Code formatted with Black", "success")
+            if self.dry_run and stdout:
+                self.log("Black would make these changes:", "verbose")
+                self.log(stdout, "verbose")
         else:
             self.log(f"Black formatting failed: {stderr}", "error")
         
-        # Run isort
-        success, stdout, stderr = self.run_command([
+        # Run isort for import sorting
+        self.log("Running isort import sorter...", "verbose")
+        isort_cmd = [
             sys.executable, '-m', 'isort',
             '--profile', 'black',
-            '--line-length', '88',
-            str(self.repo_path)
-        ])
+            '--line-length', str(self.config.max_line_length),
+            '--quiet'  # Reduce output noise
+        ]
+        
+        if self.dry_run:
+            isort_cmd.append('--diff')  # Show diff in dry run mode
+        
+        isort_cmd.append(str(self.repo_path))
+        
+        success, stdout, stderr = self.run_command(
+            isort_cmd,
+            "Import sorting with isort"
+        )
+        
         results['isort'] = success
         
         if success:
             self.fixes_applied += 1
             self.log("Imports sorted with isort", "success")
+            if self.dry_run and stdout:
+                self.log("isort would make these changes:", "verbose")
+                self.log(stdout, "verbose")
         else:
             self.log(f"Import sorting failed: {stderr}", "error")
+        
+        # Summary
+        if results['black'] and results['isort']:
+            self.log(f"Code formatting completed successfully for {results['files_processed']} files", "success")
+        elif results['black'] or results['isort']:
+            self.log("Code formatting partially completed", "warning")
+        else:
+            self.log("Code formatting failed", "error")
         
         return results
     
     def fix_whitespace_issues(self) -> Dict:
-        """Fix whitespace and basic formatting issues"""
+        """
+        Fix whitespace and basic formatting issues with enhanced safety
+        
+        Returns:
+            Dictionary with whitespace fixing results
+        """
         self.log("Fixing whitespace issues...")
+        
+        results = {
+            'files_processed': 0,
+            'files_modified': 0,
+            'files_skipped': 0,
+            'errors': []
+        }
         
         if self.dry_run:
             self.log("[DRY RUN] Would fix whitespace issues", "verbose")
-            return {'files_processed': 0}
+            return results
         
-        files_fixed = 0
         python_files = list(self.repo_path.rglob("*.py"))
         
+        # Filter out hidden files if configured
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        self.log(f"Processing {len(python_files)} Python files for whitespace issues", "verbose")
+        
         for py_file in python_files:
-            if any(part.startswith('.') for part in py_file.parts):
-                continue  # Skip hidden files/directories
+            results['files_processed'] += 1
             
             try:
-                with open(py_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # Read file with proper encoding detection
+                try:
+                    with open(py_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except UnicodeDecodeError:
+                    # Try with different encoding
+                    try:
+                        with open(py_file, 'r', encoding='latin-1') as f:
+                            content = f.read()
+                    except Exception as e:
+                        self.log(f"Cannot read file {py_file}: {e}", "error")
+                        results['files_skipped'] += 1
+                        results['errors'].append(f"Read error in {py_file}: {e}")
+                        continue
                 
                 original_content = content
                 
+                # Apply whitespace fixes
                 # Remove trailing whitespace
                 content = re.sub(r'[ \t]+$', '', content, flags=re.MULTILINE)
                 
@@ -183,58 +477,142 @@ class MCPAutofix:
                 # Fix multiple consecutive blank lines (max 2)
                 content = re.sub(r'\n{4,}', '\n\n\n', content)
                 
+                # Remove spaces before tabs (mixed indentation)
+                content = re.sub(r'^ +\t', '\t', content, flags=re.MULTILINE)
+                
+                # Only proceed if changes were made
                 if content != original_content:
                     # Validate syntax before writing
                     try:
                         ast.parse(content)
+                    except SyntaxError as e:
+                        self.log(f"Syntax error would result from whitespace fix in {py_file}: {e}", "warning")
+                        results['files_skipped'] += 1
+                        results['errors'].append(f"Syntax error would result in {py_file}: {e}")
+                        continue
+                    
+                    # Create backup if enabled
+                    if self.config.backup_enabled:
+                        backup_file = py_file.with_suffix(f'.py.autofix-backup-{self.session_id}')
+                        try:
+                            with open(backup_file, 'w', encoding='utf-8') as f:
+                                f.write(original_content)
+                        except Exception as e:
+                            self.log(f"Failed to create backup for {py_file}: {e}", "warning")
+                    
+                    # Write the fixed content
+                    try:
                         with open(py_file, 'w', encoding='utf-8') as f:
                             f.write(content)
-                        files_fixed += 1
+                        results['files_modified'] += 1
                         self.log(f"Fixed whitespace in {py_file}", "verbose")
-                    except SyntaxError:
-                        self.log(f"Skipped {py_file} - syntax error after fix", "warning")
+                    except Exception as e:
+                        self.log(f"Failed to write fixed file {py_file}: {e}", "error")
+                        results['errors'].append(f"Write error in {py_file}: {e}")
+                        continue
                         
             except Exception as e:
                 self.log(f"Error processing {py_file}: {e}", "error")
+                results['files_skipped'] += 1
+                results['errors'].append(f"Processing error in {py_file}: {e}")
         
-        if files_fixed > 0:
-            self.fixes_applied += files_fixed
-            self.log(f"Fixed whitespace in {files_fixed} files", "success")
+        # Update global counters
+        self.fixes_applied += results['files_modified']
         
-        return {'files_processed': files_fixed}
+        # Summary logging
+        if results['files_modified'] > 0:
+            self.log(f"Fixed whitespace in {results['files_modified']} files", "success")
+        
+        if results['files_skipped'] > 0:
+            self.log(f"Skipped {results['files_skipped']} files due to errors", "warning")
+        
+        if results['errors']:
+            self.log(f"Encountered {len(results['errors'])} errors during whitespace fixing", "warning")
+        
+        return results
     
     def run_security_scan(self) -> Dict:
-        """Run security analysis with bandit"""
-        self.log("Running security scan...")
+        """
+        Run security analysis with bandit and enhanced reporting
         
-        output_file = self.repo_path / "bandit-report.json"
+        Returns:
+            Dictionary with security scan results
+        """
+        self.log("Running security analysis with Bandit...")
         
-        success, stdout, stderr = self.run_command([
+        # Use timestamped report file in reports directory
+        output_file = self.report_dir / f"bandit-report-{self.session_id}.json"
+        
+        # Build bandit command with enhanced options
+        bandit_cmd = [
             sys.executable, '-m', 'bandit',
             '-r', str(self.repo_path),
             '-f', 'json',
-            '-o', str(output_file)
-        ])
+            '-o', str(output_file),
+            '--skip', 'B101',  # Skip assert_used test (often acceptable in tests)
+        ]
         
-        results = {'scan_completed': success, 'report_file': str(output_file)}
+        # Add exclusions for common non-security files
+        if self.config.skip_hidden_files:
+            bandit_cmd.extend(['--exclude', '.*,*/.*'])
+        
+        success, stdout, stderr = self.run_command(
+            bandit_cmd,
+            "Security vulnerability scan"
+        )
+        
+        results = {
+            'scan_completed': success, 
+            'report_file': str(output_file),
+            'issues_found': 0,
+            'issues_by_severity': {},
+            'scan_timestamp': datetime.now().isoformat()
+        }
         
         if success:
-            self.log(f"Security scan completed: {output_file}", "success")
+            self.log(f"Security scan completed: {output_file.name}", "success")
             
-            # Parse results if available
+            # Parse and analyze results
             try:
-                with open(output_file, 'r') as f:
-                    report = json.load(f)
-                    issues = len(report.get('results', []))
-                    results['issues_found'] = issues
-                    if issues > 0:
-                        self.log(f"Found {issues} security issues", "warning")
+                if output_file.exists():
+                    with open(output_file, 'r') as f:
+                        report = json.load(f)
+                    
+                    issues = report.get('results', [])
+                    results['issues_found'] = len(issues)
+                    
+                    # Categorize by severity
+                    severity_counts = {}
+                    for issue in issues:
+                        severity = issue.get('issue_severity', 'UNKNOWN')
+                        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                    
+                    results['issues_by_severity'] = severity_counts
+                    
+                    # Log summary
+                    if issues:
+                        self.log(f"Found {len(issues)} security issues", "warning")
+                        for severity, count in severity_counts.items():
+                            self.log(f"  {severity}: {count} issues", "verbose")
                     else:
                         self.log("No security issues found", "success")
+                        
+                    # Store detailed results for later use
+                    results['detailed_issues'] = issues
+                    
+                else:
+                    self.log("Security report file not created", "warning")
+                    
+            except json.JSONDecodeError as e:
+                self.log(f"Invalid JSON in security report: {e}", "error")
+                results['error'] = f"JSON parse error: {e}"
             except Exception as e:
-                self.log(f"Could not parse security report: {e}", "error")
+                self.log(f"Error processing security report: {e}", "error")
+                results['error'] = f"Processing error: {e}"
         else:
-            self.log(f"Security scan failed: {stderr}", "error")
+            error_msg = f"Security scan failed: {stderr}"
+            self.log(error_msg, "error")
+            results['error'] = error_msg
         
         return results
     
