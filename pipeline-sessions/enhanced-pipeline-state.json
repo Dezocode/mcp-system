@@ -1,65 +1,125 @@
 {
-  "session_id": "e6523774-0c82-4977-b459-274f1b649a1f",
-  "start_time": "1756086912",
+  "session_id": "eb925bf5-1fdf-4375-bb51-9c3ab9bf02c3",
+  "start_time": "1756418376",
   "current_phase": "environment_detection",
   "phase_history": [
     {
       "phase": "initialization",
-      "start_time": "1756086912",
-      "duration": 1,
+      "start_time": "1756418376",
+      "duration": 0,
       "success": true
     },
     {
       "phase": "environment_detection",
-      "start_time": "1756086913",
+      "start_time": "1756418376",
       "duration": 0,
       "success": false
     },
     {
       "phase": "initialization",
-      "start_time": "1756086913",
+      "start_time": "1756418376",
       "duration": 0,
       "success": true
     },
     {
       "phase": "environment_detection",
-      "start_time": "1756086913",
-      "duration": 1,
-      "success": false
-    },
-    {
-      "phase": "initialization",
-      "start_time": "1756086914",
-      "duration": 1,
-      "success": true
-    },
-    {
-      "phase": "environment_detection",
-      "start_time": "1756086915",
+      "start_time": "1756418376",
       "duration": 0,
       "success": false
     },
     {
       "phase": "initialization",
-      "start_time": "1756086916",
+      "start_time": "1756418377",
       "duration": 0,
       "success": true
     },
     {
       "phase": "environment_detection",
-      "start_time": "1756086916",
+      "start_time": "1756418377",
       "duration": 0,
       "success": false
     },
     {
       "phase": "initialization",
-      "start_time": "1756086917",
+      "start_time": "1756418377",
       "duration": 0,
       "success": true
     },
     {
       "phase": "environment_detection",
-      "start_time": "1756086917",
+      "start_time": "1756418377",
+      "duration": 0,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418377",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418377",
+      "duration": 2,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418379",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418379",
+      "duration": 2,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418382",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418382",
+      "duration": 2,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418384",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418384",
+      "duration": 2,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418386",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418386",
+      "duration": 2,
+      "success": false
+    },
+    {
+      "phase": "initialization",
+      "start_time": "1756418388",
+      "duration": 0,
+      "success": true
+    },
+    {
+      "phase": "environment_detection",
+      "start_time": "1756418388",
       "duration": 2,
       "success": false
     }
@@ -75,5 +135,7 @@
     "performance_monitoring": true,
     "react_instructions": true,
     "failure_prevention": true
-  }
+  },
+  "end_time": "1756418391",
+  "total_duration": 15
 }

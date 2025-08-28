@@ -1,0 +1,53 @@
+{
+  "timestamp": "/home/runner/work/mcp-system/mcp-system",
+  "summary": {
+    "fixes_applied": 71,
+    "issues_found": 0,
+    "dry_run": true
+  },
+  "results": {
+    "formatting": {
+      "black": true,
+      "isort": true
+    },
+    "whitespace": {
+      "files_processed": 0
+    },
+    "security_fixes": {
+      "error": "No security report found"
+    },
+    "undefined_fixes": {
+      "undefined_calls": 0,
+      "fixes_applied": 0
+    },
+    "duplicate_fixes": {
+      "duplicate_groups": 54,
+      "fixes_applied": 69,
+      "remaining_duplicates": 0
+    },
+    "type_fixes": {
+      "type_errors": 0,
+      "fixes_applied": 0
+    },
+    "test_fixes": {
+      "test_failures": 0,
+      "fixes_applied": 0
+    },
+    "security": {
+      "scan_completed": true,
+      "report_file": "/home/runner/work/mcp-system/mcp-system/bandit-report.json"
+    },
+    "quality": {
+      "flake8": true,
+      "mypy": true,
+      "flake8_report": "/home/runner/work/mcp-system/mcp-system/flake8-report.txt",
+      "mypy_report": "/home/runner/work/mcp-system/mcp-system/mypy-report.txt"
+    },
+    "tests": {
+      "ran_tests": true,
+      "test_framework": "pytest",
+      "success": true,
+      "output_file": "/home/runner/work/mcp-system/mcp-system/test-results.txt"
+    }
+  }
+}

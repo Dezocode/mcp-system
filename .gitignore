@@ -177,3 +177,6 @@ bandit-report.json
 
 # Temporary test files
 test-agent-123.json
+
+# Autofix results (temporary)
+autofix-results/

@@ -1,0 +1,19 @@
+#!/bin/bash
+# MCP Autofix - Single consolidated autofix tool
+# Uses proven tools: black, isort, flake8, mypy, bandit
+
+set -euo pipefail
+
+# Colors
+readonly CYAN='\033[0;36m'
+readonly GREEN='\033[0;32m'
+readonly NC='\033[0m'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo -e "${CYAN}🛠️ MCP Autofix - Consolidated Automated Fixing System${NC}"
+echo -e "${GREEN}✅ Single tool with proven technologies${NC}"
+echo ""
+
+# Run the consolidated autofix tool
+exec python3 "${SCRIPT_DIR}/scripts/autofix.py" "$@"
