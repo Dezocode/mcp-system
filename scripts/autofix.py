@@ -3592,6 +3592,43 @@ def {func_call.name}(*args, **kwargs):
         self.log("Fixture failure detected - manual review required", "warning")
         return False
     
+    def fix_test_failures(self) -> Dict:
+        """Intelligently fix failing tests"""
+        self.log("Fixing test failures...")
+        
+        test_results = self.run_tests()
+        
+        if not test_results.get('ran_tests') or test_results.get('success'):
+            self.log("No test failures to fix", "success")
+            return {'test_failures': 0, 'fixes_applied': 0}
+        
+        fixes_applied = 0
+        
+        # Parse test output for failures
+        output_file = test_results.get('output_file')
+        if output_file and Path(output_file).exists():
+            try:
+                with open(output_file, 'r') as f:
+                    test_output = f.read()
+                
+                # Simple failure detection
+                if 'ImportError' in test_output or 'ModuleNotFoundError' in test_output:
+                    if self.fix_test_imports({'type': 'import_error'}):
+                        fixes_applied += 1
+            
+            except Exception as e:
+                self.log(f"Error parsing test output: {e}", "error")
+        
+        self.fixes_applied += fixes_applied
+        if fixes_applied > 0:
+            self.log(f"Fixed {fixes_applied} test failures", "success")
+        
+        return {
+            'test_failures': 'unknown',  # Would need more detailed parsing
+            'fixes_applied': fixes_applied,
+            'remaining_failures': 'unknown'
+        }
+    
     def fix_import_issues(self) -> Dict:
         """Fix import-related issues using smart import analysis"""
         self.log("Fixing import issues with smart analysis...")
