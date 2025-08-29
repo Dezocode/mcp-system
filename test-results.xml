@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="13" failures="4" skipped="2" tests="47" time="3.063" timestamp="2025-08-29T21:59:35.910894+00:00" hostname="pkrvmccyg1gnepe"><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_complete_integration" time="0.157" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_config_validation" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_configuration_management" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_docker_detection_methods" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_environment_detection" time="0.004" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_environment_export" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_environment_summary" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_kubernetes_detection" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_platform_adaptation" time="0.011" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_profile_export" time="0.003" /><testcase classname="tests.test_environment_detection.TestEnvironmentDetection" name="test_runtime_profiling" time="0.204" /><testcase classname="tests.test_environment_detection.TestMCPServerIntegration" name="test_environment_detection_tool_functionality" time="0.040"><failure message="ModuleNotFoundError: No module named 'psutil'">tests/test_environment_detection.py:258: in test_environment_detection_tool_functionality
+    from main import handle_environment_detection
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</failure></testcase><testcase classname="tests.test_environment_detection.TestMCPServerIntegration" name="test_mcp_server_environment_integration" time="0.003"><failure message="ModuleNotFoundError: No module named 'psutil'">tests/test_environment_detection.py:225: in test_mcp_server_environment_integration
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</failure></testcase><testcase classname="tests.test_installer.TestMCPInstaller" name="test_auto_discovery" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_claude_config_merging" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_directory_creation" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_full_installation" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_installer_prerequisites" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_template_creation" time="0.001" /><testcase classname="tests.test_installer.TestMCPInstaller" name="test_upgrade_system" time="0.001" /><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_real_time_monitoring_system" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_parallel_processing_engine" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_performance_summary" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_claude_agent_protocol_integration" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_enhanced_tool_list" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_enhanced_session_management" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_metrics_collection_system" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_monitoring_alerts" time="0.002"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_performance_improvement_tracking" time="0.003"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_session_persistence" time="0.003"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_environment_detection_tool" time="0.003"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_health_monitoring_tool" time="0.003"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_massive_pipeline_improvements.TestMassivePipelineImprovements" name="test_massive_improvements_integration" time="0.003"><error message="failed on setup with &quot;ModuleNotFoundError: No module named 'psutil'&quot;">tests/test_massive_pipeline_improvements.py:27: in pipeline_server
+    from main import pipeline_server
+mcp-tools/pipeline-mcp/src/main.py:66: in &lt;module&gt;
+    from src.monitoring.metrics_collector import MetricsCollector
+src/monitoring/__init__.py:6: in &lt;module&gt;
+    from .metrics_collector import MetricsCollector
+src/monitoring/metrics_collector.py:14: in &lt;module&gt;
+    import psutil
+E   ModuleNotFoundError: No module named 'psutil'</error></testcase><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_standardizer_initialization" time="0.002" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_server_validation" time="0.002" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_incomplete_server_validation" time="0.002" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_server_template_creation" time="0.002" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_validator_initialization" time="0.001" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_validator_with_servers" time="0.004" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_path_migrator_legacy_detection" time="0.001" /><testcase classname="tests.test_mcp_tools_watchdog.TestMCPToolsWatchdog" name="test_get_server_directories" time="0.002" /><testcase classname="tests.test_mcp_tools_watchdog" name="test_integration_example" time="0.002" /><testcase classname="tests.test_pipeline_integration.TestPipelineIntegration" name="test_github_workflow_syntax" time="0.048" /><testcase classname="tests.test_pipeline_integration.TestPipelineIntegration" name="test_mcp_compliance_check" time="0.004"><skipped type="pytest.skip" message="pipeline-mcp server not found">/home/runner/work/mcp-system/mcp-system/tests/test_pipeline_integration.py:342: pipeline-mcp server not found</skipped></testcase><testcase classname="tests.test_pipeline_integration.TestPipelineIntegration" name="test_pipeline_mcp_server" time="0.004"><skipped type="pytest.skip" message="pipeline-mcp server not found">/home/runner/work/mcp-system/mcp-system/tests/test_pipeline_integration.py:225: pipeline-mcp server not found</skipped></testcase><testcase classname="tests.test_pipeline_integration.TestPipelineIntegration" name="test_quality_patcher_json_output" time="0.108"><failure message="AssertionError: 1 != 0 : Script failed: pytest-cov: Failed to setup subprocess coverage. Environ: {'COV_CORE_SOURCE': 'src', 'COV_CORE_CONFIG': ':', 'COV_CORE_DATAFILE': '/home/runner/work/mcp-system/mcp-system/.coverage'} Exception: ModuleNotFoundError(&quot;No module named 'pygments'&quot;)&#10;Traceback (most recent call last):&#10;  File &quot;/tmp/tmp5pcfn6e6/scripts/simple_version_keeper.py&quot;, line 1, in &lt;module&gt;&#10;    from utils.functions import main&#10;ModuleNotFoundError: No module named 'utils'">tests/test_pipeline_integration.py:152: in test_quality_patcher_json_output
+    self.test_version_keeper_json_output()
+tests/test_pipeline_integration.py:103: in test_version_keeper_json_output
+    self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
+E   AssertionError: 1 != 0 : Script failed: pytest-cov: Failed to setup subprocess coverage. Environ: {'COV_CORE_SOURCE': 'src', 'COV_CORE_CONFIG': ':', 'COV_CORE_DATAFILE': '/home/runner/work/mcp-system/mcp-system/.coverage'} Exception: ModuleNotFoundError("No module named 'pygments'")
+E   Traceback (most recent call last):
+E     File "/tmp/tmp5pcfn6e6/scripts/simple_version_keeper.py", line 1, in &lt;module&gt;
+E       from utils.functions import main
+E   ModuleNotFoundError: No module named 'utils'</failure></testcase><testcase classname="tests.test_pipeline_integration.TestPipelineIntegration" name="test_version_keeper_json_output" time="0.107"><failure message="AssertionError: 1 != 0 : Script failed: pytest-cov: Failed to setup subprocess coverage. Environ: {'COV_CORE_SOURCE': 'src', 'COV_CORE_CONFIG': ':', 'COV_CORE_DATAFILE': '/home/runner/work/mcp-system/mcp-system/.coverage'} Exception: ModuleNotFoundError(&quot;No module named 'pygments'&quot;)&#10;Traceback (most recent call last):&#10;  File &quot;/tmp/tmpq65kru59/scripts/simple_version_keeper.py&quot;, line 1, in &lt;module&gt;&#10;    from utils.functions import main&#10;ModuleNotFoundError: No module named 'utils'">tests/test_pipeline_integration.py:103: in test_version_keeper_json_output
+    self.assertEqual(result.returncode, 0, f"Script failed: {result.stderr}")
+E   AssertionError: 1 != 0 : Script failed: pytest-cov: Failed to setup subprocess coverage. Environ: {'COV_CORE_SOURCE': 'src', 'COV_CORE_CONFIG': ':', 'COV_CORE_DATAFILE': '/home/runner/work/mcp-system/mcp-system/.coverage'} Exception: ModuleNotFoundError("No module named 'pygments'")
+E   Traceback (most recent call last):
+E     File "/tmp/tmpq65kru59/scripts/simple_version_keeper.py", line 1, in &lt;module&gt;
+E       from utils.functions import main
+E   ModuleNotFoundError: No module named 'utils'</failure></testcase></testsuite></testsuites>
