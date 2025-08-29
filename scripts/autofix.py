@@ -88,7 +88,7 @@ class EnhancedTemplateDetector:
                 'keywords': ['config', 'settings', 'variable', 'substitution']
             }
         }
-        self.confidence_threshold = 0.85
+        self.confidence_threshold = 0.80
         self.context_radius = 5  # Lines to check around target
         
     def detect_template_context(self, file_path: Path, line_num: int, code: str) -> Dict:
@@ -183,7 +183,7 @@ class OrphanedMethodResolver:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.class_method_cache = {}  # Cache all class methods in project
-        self.confidence_threshold = 0.85
+        self.confidence_threshold = 0.80
         self._build_class_method_cache()
     
     def resolve_orphaned_method(self, func_call: FunctionCall) -> Optional[Dict]:
@@ -347,7 +347,7 @@ class DynamicPatternStaticizer:
     """Convert dynamic function calls to static where safely possible - Level 2 Enhancement"""
     
     def __init__(self):
-        self.confidence_threshold = 0.85
+        self.confidence_threshold = 0.80
         self.safe_conversions = {}
         
     def staticize_dynamic_call(self, func_call: FunctionCall) -> Optional[Dict]:
@@ -531,7 +531,7 @@ class CrossFileDependencyResolver:
         self.project_root = project_root
         self.import_graph = {}  # Full dependency graph
         self.module_exports = {}  # What each module exports
-        self.confidence_threshold = 0.85
+        self.confidence_threshold = 0.80
         self._build_import_graph()
     
     def resolve_cross_file_dependency(self, func_call: FunctionCall) -> Optional[Dict]:
