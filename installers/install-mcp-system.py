@@ -7,7 +7,7 @@ from utils.functions import f
 from analyze_functions import directory
 from os import path
 from src.install_mcp_system import config_file
-from mcp-docker-orchestration-integration import cmd
+from mcp_docker_orchestration_integration import cmd
 """
 Universal MCP System Installer
 Packages all MCP components and creates permissionless bridge for Claude Code
