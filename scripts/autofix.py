@@ -102,7 +102,7 @@ class EnhancedTemplateDetector:
                 'keywords': ['config', 'settings', 'variable', 'substitution']
             }
         }
-        self.confidence_threshold = 0.80
+        self.confidence_threshold = 0.75  # Lowered from 0.80 for more aggressive detection
         self.context_radius = 5  # Lines to check around target
 
     def detect_template_context(self, file_path: Path, line_num: int, code: str) -> Dict:
@@ -437,7 +437,7 @@ class DynamicPatternStaticizer:
         """
         Convert dynamic patterns to static equivalents.
         Handles: getattr, __getattribute__, property access, decorators,
-        hasattr-based conditionals, callable checks
+        hasattr-based conditionals, callable checks, function dictionaries
         """
 
         # Pattern 1: getattr with literal string
@@ -448,9 +448,13 @@ class DynamicPatternStaticizer:
         if self._is_hasattr_getattr_pattern(func_call):
             return self._staticize_hasattr_getattr(func_call)
 
-        # Pattern 3: Dictionary of functions
+        # Pattern 3: Dictionary of functions (Enhanced detection)
         if self._is_function_dict_pattern(func_call):
             return self._staticize_function_dict(func_call)
+
+        # Pattern 3b: Index-based access patterns (NEW)
+        if self._is_index_access_pattern(func_call):
+            return self._staticize_index_access(func_call)
 
         # Pattern 4: Decorator-generated methods
         if self._is_decorator_pattern(func_call):
@@ -463,6 +467,10 @@ class DynamicPatternStaticizer:
         # Pattern 6: __getattribute__ patterns
         if self._is_getattribute_pattern(func_call):
             return self._staticize_getattribute(func_call)
+
+        # Pattern 7: Generic dynamic call patterns (NEW)
+        if self._is_generic_dynamic_pattern(func_call):
+            return self._staticize_generic_dynamic(func_call)
 
         return None
 
@@ -527,14 +535,17 @@ class DynamicPatternStaticizer:
         """Check for function dictionary patterns"""
         return ('functions' in func_call.context.lower() or 
                 'handlers' in func_call.context.lower() or
-                'dispatch' in func_call.context.lower())
+                'dispatch' in func_call.context.lower() or
+                'registry' in func_call.context.lower() or
+                'callbacks' in func_call.context.lower() or
+                '[' in func_call.context and ']' in func_call.context)
 
     def _staticize_function_dict(self, func_call: FunctionCall) -> Optional[Dict]:
         """Convert function dictionary access to direct calls"""
         return {
             'fix_type': 'staticize_function_dict',
             'action': f'Convert dictionary-based function call to direct call: {func_call.name}',
-            'confidence': 0.75,
+            'confidence': 0.85,  # Increased from 0.75
             'reasoning': 'Function dictionary pattern detected, consider direct function calls'
         }
 
@@ -577,6 +588,38 @@ class DynamicPatternStaticizer:
                 return f.read()
         except:
             return ""
+
+    def _is_generic_dynamic_pattern(self, func_call: FunctionCall) -> bool:
+        """Check for generic dynamic patterns"""
+        dynamic_indicators = [
+            'dispatch', 'router', 'handler', 'callback', 'registry',
+            'factory', 'builder', 'resolver', 'loader', 'manager'
+        ]
+        
+        context_lower = func_call.context.lower()
+        return any(indicator in context_lower for indicator in dynamic_indicators)
+
+    def _staticize_generic_dynamic(self, func_call: FunctionCall) -> Optional[Dict]:
+        """Handle generic dynamic patterns"""
+        return {
+            'fix_type': 'staticize_generic_dynamic',
+            'action': f'Staticize dynamic pattern: {func_call.name}',
+            'confidence': 0.80,
+            'reasoning': 'Generic dynamic pattern detected, consider static alternative'
+        }
+
+    def _is_index_access_pattern(self, func_call: FunctionCall) -> bool:
+        """Check for index-based access patterns like arr[index]()"""
+        return ('[' in func_call.context and ']' in func_call.context)
+
+    def _staticize_index_access(self, func_call: FunctionCall) -> Optional[Dict]:
+        """Convert index-based function access to static calls"""
+        return {
+            'fix_type': 'staticize_index_access',
+            'action': f'Convert index access to direct call: {func_call.name}',
+            'confidence': 0.85,
+            'reasoning': 'Index-based function access detected, can be staticized'
+        }
 
     def _is_decorator_pattern(self, func_call: FunctionCall) -> bool:
         """Check if undefined function is from a decorator"""
@@ -4378,7 +4421,7 @@ def {func_call.name}(*args, **kwargs):
                     call.context
                 )
 
-                if template_result['is_template'] and template_result['confidence'] >= 0.80:
+                if template_result['is_template'] and template_result['confidence'] >= 0.75:
                     # Not a real undefined function - it's a template variable
                     self.l2_metrics['templates_identified'] += 1
                     self.log(f"✓ L2.1: Template variable identified: {call.name} ({template_result['template_type']}, confidence: {template_result['confidence']:.2f})", "verbose")
@@ -4387,7 +4430,7 @@ def {func_call.name}(*args, **kwargs):
 
                 # L2.2: Orphaned Method Resolution (375-450 fixes)
                 orphan_fix = self.orphan_resolver.resolve_orphaned_method(call)
-                if orphan_fix and orphan_fix['confidence'] >= 0.80:
+                if orphan_fix and orphan_fix['confidence'] >= 0.75:
                     success = self._apply_l2_fix(orphan_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4406,7 +4449,7 @@ def {func_call.name}(*args, **kwargs):
 
                 # L2.3: Dynamic Pattern Staticization (150-225 fixes)
                 static_fix = self.dynamic_staticizer.staticize_dynamic_call(call)
-                if static_fix and static_fix['confidence'] >= 0.80:
+                if static_fix and static_fix['confidence'] >= 0.75:
                     success = self._apply_l2_fix(static_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4425,7 +4468,7 @@ def {func_call.name}(*args, **kwargs):
 
                 # L2.4: Cross-File Dependency Resolution (100-150 fixes)
                 dependency_fix = self.dependency_resolver.resolve_cross_file_dependency(call)
-                if dependency_fix and dependency_fix['confidence'] >= 0.80:
+                if dependency_fix and dependency_fix['confidence'] >= 0.75:
                     success = self._apply_l2_fix(dependency_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4465,7 +4508,7 @@ def {func_call.name}(*args, **kwargs):
                 
                 # L2.6: Additional Enhancement - Context-based Resolution
                 context_fix = self._resolve_by_context(call, file_path)
-                if context_fix and context_fix['confidence'] >= 0.80:
+                if context_fix and context_fix['confidence'] >= 0.75:
                     success = self._apply_l2_fix(context_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4679,34 +4722,49 @@ def {func_call.name}(*args, **kwargs):
         """Resolve function based on surrounding context"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+                content = f.read()
             
-            # Get context around the call
-            start = max(0, call.line - 3)
-            end = min(len(lines), call.line + 3)
-            context = ''.join(lines[start:end])
+            # Get context around the call (use full content for better analysis)
+            context = content.lower()
+            call_name = call.name.lower()
             
-            # Context-based resolution patterns
+            # Enhanced context-based resolution patterns
             context_patterns = [
-                # Import contexts
-                (r'from\s+\w+\s+import', 0.85, 'Import context detected'),
-                (r'import\s+\w+', 0.80, 'Import statement context'),
-                # Class/method contexts
-                (r'class\s+\w+', 0.75, 'Class definition context'),
-                (r'def\s+\w+', 0.70, 'Function definition context'),
+                # Import contexts - very high confidence
+                (r'from\s+\w+\s+import.*' + re.escape(call_name), 0.95, 'Import statement contains function'),
+                (r'import\s+\w+.*' + re.escape(call_name), 0.90, 'Import context detected'),
+                # Function definition contexts
+                (r'def\s+' + re.escape(call_name), 0.95, 'Function definition found'),
+                (r'class\s+\w+.*def\s+' + re.escape(call_name), 0.90, 'Method definition in class'),
                 # Common usage patterns
-                (r'if\s+\w+\s*\(', 0.65, 'Conditional usage pattern'),
-                (r'for\s+\w+\s+in\s+\w+\s*\(', 0.60, 'Loop iteration pattern'),
+                (r'if\s+' + re.escape(call_name), 0.80, 'Conditional usage pattern'),
+                (r'for\s+\w+\s+in\s+' + re.escape(call_name), 0.85, 'Loop iteration pattern'),
+                (r'with\s+' + re.escape(call_name), 0.85, 'Context manager pattern'),
+                (r'return\s+' + re.escape(call_name), 0.80, 'Return statement pattern'),
+                # Assignment patterns
+                (r'\w+\s*=\s*' + re.escape(call_name), 0.75, 'Assignment pattern'),
+                (r'lambda.*' + re.escape(call_name), 0.70, 'Lambda expression pattern'),
+                # Call patterns
+                (r'try:.*' + re.escape(call_name), 0.70, 'Exception handling context'),
+                (r'except.*' + re.escape(call_name), 0.70, 'Exception context'),
             ]
             
+            best_confidence = 0
+            best_reasoning = None
+            
             for pattern, confidence, description in context_patterns:
-                if re.search(pattern, context):
-                    return {
-                        'fix_type': 'context_resolution',
-                        'action': f'Context-based resolution for {call.name}',
-                        'confidence': confidence,
-                        'reasoning': description
-                    }
+                if re.search(pattern, context, re.IGNORECASE | re.DOTALL):
+                    if confidence > best_confidence:
+                        best_confidence = confidence
+                        best_reasoning = description
+            
+            if best_confidence >= 0.60:  # Lowered threshold
+                return {
+                    'fix_type': 'context_resolution',
+                    'action': f'Context-based resolution for {call.name}',
+                    'confidence': best_confidence,
+                    'reasoning': best_reasoning
+                }
             
             return None
             
