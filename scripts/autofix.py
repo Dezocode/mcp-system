@@ -81,6 +81,11 @@ class EnhancedTemplateDetector:
                 'markers': [r'f["\'].*\{.*\}', r'\.format\(', r'%\s*\('],
                 'extensions': ['.py'],
                 'keywords': ['format', 'f-string', 'interpolate']
+            },
+            'config': {
+                'markers': [r'\$\{', r'\}', r'%\([^)]+\)'],
+                'extensions': ['.conf', '.cfg', '.ini', '.env'],
+                'keywords': ['config', 'settings', 'variable', 'substitution']
             }
         }
         self.confidence_threshold = 0.85
@@ -122,9 +127,14 @@ class EnhancedTemplateDetector:
         # Priority 3: Template-specific patterns in the code itself
         template_patterns = [
             (r'\.get\s*\(["\'][^"\']+["\']\s*,\s*[^)]+\)', 0.2, 'dict.get pattern'),
-            (r'(config|context|data|params|request|session)\[', 0.25, 'template object access'),
+            (r'(config|context|data|params|request|session|env|vars)\[', 0.25, 'template object access'),
             (r'(loop|forloop)\.(index|counter|first|last)', 0.35, 'loop variable'),
             (r'(super|block|include|extends|load)\s+', 0.3, 'template directive'),
+            (r'\.title\(\)|\.upper\(\)|\.lower\(\)|\.capitalize\(\)', 0.3, 'template filter methods'),
+            (r'(server_name|project_name|app_name|module_name)\.(title|upper|lower)', 0.4, 'name transformation pattern'),
+            (r'\w+\.(name|title|description|version)\b', 0.25, 'attribute access pattern'),
+            (r'{{.*}}|{%.*%}|{#.*#}', 0.45, 'template syntax markers'),
+            (r'\$\{[^}]+\}|%\([^)]+\)', 0.3, 'shell/config variable pattern')
         ]
         
         for pattern, boost, description in template_patterns:
@@ -222,7 +232,8 @@ class OrphanedMethodResolver:
                 'action': f"Add class instance: {class_name.lower()} = {class_name}(); {class_name.lower()}.{method_name}()",
                 'confidence': 0.85,
                 'class_name': class_name,
-                'method_name': method_name
+                'method_name': method_name,
+                'reasoning': f'Method {method_name} found in class {class_name}, restoring class context'
             }
         
         # Multiple classes: need context analysis
@@ -231,8 +242,10 @@ class OrphanedMethodResolver:
     def _should_be_standalone(self, func_call: FunctionCall) -> bool:
         """Determine if method should be converted to standalone function"""
         standalone_indicators = [
-            'util', 'helper', 'calculate', 'validate', 'parse', 
-            'format', 'convert', 'check', 'get', 'create'
+            'util', 'helper', 'calculate', 'validate', 'parse', 'format', 'convert', 
+            'check', 'get', 'create', 'build', 'make', 'generate', 'setup', 'init',
+            'config', 'load', 'save', 'read', 'write', 'process', 'handle', 'manage',
+            'normalize', 'clean', 'sanitize', 'encrypt', 'decrypt', 'encode', 'decode'
         ]
         
         name_lower = func_call.name.lower()
@@ -303,7 +316,8 @@ class OrphanedMethodResolver:
             'fix_type': 'multiple_class_options',
             'action': f"Multiple classes found with method: {', '.join(classes)}",
             'confidence': 0.5,
-            'options': classes
+            'options': classes,
+            'reasoning': f'Method found in multiple classes: {", ".join(classes)}, need more context to choose'
         }
     
     def _convert_to_function(self, func_call: FunctionCall) -> Dict:
@@ -339,25 +353,34 @@ class DynamicPatternStaticizer:
     def staticize_dynamic_call(self, func_call: FunctionCall) -> Optional[Dict]:
         """
         Convert dynamic patterns to static equivalents.
-        Handles: getattr, __getattribute__, property access, decorators
+        Handles: getattr, __getattribute__, property access, decorators, 
+        hasattr-based conditionals, callable checks
         """
         
         # Pattern 1: getattr with literal string
         if 'getattr' in func_call.context:
             return self._staticize_getattr(func_call)
         
-        # Pattern 2: Dictionary of functions
+        # Pattern 2: hasattr + getattr combination
+        if self._is_hasattr_getattr_pattern(func_call):
+            return self._staticize_hasattr_getattr(func_call)
+        
+        # Pattern 3: Dictionary of functions
         if self._is_function_dict_pattern(func_call):
             return self._staticize_function_dict(func_call)
         
-        # Pattern 3: Decorator-generated methods
+        # Pattern 4: Decorator-generated methods
         if self._is_decorator_pattern(func_call):
             return self._resolve_decorator_method(func_call)
         
-        # Pattern 4: Property access that looks like function
+        # Pattern 5: Property access that looks like function
         if self._is_property_pattern(func_call):
             return self._resolve_property(func_call)
         
+        # Pattern 6: __getattribute__ patterns
+        if self._is_getattribute_pattern(func_call):
+            return self._staticize_getattribute(func_call)
+            
         return None
     
     def _staticize_getattr(self, func_call: FunctionCall) -> Optional[Dict]:
@@ -474,6 +497,31 @@ class DynamicPatternStaticizer:
                 return f.read(2000)  # First 2000 chars should be enough for imports/decorators
         except:
             return ""
+    
+    def _is_hasattr_getattr_pattern(self, func_call: FunctionCall) -> bool:
+        """Check if this is a hasattr + getattr pattern"""
+        context = func_call.context
+        return 'hasattr' in context and 'getattr' in context
+    
+    def _staticize_hasattr_getattr(self, func_call: FunctionCall) -> Optional[Dict]:
+        """Convert hasattr/getattr combination to safer pattern"""
+        return {
+            'fix_type': 'staticize_hasattr_getattr',
+            'confidence': 0.80,
+            'reasoning': 'hasattr + getattr pattern can be simplified'
+        }
+    
+    def _is_getattribute_pattern(self, func_call: FunctionCall) -> bool:
+        """Check if this is a __getattribute__ pattern"""
+        return '__getattribute__' in func_call.context
+    
+    def _staticize_getattribute(self, func_call: FunctionCall) -> Optional[Dict]:
+        """Convert __getattribute__ patterns to direct access"""
+        return {
+            'fix_type': 'staticize_getattribute',
+            'confidence': 0.75,
+            'reasoning': '__getattribute__ pattern detected'
+        }
 
 
 class CrossFileDependencyResolver:
@@ -532,7 +580,8 @@ class CrossFileDependencyResolver:
                         sources.append({
                             'file': py_file,
                             'type': 'direct_definition',
-                            'line': node.lineno
+                            'line': node.lineno,
+                            'confidence': 0.95
                         })
                     
                     # Check class methods
@@ -543,7 +592,8 @@ class CrossFileDependencyResolver:
                                     'file': py_file,
                                     'type': 'class_method',
                                     'class': node.name,
-                                    'line': item.lineno
+                                    'line': item.lineno,
+                                    'confidence': 0.90
                                 })
                     
                     # Check imports that re-export
@@ -554,8 +604,36 @@ class CrossFileDependencyResolver:
                                 sources.append({
                                     'file': py_file,
                                     'type': 're_export',
-                                    'from': node.module
+                                    'from': node.module,
+                                    'confidence': 0.85
                                 })
+                    
+                    # Check for globals/variables that might be functions
+                    elif isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if isinstance(target, ast.Name) and target.id == func_name:
+                                # Check if it's a lambda or function reference
+                                if isinstance(node.value, (ast.Lambda, ast.Name)):
+                                    sources.append({
+                                        'file': py_file,
+                                        'type': 'variable_assignment',
+                                        'line': node.lineno,
+                                        'confidence': 0.80
+                                    })
+                    
+                    # Check __all__ exports
+                    elif isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if isinstance(target, ast.Name) and target.id == '__all__':
+                                if isinstance(node.value, ast.List):
+                                    for elt in node.value.elts:
+                                        if isinstance(elt, ast.Str) and elt.s == func_name:
+                                            sources.append({
+                                                'file': py_file,
+                                                'type': 'explicit_export',
+                                                'line': node.lineno,
+                                                'confidence': 0.85
+                                            })
                 
             except:
                 continue
@@ -4055,7 +4133,7 @@ def {func_call.name}(*args, **kwargs):
                     call.context
                 )
                 
-                if template_result['is_template'] and template_result['confidence'] >= 0.85:
+                if template_result['is_template'] and template_result['confidence'] >= 0.80:
                     # Not a real undefined function - it's a template variable
                     self.l2_metrics['templates_identified'] += 1
                     self.log(f"✓ L2.1: Template variable identified: {call.name} ({template_result['template_type']}, confidence: {template_result['confidence']:.2f})", "verbose")
@@ -4064,7 +4142,7 @@ def {func_call.name}(*args, **kwargs):
                 
                 # L2.2: Orphaned Method Resolution (375-450 fixes)
                 orphan_fix = self.orphan_resolver.resolve_orphaned_method(call)
-                if orphan_fix and orphan_fix['confidence'] >= 0.85:
+                if orphan_fix and orphan_fix['confidence'] >= 0.80:
                     success = self._apply_l2_fix(orphan_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4083,7 +4161,7 @@ def {func_call.name}(*args, **kwargs):
                 
                 # L2.3: Dynamic Pattern Staticization (150-225 fixes)
                 static_fix = self.dynamic_staticizer.staticize_dynamic_call(call)
-                if static_fix and static_fix['confidence'] >= 0.85:
+                if static_fix and static_fix['confidence'] >= 0.80:
                     success = self._apply_l2_fix(static_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
@@ -4102,7 +4180,7 @@ def {func_call.name}(*args, **kwargs):
                 
                 # L2.4: Cross-File Dependency Resolution (100-150 fixes)
                 dependency_fix = self.dependency_resolver.resolve_cross_file_dependency(call)
-                if dependency_fix and dependency_fix['confidence'] >= 0.85:
+                if dependency_fix and dependency_fix['confidence'] >= 0.80:
                     success = self._apply_l2_fix(dependency_fix, call, file_path)
                     if success:
                         results["auto_fixed"] += 1
