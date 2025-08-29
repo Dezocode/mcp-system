@@ -1,0 +1,1 @@
+installers/install-mcp-system.py:10: error: Invalid syntax  [syntax]

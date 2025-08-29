@@ -14,7 +14,7 @@ This server provides 12 tools for advanced pipeline automation:
 8. mcp_compliance_check - Validate MCP standards
 9. claude_agent_protocol - Bidirectional communication with Claude
 10. get_claude_fix_commands - Generate Edit/MultiEdit commands for Claude
-11. differential_restoration - Surgical code restoration to prevent deletions  
+11. differential_restoration - Surgical code restoration to prevent deletions
 12. streaming_fix_monitor - Real-time streaming of fix instructions
 
 MASSIVE IMPROVEMENTS + CLAUDE CODE INTEGRATION:
@@ -34,19 +34,19 @@ Version: 2.0.0 (Massive Improvements)
 MCP Protocol: v1.0
 """
 
+import ast
 import asyncio
 import json
+import logging
+import re
 import sys
+import threading
 import time
 import uuid
-import threading
-import ast
-import re
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import asdict
-import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 # Add repository root to path for imports
 repo_root = Path(__file__).parent.parent.parent
@@ -54,64 +54,70 @@ sys.path.insert(0, str(repo_root))
 
 # Removed invalid import - using MCP v1.0 error codes directly
 
+from src.config.config_manager import ConfigManager, config_manager
+
 # Environment Detection System
 from src.config.environment_detector import EnvironmentDetector, environment_detector
-from src.config.config_manager import ConfigManager, config_manager
 from src.config.platform_adapter import PlatformAdapter, platform_adapter
 from src.config.runtime_profiler import RuntimeProfiler, runtime_profiler
 
-# Docker Integration System  
+# Docker Integration System
 from src.docker.health_check import DockerHealthCheck, docker_health_check
+from src.monitoring.metrics_collector import MetricsCollector
 
 # Real-Time Monitoring System (Phase 2.1 Implementation)
 from src.monitoring.realtime_monitor import RealtimeMonitor
-from src.monitoring.metrics_collector import MetricsCollector
+from src.processing.differential_restoration import DifferentialRestoration
+from src.processing.job_queue import JobQueue, Priority
 
 # Parallel Processing Engine (Phase 2.1.5-2.1.6 Implementation)
 from src.processing.parallel_executor import ParallelExecutor
-from src.processing.job_queue import JobQueue, Priority
-from src.processing.differential_restoration import DifferentialRestoration
 
 # Claude Agent Protocol Integration (Enhanced Bidirectional Communication)
 try:
     # Add repository root to path for Claude agent protocol
     import sys
     from pathlib import Path
+
     repo_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(repo_root / "scripts"))
-    from claude_agent_protocol import get_protocol, TaskType, ActionType
+    from claude_agent_protocol import ActionType, TaskType, get_protocol
+
     CLAUDE_PROTOCOL_AVAILABLE = True
 except ImportError as e:
     # Logger will be defined after logging setup
     CLAUDE_PROTOCOL_AVAILABLE = False
     CLAUDE_PROTOCOL_ERROR = str(e)
 
+
 # MCP Error compatibility layer
 class McpError(Exception):
     """MCP Error compatibility wrapper"""
+
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
         super().__init__(message)
 
+
+from mcp.server import Server
+
 # MCP Protocol Imports (MCP v1.0)
 from mcp.server.models import InitializationOptions
-from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
-    Tool,
-    TextContent,
-    JSONRPCError,
-    ErrorData,
+    INTERNAL_ERROR,
     INVALID_PARAMS,
     METHOD_NOT_FOUND,
-    INTERNAL_ERROR
+    ErrorData,
+    JSONRPCError,
+    TextContent,
+    Tool,
 )
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -135,17 +141,17 @@ class PipelineSession:
             "fixes_applied": 0,
             "remaining_issues": 0,
             "execution_time": 0,
-            "stages_completed": []
+            "stages_completed": [],
         }
         self.artifacts = []
         self.error_count = 0
         self.last_updated = self.created_at
-        
+
         # ADD MONITORING CAPABILITIES (Phase 2.1.2)
         self.realtime_monitor = RealtimeMonitor(session_id)
         self.metrics_collector = MetricsCollector()
         self.performance_baseline = None
-        
+
         # ADD CLAUDE AGENT PROTOCOL (Enhanced Bidirectional Communication)
         if CLAUDE_PROTOCOL_AVAILABLE:
             self.claude_protocol = get_protocol(
@@ -163,7 +169,7 @@ class PipelineSession:
             if stage not in self.metrics["stages_completed"]:
                 self.metrics["stages_completed"].append(stage)
         self.last_updated = datetime.now(timezone.utc)
-        
+
         # ADD MONITORING UPDATE (Phase 2.1.2)
         if stage:
             self.realtime_monitor.record_metric("stage_transition", stage)
@@ -171,11 +177,13 @@ class PipelineSession:
 
     def add_artifact(self, path: str, artifact_type: str):
         """Add artifact to session tracking."""
-        self.artifacts.append({
-            "path": path,
-            "type": artifact_type,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
+        self.artifacts.append(
+            {
+                "path": path,
+                "type": artifact_type,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     def get_status_dict(self) -> Dict[str, Any]:
         """Get complete session status as dictionary."""
@@ -188,12 +196,12 @@ class PipelineSession:
             "metrics": self.metrics,
             "artifacts": self.artifacts,
             "error_count": self.error_count,
-            "execution_time": (self.last_updated - self.created_at).total_seconds()
+            "execution_time": (self.last_updated - self.created_at).total_seconds(),
         }
-        
+
         # ADD MONITORING DATA (Phase 2.1.2)
         status_dict["monitoring"] = self.realtime_monitor.get_current_metrics()
-        
+
         return status_dict
 
 
@@ -203,68 +211,80 @@ class PipelineMCPServer:
     def __init__(self):
         self.server = Server("pipeline-mcp-server")
         self.sessions: Dict[str, PipelineSession] = {}
-        
+
         # Initialize environment detection and adaptive configuration
         self.environment_detector = environment_detector
         self.config_manager = config_manager
         self.platform_adapter = platform_adapter
         self.runtime_profiler = runtime_profiler
-        
+
         # Initialize Docker health check system
         self.docker_health_check = docker_health_check
         self.docker_health_check.config_manager = self.config_manager
-        
+
         # ADD PARALLEL EXECUTOR INITIALIZATION (Phase 2.1.6)
         self.parallel_executor = ParallelExecutor(max_workers=3)
         self.job_queue = JobQueue(max_concurrent_jobs=3)
-        
+
         # Detect environment and apply adaptive configuration
         self.environment_info = self.environment_detector.detect_environment()
         self.adaptive_config = self.config_manager.get_config()
-        self.platform_optimizations = self.platform_adapter.optimize_for_current_platform()
-        
+        self.platform_optimizations = (
+            self.platform_adapter.optimize_for_current_platform()
+        )
+
         # Apply adaptive configuration
         self._apply_adaptive_configuration()
-        
+
         # Start runtime profiling
         self.runtime_profiler.start_profiling()
-        
+
         # Server capabilities
         self.server_capabilities = {
             "experimental": {},
             "logging": {},
             "prompts": {},
             "resources": {},
-            "tools": {}
+            "tools": {},
         }
 
-        logger.info(f"Environment detection initialized: {'Docker' if self.environment_info.is_docker else 'Local'}")
-        logger.info(f"Platform: {self.environment_info.platform} {self.environment_info.architecture}")
+        logger.info(
+            f"Environment detection initialized: {'Docker' if self.environment_info.is_docker else 'Local'}"
+        )
+        logger.info(
+            f"Platform: {self.environment_info.platform} {self.environment_info.architecture}"
+        )
         logger.info(f"Pipeline MCP Server initialized at {self.workspace_root}")
         logger.info(f"Session directory: {self.session_dir}")
-        
+
     def _apply_adaptive_configuration(self):
         """Apply adaptive configuration based on environment"""
         # Update workspace settings
         self.workspace_root = Path(self.adaptive_config.workspace_root)
         self.session_dir = Path(self.adaptive_config.session_dir)
         self.database_path = Path(self.adaptive_config.database_path)
-        
+
         # Update performance settings
         self.max_workers = self.adaptive_config.max_workers
         self.default_timeout = self.adaptive_config.timeout
-        
+
         # Update logging
-        logging.getLogger().setLevel(getattr(logging, self.adaptive_config.log_level.upper()))
-        
+        logging.getLogger().setLevel(
+            getattr(logging, self.adaptive_config.log_level.upper())
+        )
+
         # Update security settings
-        self.allowed_paths = self.adaptive_config.security_settings.get("allowed_paths", [str(Path.cwd())])
-        self.restricted_paths = self.adaptive_config.security_settings.get("restricted_paths", [])
-        
+        self.allowed_paths = self.adaptive_config.security_settings.get(
+            "allowed_paths", [str(Path.cwd())]
+        )
+        self.restricted_paths = self.adaptive_config.security_settings.get(
+            "restricted_paths", []
+        )
+
         # Ensure directories exist with proper permissions
         for directory in [self.session_dir, self.database_path.parent]:
             directory.mkdir(parents=True, exist_ok=True)
-            
+
         logger.info("Adaptive configuration applied successfully")
 
     def create_session(self) -> str:
@@ -284,21 +304,21 @@ class PipelineMCPServer:
         """Get pipeline session by ID."""
         return self.sessions.get(session_id)
 
-    async def run_command(self, command: List[str], cwd: Optional[Path] = None,
-                          timeout: int = 300) -> Tuple[int, str, str]:
+    async def run_command(
+        self, command: List[str], cwd: Optional[Path] = None, timeout: int = 300
+    ) -> Tuple[int, str, str]:
         """Run shell command with timeout and error handling."""
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=cwd or self.workspace_root
+                cwd=cwd or self.workspace_root,
             )
 
             try:
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
+                    process.communicate(), timeout=timeout
                 )
                 return process.returncode, stdout.decode(), stderr.decode()
             except asyncio.TimeoutError:
@@ -314,7 +334,7 @@ class PipelineMCPServer:
         required_files = [
             "scripts/version_keeper.py",
             "scripts/claude_quality_patcher.py",
-            "requirements.txt"
+            "requirements.txt",
         ]
 
         for file_path in required_files:
@@ -348,29 +368,29 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "description": (
                             "Optional session ID (will create new if not provided)"
-                        )
+                        ),
                     },
                     "comprehensive": {
                         "type": "boolean",
                         "description": "Enable comprehensive linting mode",
-                        "default": True
+                        "default": True,
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "target_files": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": (
                             "Specific files to scan (optional, defaults to all)"
-                        )
-                    }
+                        ),
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="quality_patcher_fix",
@@ -383,31 +403,31 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID (required for tracking fixes)"
+                        "description": "Session ID (required for tracking fixes)",
                     },
                     "lint_report_path": {
                         "type": "string",
-                        "description": "Path to lint report JSON file"
+                        "description": "Path to lint report JSON file",
                     },
                     "max_fixes": {
                         "type": "integer",
                         "description": "Maximum number of fixes to apply (-1 for unlimited)",
                         "minimum": -1,
-                        "default": -1
+                        "default": -1,
                     },
                     "auto_apply": {
                         "type": "boolean",
                         "description": "Automatically apply fixes without confirmation",
-                        "default": True
+                        "default": True,
                     },
                     "claude_agent": {
                         "type": "boolean",
                         "description": "Use Claude agent for intelligent fixes",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["session_id"]
-            }
+                "required": ["session_id"],
+            },
         ),
         Tool(
             name="pipeline_run_full",
@@ -421,29 +441,29 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "integer",
                         "description": "Maximum number of pipeline cycles (-1 for unlimited until completion)",
                         "minimum": -1,
-                        "default": -1
+                        "default": -1,
                     },
                     "max_fixes_per_cycle": {
                         "type": "integer",
                         "description": "Maximum fixes per cycle (-1 for unlimited)",
                         "minimum": -1,
-                        "default": -1
+                        "default": -1,
                     },
                     "target_quality_score": {
                         "type": "number",
                         "description": "Target quality score (0-100)",
                         "minimum": 0,
                         "maximum": 100,
-                        "default": 95.0
+                        "default": 95.0,
                     },
                     "break_on_no_issues": {
                         "type": "boolean",
                         "description": "Stop pipeline when no issues found",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="github_workflow_trigger",
@@ -454,12 +474,12 @@ async def handle_list_tools() -> List[Tool]:
                     "workflow_name": {
                         "type": "string",
                         "description": "Name of GitHub workflow to trigger",
-                        "default": "pipeline-integration.yml"
+                        "default": "pipeline-integration.yml",
                     },
                     "ref": {
                         "type": "string",
                         "description": "Git ref to run workflow on",
-                        "default": "main"
+                        "default": "main",
                     },
                     "inputs": {
                         "type": "object",
@@ -468,23 +488,23 @@ async def handle_list_tools() -> List[Tool]:
                             "max_fixes": {
                                 "type": "string",
                                 "description": "Maximum number of fixes",
-                                "default": "10"
+                                "default": "10",
                             },
                             "force_fresh_report": {
                                 "type": "string",
                                 "description": "Force fresh lint report",
-                                "default": "false"
-                            }
-                        }
+                                "default": "false",
+                            },
+                        },
                     },
                     "wait_for_completion": {
                         "type": "boolean",
                         "description": "Wait for workflow completion",
-                        "default": False
-                    }
+                        "default": False,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="pipeline_status",
@@ -496,21 +516,21 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "description": (
                             "Specific session ID (optional, returns all if none)"
-                        )
+                        ),
                     },
                     "include_artifacts": {
                         "type": "boolean",
                         "description": "Include artifact information",
-                        "default": True
+                        "default": True,
                     },
                     "include_metrics": {
                         "type": "boolean",
                         "description": "Include performance metrics",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="environment_detection",
@@ -520,29 +540,37 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["detect", "summary", "config", "validate", "reload", "profile", "optimize"],
+                        "enum": [
+                            "detect",
+                            "summary",
+                            "config",
+                            "validate",
+                            "reload",
+                            "profile",
+                            "optimize",
+                        ],
                         "description": "Action to perform",
-                        "default": "detect"
+                        "default": "detect",
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "include_performance": {
                         "type": "boolean",
                         "description": "Include performance metrics in output",
-                        "default": True
+                        "default": True,
                     },
                     "include_system_health": {
                         "type": "boolean",
                         "description": "Include system health metrics",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="health_monitoring",
@@ -554,26 +582,26 @@ async def handle_list_tools() -> List[Tool]:
                         "type": "string",
                         "enum": ["health_check", "comprehensive", "export"],
                         "description": "Type of health monitoring to perform",
-                        "default": "health_check"
+                        "default": "health_check",
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for results",
-                        "default": "json"
+                        "default": "json",
                     },
                     "export_path": {
                         "type": "string",
-                        "description": "Path to export detailed health report (for export action)"
+                        "description": "Path to export detailed health report (for export action)",
                     },
                     "include_details": {
                         "type": "boolean",
                         "description": "Include detailed component information",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="mcp_compliance_check",
@@ -584,27 +612,27 @@ async def handle_list_tools() -> List[Tool]:
                     "check_tools": {
                         "type": "boolean",
                         "description": "Validate tool definitions",
-                        "default": True
+                        "default": True,
                     },
                     "check_schemas": {
                         "type": "boolean",
                         "description": "Validate input schemas",
-                        "default": True
+                        "default": True,
                     },
                     "check_error_handling": {
                         "type": "boolean",
                         "description": "Validate error handling",
-                        "default": True
+                        "default": True,
                     },
                     "output_format": {
                         "type": "string",
                         "enum": ["json", "text"],
                         "description": "Output format for compliance report",
-                        "default": "json"
-                    }
+                        "default": "json",
+                    },
                 },
-                "required": []
-            }
+                "required": [],
+            },
         ),
         Tool(
             name="get_claude_fix_commands",
@@ -614,36 +642,40 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID containing lint report"
+                        "description": "Session ID containing lint report",
                     },
                     "lint_report_path": {
                         "type": "string",
-                        "description": "Path to lint report JSON (optional if session has one)"
+                        "description": "Path to lint report JSON (optional if session has one)",
                     },
                     "max_fixes": {
                         "type": "integer",
                         "description": "Maximum fixes to return (-1 for unlimited)",
-                        "default": -1
+                        "default": -1,
                     },
                     "format": {
                         "type": "string",
-                        "enum": ["edit_commands", "multiedit_batches", "direct_instructions"],
+                        "enum": [
+                            "edit_commands",
+                            "multiedit_batches",
+                            "direct_instructions",
+                        ],
                         "description": "Output format for Claude tools",
-                        "default": "multiedit_batches"
+                        "default": "multiedit_batches",
                     },
                     "include_context": {
                         "type": "boolean",
                         "description": "Include surrounding context for validation",
-                        "default": True
+                        "default": True,
                     },
                     "priority_filter": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Filter by priority categories (security, quality, duplicates)"
-                    }
+                        "description": "Filter by priority categories (security, quality, duplicates)",
+                    },
                 },
-                "required": ["session_id"]
-            }
+                "required": ["session_id"],
+            },
         ),
         Tool(
             name="differential_restoration",
@@ -653,37 +685,37 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID for tracking"
+                        "description": "Session ID for tracking",
                     },
                     "files_to_check": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Files to check for deletions (optional, checks all if not specified)"
+                        "description": "Files to check for deletions (optional, checks all if not specified)",
                     },
                     "restoration_mode": {
                         "type": "string",
                         "enum": ["surgical", "selective", "critical_only", "full"],
                         "description": "Restoration strategy",
-                        "default": "surgical"
+                        "default": "surgical",
                     },
                     "confidence_threshold": {
                         "type": "number",
                         "description": "Minimum confidence for restoration (0.0-1.0)",
-                        "default": 0.6
+                        "default": 0.6,
                     },
                     "auto_apply": {
                         "type": "boolean",
                         "description": "Automatically apply restorations",
-                        "default": False
+                        "default": False,
                     },
                     "return_edit_commands": {
                         "type": "boolean",
                         "description": "Return as Edit/MultiEdit commands for Claude",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["session_id"]
-            }
+                "required": ["session_id"],
+            },
         ),
         Tool(
             name="streaming_fix_monitor",
@@ -693,27 +725,27 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID to monitor"
+                        "description": "Session ID to monitor",
                     },
                     "stream_mode": {
                         "type": "string",
                         "enum": ["continuous", "batch", "on_demand"],
                         "description": "Streaming mode",
-                        "default": "continuous"
+                        "default": "continuous",
                     },
                     "batch_size": {
                         "type": "integer",
                         "description": "Fixes per batch (for batch mode)",
-                        "default": 5
+                        "default": 5,
                     },
                     "format_for_claude": {
                         "type": "boolean",
                         "description": "Format output for direct Claude tool usage",
-                        "default": True
-                    }
+                        "default": True,
+                    },
                 },
-                "required": ["session_id"]
-            }
+                "required": ["session_id"],
+            },
         ),
         Tool(
             name="semantic_catalog_review",
@@ -723,82 +755,90 @@ async def handle_list_tools() -> List[Tool]:
                 "properties": {
                     "session_id": {
                         "type": "string",
-                        "description": "Session ID for tracking"
+                        "description": "Session ID for tracking",
                     },
                     "action": {
                         "type": "string",
-                        "enum": ["full_review", "create_version_branch", "diff_analysis", "semantic_analysis", "compliance_check", "auto_fix"],
+                        "enum": [
+                            "full_review",
+                            "create_version_branch",
+                            "diff_analysis",
+                            "semantic_analysis",
+                            "compliance_check",
+                            "auto_fix",
+                        ],
                         "description": "Action to perform",
-                        "default": "full_review"
+                        "default": "full_review",
                     },
                     "version_bump_type": {
                         "type": "string",
                         "enum": ["patch", "minor", "major"],
                         "description": "Type of version bump for branch creation",
-                        "default": "patch"
+                        "default": "patch",
                     },
                     "base_branch": {
                         "type": "string",
                         "description": "Base branch for comparison",
-                        "default": "main"
+                        "default": "main",
                     },
                     "target_branch": {
                         "type": "string",
-                        "description": "Target branch for comparison (optional, auto-generated if creating)"
+                        "description": "Target branch for comparison (optional, auto-generated if creating)",
                     },
                     "include_function_review": {
                         "type": "boolean",
                         "description": "Include detailed function-level review",
-                        "default": True
+                        "default": True,
                     },
                     "include_watchdog_compliance": {
                         "type": "boolean",
                         "description": "Include watchdog compliance checking",
-                        "default": True
+                        "default": True,
                     },
                     "response_format": {
                         "type": "string",
                         "enum": ["json", "react", "mcp_compatible"],
                         "description": "Output format compatible with MCP/React",
-                        "default": "mcp_compatible"
+                        "default": "mcp_compatible",
                     },
                     "high_resolution_mode": {
                         "type": "boolean",
                         "description": "Enable high-resolution execution and analysis",
-                        "default": True
+                        "default": True,
                     },
                     "hierarchical_protection": {
                         "type": "boolean",
                         "description": "Enable hierarchical protection for 100% reliability",
-                        "default": True
+                        "default": True,
                     },
                     "auto_fix": {
                         "type": "boolean",
                         "description": "Enable automatic fixing of detected issues",
-                        "default": False
+                        "default": False,
                     },
                     "communicate_to_claude": {
                         "type": "boolean",
                         "description": "Communicate results including diffs and version keeper issues to Claude",
-                        "default": False
+                        "default": False,
                     },
                     "github_integration": {
                         "type": "boolean",
                         "description": "Enable GitHub API integration for remote branch creation",
-                        "default": False
+                        "default": False,
                     },
                     "operation_timeout": {
                         "type": "integer",
                         "description": "Operation timeout in seconds for long-running operations",
                         "default": 1800,
                         "minimum": 60,
-                        "maximum": 3600
-                    }
+                        "maximum": 3600,
+                    },
                 },
-                "required": ["session_id"]
-            }
-        )
+                "required": ["session_id"],
+            },
+        ),
     ]
+
 
 # Tool Implementation Functions
 
@@ -835,19 +875,13 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[TextCon
         elif name == "semantic_catalog_review":
             return await handle_semantic_catalog_review(arguments)
         else:
-            raise McpError(
-                METHOD_NOT_FOUND,
-                f"Unknown tool: {name}"
-            )
+            raise McpError(METHOD_NOT_FOUND, f"Unknown tool: {name}")
 
     except McpError:
         raise
     except Exception as e:
         logger.error(f"Tool {name} failed: {str(e)}")
-        raise McpError(
-            INTERNAL_ERROR,
-            f"Tool execution failed: {str(e)}"
-        )
+        raise McpError(INTERNAL_ERROR, f"Tool execution failed: {str(e)}")
 
 
 async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -863,14 +897,14 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
         raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
 
     session.update_status("scanning", "version_keeper_scan")
-    
+
     # ADD MONITORING START (Phase 2.1.2)
     monitor_id = session.realtime_monitor.start_monitoring(
-        f"version_keeper_scan_{int(time.time())}", 
+        f"version_keeper_scan_{int(time.time())}",
         "version_keeper_scan",
-        {"arguments": arguments}
+        {"arguments": arguments},
     )
-    
+
     # ADD CLAUDE PROTOCOL INTEGRATION (Enhanced Bidirectional Communication)
     if session.claude_protocol and CLAUDE_PROTOCOL_AVAILABLE:
         task = session.claude_protocol.create_task(
@@ -878,13 +912,12 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
             context={
                 "session_id": session_id,
                 "operation": "version_keeper_scan",
-                "arguments": arguments
+                "arguments": arguments,
             },
-            priority=1
+            priority=1,
         )
         session.claude_protocol.record_thought(
-            task.task_id,
-            f"Starting comprehensive lint scan for session {session_id}"
+            task.task_id, f"Starting comprehensive lint scan for session {session_id}"
         )
 
     # Prepare command arguments
@@ -892,7 +925,7 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
         sys.executable,
         str(pipeline_server.workspace_root / "scripts" / "version_keeper.py"),
         "--comprehensive-lint",
-        "--lint-only"
+        "--lint-only",
     ]
 
     # Add format and output options
@@ -926,17 +959,13 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     if returncode != 0:
         session.update_status("failed", "version_keeper_scan")
         session.error_count += 1
-        
+
         # ADD ERROR MONITORING (Phase 2.1.2)
-        session.realtime_monitor.stop_monitoring(monitor_id, {
-            "error": stderr,
-            "status": "failed"
-        })
-        
-        raise McpError(
-            INTERNAL_ERROR,
-            f"Version Keeper scan failed: {stderr}"
+        session.realtime_monitor.stop_monitoring(
+            monitor_id, {"error": stderr, "status": "failed"}
         )
+
+        raise McpError(INTERNAL_ERROR, f"Version Keeper scan failed: {stderr}")
 
     # Parse results
     result_data = {"stdout": stdout, "stderr": stderr}
@@ -944,43 +973,51 @@ async def handle_version_keeper_scan(arguments: Dict[str, Any]) -> List[TextCont
     if output_format == "json":
         output_file = pipeline_server.session_dir / session_id / "lint-report.json"
         if output_file.exists():
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 result_data = json.load(f)
                 total_issues = result_data.get("summary", {}).get("total_issues", 0)
                 session.metrics["total_issues_found"] = total_issues
                 session.add_artifact(str(output_file), "lint_report")
 
     session.update_status("completed", "version_keeper_scan")
-    
+
     # ADD SUCCESSFUL MONITORING COMPLETION (Phase 2.1.2)
-    session.realtime_monitor.stop_monitoring(monitor_id, {
-        "status": "success",
-        "issues_found": session.metrics["total_issues_found"],
-        "execution_time": execution_time
-    })
-    
+    session.realtime_monitor.stop_monitoring(
+        monitor_id,
+        {
+            "status": "success",
+            "issues_found": session.metrics["total_issues_found"],
+            "execution_time": execution_time,
+        },
+    )
+
     # ADD CLAUDE PROTOCOL COMPLETION (Enhanced Bidirectional Communication)
     if session.claude_protocol and CLAUDE_PROTOCOL_AVAILABLE:
         session.claude_protocol.record_observation(
-            task.task_id if 'task' in locals() else monitor_id,
+            task.task_id if "task" in locals() else monitor_id,
             {
                 "result": "success",
                 "issues_found": session.metrics["total_issues_found"],
                 "execution_time": execution_time,
-                "artifacts": [artifact["path"] for artifact in session.artifacts]
-            }
+                "artifacts": [artifact["path"] for artifact in session.artifacts],
+            },
         )
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "version_keeper_scan",
-            "session_id": session_id,
-            "status": "success",
-            "execution_time": execution_time,
-            "results": result_data
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "version_keeper_scan",
+                    "session_id": session_id,
+                    "status": "success",
+                    "execution_time": execution_time,
+                    "results": result_data,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -999,7 +1036,7 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     # Prepare command
     cmd = [
         sys.executable,
-        str(pipeline_server.workspace_root / "scripts" / "claude_quality_patcher.py")
+        str(pipeline_server.workspace_root / "scripts" / "claude_quality_patcher.py"),
     ]
 
     # Add options
@@ -1049,35 +1086,39 @@ async def handle_quality_patcher_fix(arguments: Dict[str, Any]) -> List[TextCont
     if returncode != 0:
         session.update_status("failed", "quality_patcher_fix")
         session.error_count += 1
-        raise McpError(
-            INTERNAL_ERROR,
-            f"Quality Patcher failed: {stderr}"
-        )
+        raise McpError(INTERNAL_ERROR, f"Quality Patcher failed: {stderr}")
 
     # Parse results
     result_data = {"stdout": stdout, "stderr": stderr}
 
     if output_file.exists():
-        with open(output_file, 'r') as f:
+        with open(output_file, "r") as f:
             result_data = json.load(f)
-            session.metrics["fixes_applied"] = result_data.get(
-                "summary", {}).get("fixes_applied", 0)
-            session.metrics["remaining_issues"] = result_data.get(
-                "summary", {}).get("remaining_issues", 0)
+            session.metrics["fixes_applied"] = result_data.get("summary", {}).get(
+                "fixes_applied", 0
+            )
+            session.metrics["remaining_issues"] = result_data.get("summary", {}).get(
+                "remaining_issues", 0
+            )
             session.add_artifact(str(output_file), "fixes_report")
 
     session.update_status("completed", "quality_patcher_fix")
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "quality_patcher_fix",
-            "session_id": session_id,
-            "status": "success",
-            "execution_time": execution_time,
-            "results": result_data
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "quality_patcher_fix",
+                    "session_id": session_id,
+                    "status": "success",
+                    "execution_time": execution_time,
+                    "results": result_data,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -1089,11 +1130,11 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
 
     max_cycles = arguments.get("max_cycles", -1)
     max_fixes_per_cycle = arguments.get("max_fixes_per_cycle", -1)
-    
+
     # Handle unlimited cycles (-1 means run until completion)
     if max_cycles == -1:
         max_cycles = 999  # Very high number for "unlimited"
-    
+
     # Handle unlimited fixes per cycle
     unlimited_fixes = max_fixes_per_cycle == -1
     target_quality = arguments.get("target_quality_score", 95.0)
@@ -1105,16 +1146,16 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         "final_metrics": {},
         "success": False,
         "parallel_processing": True,  # Indicate parallel processing is enabled
-        "performance_improvement": {}
+        "performance_improvement": {},
     }
 
     # ADD PARALLEL EXECUTOR INITIALIZATION (Phase 2.1.6)
     parallel_executor = pipeline_server.parallel_executor
-    
+
     for cycle in range(1, max_cycles + 1):
         cycle_start_time = time.time()
         cycle_result = {"cycle": cycle, "stages": [], "parallel_tasks": []}
-        
+
         # CREATE PARALLEL TASKS FOR CURRENT CYCLE (Phase 2.1.6)
         parallel_tasks = [
             {
@@ -1124,26 +1165,30 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
                 "args": {
                     "session_id": session_id,
                     "comprehensive": True,
-                    "output_format": "json"
-                }
+                    "output_format": "json",
+                },
             }
         ]
 
         try:
             # Stage 1: Version Keeper Scan
             logger.info(f"Cycle {cycle}: Running Version Keeper scan")
-            scan_result = await handle_version_keeper_scan({
-                "session_id": session_id,
-                "comprehensive": True,
-                "output_format": "json"
-            })
+            scan_result = await handle_version_keeper_scan(
+                {
+                    "session_id": session_id,
+                    "comprehensive": True,
+                    "output_format": "json",
+                }
+            )
 
             scan_data = json.loads(scan_result[0].text)
-            cycle_result["stages"].append({
-                "stage": "version_keeper_scan",
-                "status": "completed",
-                "execution_time": scan_data.get("execution_time", 0)
-            })
+            cycle_result["stages"].append(
+                {
+                    "stage": "version_keeper_scan",
+                    "status": "completed",
+                    "execution_time": scan_data.get("execution_time", 0),
+                }
+            )
 
             # Check if no issues found
             issues_found = session.metrics["total_issues_found"]
@@ -1155,36 +1200,44 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
             # Stage 2: Quality Patcher (only if issues found)
             if issues_found > 0:
                 logger.info(f"Cycle {cycle}: Applying fixes for {issues_found} issues")
-                fix_result = await handle_quality_patcher_fix({
-                    "session_id": session_id,
-                    "max_fixes": max_fixes_per_cycle,
-                    "auto_apply": True,
-                    "claude_agent": True
-                })
+                fix_result = await handle_quality_patcher_fix(
+                    {
+                        "session_id": session_id,
+                        "max_fixes": max_fixes_per_cycle,
+                        "auto_apply": True,
+                        "claude_agent": True,
+                    }
+                )
 
                 fix_data = json.loads(fix_result[0].text)
-                cycle_result["stages"].append({
-                    "stage": "quality_patcher_fix",
-                    "status": "completed",
-                    "execution_time": fix_data.get("execution_time", 0),
-                    "fixes_applied": session.metrics["fixes_applied"]
-                })
+                cycle_result["stages"].append(
+                    {
+                        "stage": "quality_patcher_fix",
+                        "status": "completed",
+                        "execution_time": fix_data.get("execution_time", 0),
+                        "fixes_applied": session.metrics["fixes_applied"],
+                    }
+                )
 
                 # Stage 3: Validation Scan
                 logger.info(f"Cycle {cycle}: Running validation scan")
-                validation_result = await handle_version_keeper_scan({
-                    "session_id": session_id,
-                    "comprehensive": True,
-                    "output_format": "json"
-                })
+                validation_result = await handle_version_keeper_scan(
+                    {
+                        "session_id": session_id,
+                        "comprehensive": True,
+                        "output_format": "json",
+                    }
+                )
 
                 validation_data = json.loads(validation_result[0].text)
-                cycle_result["stages"].append({
-                    "stage": "validation_scan",
-                    "status": "completed",
-                    "execution_time": validation_data.get("execution_time", 0),
-                    "remaining_issues": session.metrics["remaining_issues"]
-                })
+                cycle_result["stages"].append(
+                    {
+                        "stage": "validation_scan",
+                        "status": "completed",
+                        "execution_time": validation_data.get("execution_time", 0),
+                        "remaining_issues": session.metrics["remaining_issues"],
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Cycle {cycle} failed: {str(e)}")
@@ -1202,25 +1255,32 @@ async def handle_pipeline_run_full(arguments: Dict[str, Any]) -> List[TextConten
         if quality_score >= target_quality:
             logger.info(
                 f"Target quality score {target_quality}% achieved: "
-                f"{quality_score:.1f}%")
+                f"{quality_score:.1f}%"
+            )
             results["success"] = True
             break
 
     session.update_status("completed", "pipeline_full_cycle")
     results["final_metrics"] = session.get_status_dict()
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "pipeline_run_full",
-            "status": "success" if results["success"] else "partial",
-            "results": results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "pipeline_run_full",
+                    "status": "success" if results["success"] else "partial",
+                    "results": results,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_github_workflow_trigger(
-        arguments: Dict[str, Any]) -> List[TextContent]:
+    arguments: Dict[str, Any],
+) -> List[TextContent]:
     """Trigger GitHub Actions workflow."""
 
     workflow = arguments.get("workflow_name", "pipeline-integration.yml")
@@ -1241,17 +1301,14 @@ async def handle_github_workflow_trigger(
     returncode, stdout, stderr = await pipeline_server.run_command(cmd)
 
     if returncode != 0:
-        raise McpError(
-            INTERNAL_ERROR,
-            f"GitHub workflow trigger failed: {stderr}"
-        )
+        raise McpError(INTERNAL_ERROR, f"GitHub workflow trigger failed: {stderr}")
 
     result = {
         "workflow": workflow,
         "ref": ref,
         "inputs": inputs,
         "status": "triggered",
-        "output": stdout
+        "output": stdout,
     }
 
     # If waiting for completion, monitor the workflow
@@ -1259,16 +1316,22 @@ async def handle_github_workflow_trigger(
         # This would require additional GitHub API calls
         result["note"] = (
             "Workflow triggered successfully. "
-            "Use GitHub web interface to monitor progress.")
+            "Use GitHub web interface to monitor progress."
+        )
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "github_workflow_trigger",
-            "status": "success",
-            "results": result
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "github_workflow_trigger",
+                    "status": "success",
+                    "results": result,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -1293,10 +1356,7 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
         results = {"session": status_data}
     else:
         # Get all sessions
-        results = {
-            "total_sessions": len(pipeline_server.sessions),
-            "sessions": []
-        }
+        results = {"total_sessions": len(pipeline_server.sessions), "sessions": []}
 
         for sess_id, session in pipeline_server.sessions.items():
             status_data = session.get_status_dict()
@@ -1306,14 +1366,15 @@ async def handle_pipeline_status(arguments: Dict[str, Any]) -> List[TextContent]
                 status_data.pop("metrics", None)
             results["sessions"].append(status_data)
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "pipeline_status",
-            "status": "success",
-            "results": results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {"tool": "pipeline_status", "status": "success", "results": results},
+                indent=2,
+            ),
+        )
+    ]
 
 
 async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextContent]:
@@ -1330,7 +1391,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
         "compliance_score": 0,
         "checks": [],
         "issues": [],
-        "recommendations": []
+        "recommendations": [],
     }
 
     total_checks = 0
@@ -1344,7 +1405,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
             "category": "tools",
             "total_tools": len(tools),
             "valid_tools": 0,
-            "issues": []
+            "issues": [],
         }
 
         for tool in tools:
@@ -1359,11 +1420,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
 
     if check_schemas:
         # Check input schema completeness
-        schema_check = {
-            "category": "schemas",
-            "valid_schemas": 0,
-            "issues": []
-        }
+        schema_check = {"category": "schemas", "valid_schemas": 0, "issues": []}
 
         tools = await handle_list_tools()
         for tool in tools:
@@ -1374,7 +1431,8 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
                 schema_check["valid_schemas"] += 1
             else:
                 schema_check["issues"].append(
-                    f"Tool {tool.name} has incomplete inputSchema")
+                    f"Tool {tool.name} has incomplete inputSchema"
+                )
 
         compliance_results["checks"].append(schema_check)
 
@@ -1384,7 +1442,7 @@ async def handle_mcp_compliance_check(arguments: Dict[str, Any]) -> List[TextCon
             "category": "error_handling",
             "mcp_errors_used": True,
             "proper_error_codes": True,
-            "issues": []
+            "issues": [],
         }
 
         total_checks += 2
@@ -1418,14 +1476,19 @@ Passed Tests: {passed_checks}
 
         return [TextContent(type="text", text=text_output)]
 
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "mcp_compliance_check",
-            "status": "success",
-            "results": compliance_results
-        }, indent=2)
-    )]
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "mcp_compliance_check",
+                    "status": "success",
+                    "results": compliance_results,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
 # Server initialization and main function
@@ -1433,424 +1496,560 @@ Passed Tests: {passed_checks}
 
 async def handle_environment_detection(arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle environment detection requests"""
-    
+
     action = arguments.get("action", "detect")
     output_format = arguments.get("output_format", "json")
     include_performance = arguments.get("include_performance", True)
     include_system_health = arguments.get("include_system_health", True)
-    
+
     if action == "detect":
         # Get comprehensive environment information
         env_info = pipeline_server.environment_detector.detect_environment()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "detect",
-                "environment_info": asdict(env_info),
-                "timestamp": time.time()
-            }, indent=2, default=str)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "detect",
+                        "environment_info": asdict(env_info),
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
+
     elif action == "summary":
         # Get environment summary
         summary = pipeline_server.environment_detector.get_environment_summary()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "summary",
-                "summary": summary,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "summary",
+                        "summary": summary,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     elif action == "config":
         # Get current configuration
         config_summary = pipeline_server.config_manager.get_config_summary()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "config",
-                "configuration": config_summary,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "config",
+                        "configuration": config_summary,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     elif action == "validate":
         # Validate current configuration
         validation_results = pipeline_server.config_manager.validate_configuration()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "validate",
-                "validation": validation_results,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "validate",
+                        "validation": validation_results,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     elif action == "reload":
         # Reload configuration
         try:
             pipeline_server.config_manager.reload_configuration()
             pipeline_server._apply_adaptive_configuration()
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "environment_detection",
-                    "action": "reload",
-                    "status": "success",
-                    "message": "Configuration reloaded successfully",
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "environment_detection",
+                            "action": "reload",
+                            "status": "success",
+                            "message": "Configuration reloaded successfully",
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
         except Exception as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "environment_detection",
-                    "action": "reload",
-                    "status": "error",
-                    "error": str(e),
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
-            
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "environment_detection",
+                            "action": "reload",
+                            "status": "error",
+                            "error": str(e),
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
     elif action == "profile":
         # Get runtime performance profile
         performance_data = {}
-        
+
         if include_performance:
             profile = pipeline_server.runtime_profiler.get_current_profile()
-            resource_summary = pipeline_server.runtime_profiler.get_resource_usage_summary()
-            performance_data.update({
-                "performance_profile": asdict(profile),
-                "resource_summary": resource_summary
-            })
-            
+            resource_summary = (
+                pipeline_server.runtime_profiler.get_resource_usage_summary()
+            )
+            performance_data.update(
+                {
+                    "performance_profile": asdict(profile),
+                    "resource_summary": resource_summary,
+                }
+            )
+
         if include_system_health:
             system_health = pipeline_server.runtime_profiler.get_system_health()
             performance_data["system_health"] = system_health
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "profile",
-                **performance_data,
-                "timestamp": time.time()
-            }, indent=2, default=str)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "profile",
+                        **performance_data,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
+
     elif action == "optimize":
         # Get platform optimizations
         optimizations = pipeline_server.platform_adapter.optimize_for_current_platform()
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "environment_detection",
-                "action": "optimize",
-                "optimizations": optimizations,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "environment_detection",
+                        "action": "optimize",
+                        "optimizations": optimizations,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     else:
         raise McpError(METHOD_NOT_FOUND, f"Unknown action: {action}")
 
 
 async def handle_health_monitoring(arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle health monitoring requests"""
-    
+
     action = arguments.get("action", "health_check")
     output_format = arguments.get("output_format", "json")
     include_details = arguments.get("include_details", True)
     export_path = arguments.get("export_path")
-    
+
     if action == "health_check":
         # Perform basic health check
-        response = pipeline_server.docker_health_check.get_health_check_endpoint_response()
-        
+        response = (
+            pipeline_server.docker_health_check.get_health_check_endpoint_response()
+        )
+
         if not include_details and "issues" in response:
             # Remove detailed issue information for simple response
             response["issues"] = len(response["issues"])
-            
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "health_monitoring",
-                "action": "health_check",
-                "health_status": response,
-                "timestamp": time.time()
-            }, indent=2)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "health_monitoring",
+                        "action": "health_check",
+                        "health_status": response,
+                        "timestamp": time.time(),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     elif action == "comprehensive":
         # Perform comprehensive health check
-        result = pipeline_server.docker_health_check.perform_comprehensive_health_check()
-        
+        result = (
+            pipeline_server.docker_health_check.perform_comprehensive_health_check()
+        )
+
         response_data = {
             "tool": "health_monitoring",
             "action": "comprehensive",
             "health_result": asdict(result),
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
-        
+
         if not include_details:
             # Remove detailed check information
             if "details" in response_data["health_result"]:
                 details_summary = {}
-                for component, data in response_data["health_result"]["details"].items():
+                for component, data in response_data["health_result"][
+                    "details"
+                ].items():
                     details_summary[component] = data.get("status", "unknown")
                 response_data["health_result"]["details"] = details_summary
-                
-        return [TextContent(
-            type="text",
-            text=json.dumps(response_data, indent=2, default=str)
-        )]
-        
+
+        return [
+            TextContent(
+                type="text", text=json.dumps(response_data, indent=2, default=str)
+            )
+        ]
+
     elif action == "export":
         # Export detailed health report
         if not export_path:
             export_path = f"/tmp/health_report_{int(time.time())}.json"
-            
+
         try:
             pipeline_server.docker_health_check.export_health_report(export_path)
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "health_monitoring",
-                    "action": "export",
-                    "status": "success",
-                    "export_path": export_path,
-                    "message": "Health report exported successfully",
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
-            
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "health_monitoring",
+                            "action": "export",
+                            "status": "success",
+                            "export_path": export_path,
+                            "message": "Health report exported successfully",
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         except Exception as e:
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "health_monitoring",
-                    "action": "export",
-                    "status": "error",
-                    "error": str(e),
-                    "timestamp": time.time()
-                }, indent=2)
-            )]
-            
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "health_monitoring",
+                            "action": "export",
+                            "status": "error",
+                            "error": str(e),
+                            "timestamp": time.time(),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
     else:
         raise McpError(METHOD_NOT_FOUND, f"Unknown health monitoring action: {action}")
 
 
 async def handle_claude_agent_protocol(arguments: Dict[str, Any]) -> List[TextContent]:
     """Handle Claude Agent Protocol operations for bidirectional communication"""
-    
+
     if not CLAUDE_PROTOCOL_AVAILABLE:
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "claude_agent_protocol",
-                "status": "unavailable",
-                "error": "Claude Agent Protocol not available",
-                "message": "Protocol integration requires claude_agent_protocol.py"
-            }, indent=2)
-        )]
-    
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "claude_agent_protocol",
+                        "status": "unavailable",
+                        "error": "Claude Agent Protocol not available",
+                        "message": "Protocol integration requires claude_agent_protocol.py",
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     action = arguments.get("action", "get_status")
     session_id = arguments.get("session_id")
-    
+
     try:
         if action == "get_status":
             # Get protocol status for session or all sessions
             if session_id:
                 session = pipeline_server.get_session(session_id)
                 if not session or not session.claude_protocol:
-                    return [TextContent(
-                        type="text",
-                        text=json.dumps({
-                            "tool": "claude_agent_protocol",
-                            "action": "get_status",
-                            "session_id": session_id,
-                            "status": "not_found"
-                        }, indent=2)
-                    )]
-                
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {
+                                    "tool": "claude_agent_protocol",
+                                    "action": "get_status",
+                                    "session_id": session_id,
+                                    "status": "not_found",
+                                },
+                                indent=2,
+                            ),
+                        )
+                    ]
+
                 protocol_status = {
                     "session_id": session_id,
                     "protocol_active": True,
                     "current_state": session.claude_protocol.current_state,
                     "task_queue_size": session.claude_protocol.task_queue.qsize(),
                     "completed_tasks": len(session.claude_protocol.completed_tasks),
-                    "performance_data": session.claude_protocol.performance_data
+                    "performance_data": session.claude_protocol.performance_data,
                 }
             else:
                 # Get status for all sessions with active protocols
                 protocol_status = {
                     "active_sessions": [],
-                    "total_sessions": len(pipeline_server.sessions)
+                    "total_sessions": len(pipeline_server.sessions),
                 }
-                
+
                 for sess_id, session in pipeline_server.sessions.items():
                     if session.claude_protocol:
-                        protocol_status["active_sessions"].append({
-                            "session_id": sess_id,
-                            "task_queue_size": session.claude_protocol.task_queue.qsize(),
-                            "completed_tasks": len(session.claude_protocol.completed_tasks)
-                        })
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "claude_agent_protocol",
-                    "action": "get_status",
-                    "status": "success",
-                    "results": protocol_status
-                }, indent=2)
-            )]
-        
+                        protocol_status["active_sessions"].append(
+                            {
+                                "session_id": sess_id,
+                                "task_queue_size": session.claude_protocol.task_queue.qsize(),
+                                "completed_tasks": len(
+                                    session.claude_protocol.completed_tasks
+                                ),
+                            }
+                        )
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "claude_agent_protocol",
+                            "action": "get_status",
+                            "status": "success",
+                            "results": protocol_status,
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         elif action == "create_task":
             if not session_id:
                 raise McpError(INVALID_PARAMS, "session_id required for create_task")
-            
+
             session = pipeline_server.get_session(session_id)
             if not session or not session.claude_protocol:
-                raise McpError(INVALID_PARAMS, f"Session {session_id} not found or protocol not active")
-            
+                raise McpError(
+                    INVALID_PARAMS,
+                    f"Session {session_id} not found or protocol not active",
+                )
+
             task_type_str = arguments.get("task_type", "LINT_FIX")
             context = arguments.get("context", {})
-            
+
             # Map string to TaskType enum
             try:
                 task_type = TaskType[task_type_str.upper()]
             except KeyError:
                 task_type = TaskType.LINT_FIX
-            
+
             task = session.claude_protocol.create_task(
-                task_type=task_type,
-                context=context,
-                priority=1
+                task_type=task_type, context=context, priority=1
             )
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "claude_agent_protocol",
-                    "action": "create_task",
-                    "status": "success",
-                    "task_created": {
-                        "task_id": task.task_id,
-                        "task_type": task.task_type.value,
-                        "status": task.status.value,
-                        "created_at": task.created_at
-                    }
-                }, indent=2)
-            )]
-        
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "claude_agent_protocol",
+                            "action": "create_task",
+                            "status": "success",
+                            "task_created": {
+                                "task_id": task.task_id,
+                                "task_type": task.task_type.value,
+                                "status": task.status.value,
+                                "created_at": task.created_at,
+                            },
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         elif action == "record_thought":
-            if not session_id or not arguments.get("task_id") or not arguments.get("thought"):
-                raise McpError(INVALID_PARAMS, "session_id, task_id, and thought required")
-            
+            if (
+                not session_id
+                or not arguments.get("task_id")
+                or not arguments.get("thought")
+            ):
+                raise McpError(
+                    INVALID_PARAMS, "session_id, task_id, and thought required"
+                )
+
             session = pipeline_server.get_session(session_id)
             if not session or not session.claude_protocol:
-                raise McpError(INVALID_PARAMS, f"Session {session_id} not found or protocol not active")
-            
+                raise McpError(
+                    INVALID_PARAMS,
+                    f"Session {session_id} not found or protocol not active",
+                )
+
             session.claude_protocol.record_thought(
-                arguments["task_id"],
-                arguments["thought"]
+                arguments["task_id"], arguments["thought"]
             )
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "claude_agent_protocol",
-                    "action": "record_thought",
-                    "status": "success",
-                    "task_id": arguments["task_id"]
-                }, indent=2)
-            )]
-        
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "claude_agent_protocol",
+                            "action": "record_thought",
+                            "status": "success",
+                            "task_id": arguments["task_id"],
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         elif action == "record_observation":
-            if not session_id or not arguments.get("task_id") or not arguments.get("observation"):
-                raise McpError(INVALID_PARAMS, "session_id, task_id, and observation required")
-            
+            if (
+                not session_id
+                or not arguments.get("task_id")
+                or not arguments.get("observation")
+            ):
+                raise McpError(
+                    INVALID_PARAMS, "session_id, task_id, and observation required"
+                )
+
             session = pipeline_server.get_session(session_id)
             if not session or not session.claude_protocol:
-                raise McpError(INVALID_PARAMS, f"Session {session_id} not found or protocol not active")
-            
+                raise McpError(
+                    INVALID_PARAMS,
+                    f"Session {session_id} not found or protocol not active",
+                )
+
             session.claude_protocol.record_observation(
-                arguments["task_id"],
-                arguments["observation"]
+                arguments["task_id"], arguments["observation"]
             )
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "claude_agent_protocol",
-                    "action": "record_observation", 
-                    "status": "success",
-                    "task_id": arguments["task_id"]
-                }, indent=2)
-            )]
-        
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "claude_agent_protocol",
+                            "action": "record_observation",
+                            "status": "success",
+                            "task_id": arguments["task_id"],
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         elif action == "get_performance":
             if not session_id:
-                raise McpError(INVALID_PARAMS, "session_id required for get_performance")
-            
+                raise McpError(
+                    INVALID_PARAMS, "session_id required for get_performance"
+                )
+
             session = pipeline_server.get_session(session_id)
             if not session or not session.claude_protocol:
-                raise McpError(INVALID_PARAMS, f"Session {session_id} not found or protocol not active")
-            
+                raise McpError(
+                    INVALID_PARAMS,
+                    f"Session {session_id} not found or protocol not active",
+                )
+
             performance_metrics = session.claude_protocol.get_performance_metrics()
-            
-            return [TextContent(
-                type="text",
-                text=json.dumps({
-                    "tool": "claude_agent_protocol",
-                    "action": "get_performance",
-                    "status": "success",
-                    "session_id": session_id,
-                    "performance": performance_metrics
-                }, indent=2)
-            )]
-        
+
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "tool": "claude_agent_protocol",
+                            "action": "get_performance",
+                            "status": "success",
+                            "session_id": session_id,
+                            "performance": performance_metrics,
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         else:
             raise McpError(METHOD_NOT_FOUND, f"Unknown protocol action: {action}")
-    
+
     except Exception as e:
         logger.error(f"Claude Agent Protocol error: {e}")
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "claude_agent_protocol",
-                "action": action,
-                "status": "error",
-                "error": str(e)
-            }, indent=2)
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "claude_agent_protocol",
+                        "action": action,
+                        "status": "error",
+                        "error": str(e),
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
 
-async def handle_get_claude_fix_commands(arguments: Dict[str, Any]) -> List[TextContent]:
+async def handle_get_claude_fix_commands(
+    arguments: Dict[str, Any],
+) -> List[TextContent]:
     """Generate fix commands formatted for Claude's Edit/MultiEdit tools"""
-    
+
     session_id = arguments.get("session_id")
     if not session_id:
         raise McpError(INVALID_PARAMS, "session_id is required")
-    
+
     session = pipeline_server.get_session(session_id)
     if not session:
         raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
-    
+
     # Get lint report
     lint_report_path = arguments.get("lint_report_path")
     if not lint_report_path:
@@ -1860,35 +2059,34 @@ async def handle_get_claude_fix_commands(arguments: Dict[str, Any]) -> List[Text
             lint_report_path = lint_artifacts[-1]["path"]
         else:
             raise McpError(INVALID_PARAMS, "No lint report found in session")
-    
+
     # Load lint report
     try:
-        with open(lint_report_path, 'r') as f:
+        with open(lint_report_path, "r") as f:
             lint_data = json.load(f)
     except Exception as e:
         raise McpError(INTERNAL_ERROR, f"Failed to load lint report: {e}")
-    
+
     # Extract priority fixes
     priority_fixes = lint_data.get("priority_fixes", [])
     max_fixes = arguments.get("max_fixes", -1)
     format_type = arguments.get("format", "multiedit_batches")
     include_context = arguments.get("include_context", True)
     priority_filter = arguments.get("priority_filter", [])
-    
+
     # Filter by priority if specified
     if priority_filter:
         priority_fixes = [
-            fix for fix in priority_fixes
-            if fix.get("category") in priority_filter
+            fix for fix in priority_fixes if fix.get("category") in priority_filter
         ]
-    
+
     # Apply max_fixes limit (-1 means unlimited)
     if max_fixes > 0:
         priority_fixes = priority_fixes[:max_fixes]
-    
+
     # Generate Claude-compatible commands
     commands = []
-    
+
     if format_type == "multiedit_batches":
         # Group fixes by file for MultiEdit efficiency
         by_file = {}
@@ -1899,96 +2097,113 @@ async def handle_get_claude_fix_commands(arguments: Dict[str, Any]) -> List[Text
                 if file_path not in by_file:
                     by_file[file_path] = []
                 by_file[file_path].append(fix_info)
-        
+
         # Create MultiEdit commands
         for file_path, file_fixes in by_file.items():
             if len(file_fixes) == 1:
                 # Single edit
                 fix = file_fixes[0]
-                commands.append({
-                    "tool": "Edit",
-                    "file_path": file_path,
-                    "old_string": fix.get("old_string", ""),
-                    "new_string": fix.get("new_string", ""),
-                    "description": fix.get("description", "Fix issue")
-                })
+                commands.append(
+                    {
+                        "tool": "Edit",
+                        "file_path": file_path,
+                        "old_string": fix.get("old_string", ""),
+                        "new_string": fix.get("new_string", ""),
+                        "description": fix.get("description", "Fix issue"),
+                    }
+                )
             else:
                 # MultiEdit for multiple fixes
                 edits = []
                 for fix in file_fixes:
-                    edits.append({
-                        "old_string": fix.get("old_string", ""),
-                        "new_string": fix.get("new_string", ""),
-                        "description": fix.get("description", "Fix issue")
-                    })
-                
-                commands.append({
-                    "tool": "MultiEdit",
-                    "file_path": file_path,
-                    "edits": edits,
-                    "description": f"Apply {len(edits)} fixes to {Path(file_path).name}"
-                })
-    
+                    edits.append(
+                        {
+                            "old_string": fix.get("old_string", ""),
+                            "new_string": fix.get("new_string", ""),
+                            "description": fix.get("description", "Fix issue"),
+                        }
+                    )
+
+                commands.append(
+                    {
+                        "tool": "MultiEdit",
+                        "file_path": file_path,
+                        "edits": edits,
+                        "description": f"Apply {len(edits)} fixes to {Path(file_path).name}",
+                    }
+                )
+
     elif format_type == "edit_commands":
         # Individual Edit commands
         for fix in priority_fixes:
             fix_info = fix.get("fix", {})
-            commands.append({
-                "tool": "Edit",
-                "file_path": fix_info.get("file"),
-                "old_string": fix_info.get("old_string", ""),
-                "new_string": fix_info.get("new_string", ""),
-                "description": fix_info.get("description", "Fix issue"),
-                "line_number": fix_info.get("line"),
-                "category": fix.get("category"),
-                "severity": fix.get("severity")
-            })
-    
+            commands.append(
+                {
+                    "tool": "Edit",
+                    "file_path": fix_info.get("file"),
+                    "old_string": fix_info.get("old_string", ""),
+                    "new_string": fix_info.get("new_string", ""),
+                    "description": fix_info.get("description", "Fix issue"),
+                    "line_number": fix_info.get("line"),
+                    "category": fix.get("category"),
+                    "severity": fix.get("severity"),
+                }
+            )
+
     elif format_type == "direct_instructions":
         # Direct instructions for Claude to apply
         for fix in priority_fixes:
             fix_info = fix.get("fix", {})
-            commands.append({
-                "instruction": f"💡 ACTION REQUIRED: Use Edit tool to fix {fix.get('category')} issue",
-                "file": fix_info.get("file"),
-                "line": fix_info.get("line"),
-                "old_text": fix_info.get("old_string", ""),
-                "new_text": fix_info.get("new_string", ""),
-                "description": fix_info.get("description", ""),
-                "context": fix_info.get("context", "") if include_context else None
-            })
-    
+            commands.append(
+                {
+                    "instruction": f"💡 ACTION REQUIRED: Use Edit tool to fix {fix.get('category')} issue",
+                    "file": fix_info.get("file"),
+                    "line": fix_info.get("line"),
+                    "old_text": fix_info.get("old_string", ""),
+                    "new_text": fix_info.get("new_string", ""),
+                    "description": fix_info.get("description", ""),
+                    "context": fix_info.get("context", "") if include_context else None,
+                }
+            )
+
     # Update session
     session.update_status("generating_commands", "get_claude_fix_commands")
-    
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "get_claude_fix_commands",
-            "session_id": session_id,
-            "status": "success",
-            "total_fixes_available": len(lint_data.get("priority_fixes", [])),
-            "fixes_returned": len(commands),
-            "format": format_type,
-            "commands": commands
-        }, indent=2)
-    )]
+
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "get_claude_fix_commands",
+                    "session_id": session_id,
+                    "status": "success",
+                    "total_fixes_available": len(lint_data.get("priority_fixes", [])),
+                    "fixes_returned": len(commands),
+                    "format": format_type,
+                    "commands": commands,
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
-async def handle_differential_restoration(arguments: Dict[str, Any]) -> List[TextContent]:
+async def handle_differential_restoration(
+    arguments: Dict[str, Any],
+) -> List[TextContent]:
     """Handle differential code restoration to prevent accidental deletions"""
-    
+
     session_id = arguments.get("session_id")
     if not session_id:
         raise McpError(INVALID_PARAMS, "session_id is required")
-    
+
     session = pipeline_server.get_session(session_id)
     if not session:
         raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
-    
+
     # Initialize differential restoration engine
     restoration_engine = DifferentialRestoration(pipeline_server.workspace_root)
-    
+
     # Get files to check
     files_to_check = arguments.get("files_to_check", [])
     if not files_to_check:
@@ -1997,17 +2212,18 @@ async def handle_differential_restoration(arguments: Dict[str, Any]) -> List[Tex
         # Filter out common directories to skip
         skip_patterns = ["__pycache__", ".git", "venv", "env", "node_modules"]
         files_to_check = [
-            f for f in files_to_check 
+            f
+            for f in files_to_check
             if not any(pattern in str(f) for pattern in skip_patterns)
         ]
     else:
         files_to_check = [Path(f) for f in files_to_check]
-    
+
     restoration_mode = arguments.get("restoration_mode", "surgical")
     confidence_threshold = arguments.get("confidence_threshold", 0.6)
     auto_apply = arguments.get("auto_apply", False)
     return_edit_commands = arguments.get("return_edit_commands", True)
-    
+
     # Capture baselines and detect deletions
     all_deletions = []
     for file_path in files_to_check:
@@ -2015,22 +2231,21 @@ async def handle_differential_restoration(arguments: Dict[str, Any]) -> List[Tex
             # Capture baseline if not already done
             if str(file_path) not in restoration_engine.baseline_snapshots:
                 restoration_engine.capture_baseline(file_path)
-            
+
             # Detect deletions
             deletions = restoration_engine.detect_deletions(file_path)
             all_deletions.extend(deletions)
-    
+
     # Create restoration plan
     plan = restoration_engine.create_restoration_plan(
-        all_deletions,
-        threshold=confidence_threshold
+        all_deletions, threshold=confidence_threshold
     )
-    
+
     # Apply restorations if requested
     application_results = None
     if auto_apply and plan.restorations_needed:
         application_results = restoration_engine.apply_restoration_plan(plan)
-    
+
     # Prepare response
     response = {
         "tool": "differential_restoration",
@@ -2041,166 +2256,186 @@ async def handle_differential_restoration(arguments: Dict[str, Any]) -> List[Tex
         "restorations_planned": len(plan.restorations_needed),
         "restoration_summary": plan.summary,
         "restoration_mode": restoration_mode,
-        "confidence_threshold": confidence_threshold
+        "confidence_threshold": confidence_threshold,
     }
-    
+
     if return_edit_commands:
         response["edit_commands"] = plan.edit_commands
-    
+
     if application_results:
         response["application_results"] = application_results
-    
+
     # Generate detailed report
     report = restoration_engine.get_restoration_report(plan)
     response["detailed_report"] = report
-    
+
     # Update session
     session.update_status("restoration_complete", "differential_restoration")
-    
-    return [TextContent(
-        type="text",
-        text=json.dumps(response, indent=2)
-    )]
+
+    return [TextContent(type="text", text=json.dumps(response, indent=2))]
 
 
 async def handle_streaming_fix_monitor(arguments: Dict[str, Any]) -> List[TextContent]:
     """Stream real-time fix instructions as they are discovered"""
-    
+
     session_id = arguments.get("session_id")
     if not session_id:
         raise McpError(INVALID_PARAMS, "session_id is required")
-    
+
     session = pipeline_server.get_session(session_id)
     if not session:
         raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
-    
+
     stream_mode = arguments.get("stream_mode", "continuous")
     batch_size = arguments.get("batch_size", 5)
     format_for_claude = arguments.get("format_for_claude", True)
-    
+
     # This would ideally use SSE or WebSockets for true streaming
     # For now, we'll return batched results that simulate streaming
-    
+
     # Get latest lint report
     lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
     if not lint_artifacts:
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "tool": "streaming_fix_monitor",
-                "session_id": session_id,
-                "status": "no_data",
-                "message": "No lint report available for streaming"
-            }, indent=2)
-        )]
-    
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "tool": "streaming_fix_monitor",
+                        "session_id": session_id,
+                        "status": "no_data",
+                        "message": "No lint report available for streaming",
+                    },
+                    indent=2,
+                ),
+            )
+        ]
+
     lint_report_path = lint_artifacts[-1]["path"]
-    
+
     try:
-        with open(lint_report_path, 'r') as f:
+        with open(lint_report_path, "r") as f:
             lint_data = json.load(f)
     except Exception as e:
         raise McpError(INTERNAL_ERROR, f"Failed to load lint report: {e}")
-    
+
     priority_fixes = lint_data.get("priority_fixes", [])
-    
+
     # Simulate streaming by batching
     streamed_batches = []
-    
+
     if stream_mode == "batch":
         # Create batches
         for i in range(0, len(priority_fixes), batch_size):
-            batch = priority_fixes[i:i + batch_size]
-            
+            batch = priority_fixes[i : i + batch_size]
+
             if format_for_claude:
                 # Format as Claude commands
                 batch_commands = []
                 for fix in batch:
                     fix_info = fix.get("fix", {})
-                    batch_commands.append({
-                        "immediate_action": f"APPLY NOW: {fix_info.get('file')}:{fix_info.get('line')}",
-                        "tool": "Edit",
-                        "file_path": fix_info.get("file"),
-                        "old_string": fix_info.get("old_string", ""),
-                        "new_string": fix_info.get("new_string", ""),
-                        "urgency": "HIGH" if fix.get("category") == "security" else "MEDIUM"
-                    })
-                
-                streamed_batches.append({
-                    "batch_number": i // batch_size + 1,
-                    "fixes_in_batch": len(batch_commands),
-                    "commands": batch_commands
-                })
+                    batch_commands.append(
+                        {
+                            "immediate_action": f"APPLY NOW: {fix_info.get('file')}:{fix_info.get('line')}",
+                            "tool": "Edit",
+                            "file_path": fix_info.get("file"),
+                            "old_string": fix_info.get("old_string", ""),
+                            "new_string": fix_info.get("new_string", ""),
+                            "urgency": (
+                                "HIGH"
+                                if fix.get("category") == "security"
+                                else "MEDIUM"
+                            ),
+                        }
+                    )
+
+                streamed_batches.append(
+                    {
+                        "batch_number": i // batch_size + 1,
+                        "fixes_in_batch": len(batch_commands),
+                        "commands": batch_commands,
+                    }
+                )
             else:
-                streamed_batches.append({
-                    "batch_number": i // batch_size + 1,
-                    "fixes": batch
-                })
-    
+                streamed_batches.append(
+                    {"batch_number": i // batch_size + 1, "fixes": batch}
+                )
+
     elif stream_mode == "continuous":
         # Simulate continuous streaming with priority ordering
         # Security fixes first, then critical, then others
         sorted_fixes = sorted(
             priority_fixes,
             key=lambda x: (
-                0 if x.get("category") == "security" else
-                1 if x.get("severity") == "critical" else 2
-            )
+                0
+                if x.get("category") == "security"
+                else 1 if x.get("severity") == "critical" else 2
+            ),
         )
-        
+
         for i, fix in enumerate(sorted_fixes[:10]):  # Limit for demo
             fix_info = fix.get("fix", {})
-            streamed_batches.append({
-                "stream_index": i + 1,
-                "timestamp": time.time(),
-                "priority": "IMMEDIATE" if fix.get("category") == "security" else "HIGH",
-                "fix_command": {
-                    "file": fix_info.get("file"),
-                    "line": fix_info.get("line"),
-                    "old": fix_info.get("old_string", ""),
-                    "new": fix_info.get("new_string", ""),
-                    "apply_now": True
+            streamed_batches.append(
+                {
+                    "stream_index": i + 1,
+                    "timestamp": time.time(),
+                    "priority": (
+                        "IMMEDIATE" if fix.get("category") == "security" else "HIGH"
+                    ),
+                    "fix_command": {
+                        "file": fix_info.get("file"),
+                        "line": fix_info.get("line"),
+                        "old": fix_info.get("old_string", ""),
+                        "new": fix_info.get("new_string", ""),
+                        "apply_now": True,
+                    },
                 }
-            })
-    
+            )
+
     # Update session with streaming status
     session.update_status("streaming_active", "streaming_fix_monitor")
-    
-    return [TextContent(
-        type="text",
-        text=json.dumps({
-            "tool": "streaming_fix_monitor",
-            "session_id": session_id,
-            "status": "streaming",
-            "stream_mode": stream_mode,
-            "total_fixes_available": len(priority_fixes),
-            "streamed_count": len(streamed_batches),
-            "format": "claude_commands" if format_for_claude else "raw",
-            "stream_data": streamed_batches,
-            "note": "Real-time streaming would use SSE/WebSockets in production"
-        }, indent=2)
-    )]
+
+    return [
+        TextContent(
+            type="text",
+            text=json.dumps(
+                {
+                    "tool": "streaming_fix_monitor",
+                    "session_id": session_id,
+                    "status": "streaming",
+                    "stream_mode": stream_mode,
+                    "total_fixes_available": len(priority_fixes),
+                    "streamed_count": len(streamed_batches),
+                    "format": "claude_commands" if format_for_claude else "raw",
+                    "stream_data": streamed_batches,
+                    "note": "Real-time streaming would use SSE/WebSockets in production",
+                },
+                indent=2,
+            ),
+        )
+    ]
 
 
-
-async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[TextContent]:
+async def handle_semantic_catalog_review(
+    arguments: Dict[str, Any],
+) -> List[TextContent]:
     """
-    Advanced semantic catalog tool for high-resolution code execution, 
+    Advanced semantic catalog tool for high-resolution code execution,
     version branch creation, diff analysis, and compliance review.
-    
+
     This tool provides comprehensive semantic function analysis with 100% reliability
     and hierarchical protection, creating version branches and assessing diffs
     for function review and watchdog compliance.
     """
-    
+
     session_id = arguments.get("session_id")
     if not session_id:
         raise McpError(INVALID_PARAMS, "session_id is required")
-    
+
     session = pipeline_server.get_session(session_id)
     if not session:
         raise McpError(INVALID_PARAMS, f"Invalid session ID: {session_id}")
-    
+
     action = arguments.get("action", "full_review")
     version_bump_type = arguments.get("version_bump_type", "patch")
     base_branch = arguments.get("base_branch", "main")
@@ -2214,13 +2449,13 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
     communicate_to_claude = arguments.get("communicate_to_claude", False)
     github_integration = arguments.get("github_integration", False)
     operation_timeout = arguments.get("operation_timeout", 1800)  # 30 minutes default
-    
+
     session.update_status("semantic_catalog_review", f"semantic_catalog_{action}")
-    
+
     # Async operation management - Add cancellation tokens for long-running operations
     cancellation_token = asyncio.Event()
     operation_task = None
-    
+
     # Initialize semantic catalog results
     catalog_results = {
         "tool": "semantic_catalog_review",
@@ -2235,58 +2470,77 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
             "base_branch": base_branch,
             "target_branch": target_branch,
             "high_resolution_mode": high_resolution_mode,
-            "hierarchical_protection": hierarchical_protection
+            "hierarchical_protection": hierarchical_protection,
         },
-        "results": {}
+        "results": {},
     }
-    
+
     try:
         # Wrap the main operation in a task with timeout and cancellation support
         async def main_operation():
             # Step 1: High-resolution execution and analysis
             if high_resolution_mode:
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before high-resolution execution")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before high-resolution execution"
+                    )
                 execution_results = await perform_high_resolution_execution(session_id)
-                catalog_results["results"]["high_resolution_execution"] = execution_results
-            
+                catalog_results["results"][
+                    "high_resolution_execution"
+                ] = execution_results
+
             # Step 2: Version branch creation (if requested or full review)
             if action in ["create_version_branch", "full_review"]:
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before version branch creation")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before version branch creation"
+                    )
                 branch_results = await create_version_bumped_branch(
-                    session_id, version_bump_type, base_branch, target_branch, github_integration
+                    session_id,
+                    version_bump_type,
+                    base_branch,
+                    target_branch,
+                    github_integration,
                 )
                 catalog_results["results"]["version_branch"] = branch_results
                 target_branch = branch_results.get("branch_name", target_branch)
-            
+
             # Step 3: Diff analysis between branches
             if action in ["diff_analysis", "full_review"] and target_branch:
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before diff analysis")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before diff analysis"
+                    )
                 diff_results = await perform_semantic_diff_analysis(
                     session_id, base_branch, target_branch, hierarchical_protection
                 )
                 catalog_results["results"]["diff_analysis"] = diff_results
-            
+
             # Step 4: Semantic function analysis
             if action in ["semantic_analysis", "full_review"]:
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before semantic analysis")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before semantic analysis"
+                    )
                 semantic_results = await perform_semantic_function_analysis(
                     session_id, include_function_review, hierarchical_protection
                 )
                 catalog_results["results"]["semantic_analysis"] = semantic_results
-            
+
             # Step 5: Watchdog compliance review
-            if action in ["compliance_check", "full_review"] and include_watchdog_compliance:
+            if (
+                action in ["compliance_check", "full_review"]
+                and include_watchdog_compliance
+            ):
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before compliance review")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before compliance review"
+                    )
                 compliance_results = await perform_watchdog_compliance_review(
                     session_id, hierarchical_protection
                 )
                 catalog_results["results"]["compliance_review"] = compliance_results
-            
+
             # Step 6: Auto-fix capability (NEW FEATURE)
             if auto_fix_enabled and action in ["auto_fix", "full_review"]:
                 if cancellation_token.is_set():
@@ -2295,19 +2549,23 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
                     session_id, hierarchical_protection
                 )
                 catalog_results["results"]["auto_fix"] = autofix_results
-            
+
             # Step 7: Communicate to Claude with diffs and version keeper issues (NEW FEATURE)
             if communicate_to_claude:
                 if cancellation_token.is_set():
-                    raise asyncio.CancelledError("Operation cancelled before Claude communication")
+                    raise asyncio.CancelledError(
+                        "Operation cancelled before Claude communication"
+                    )
                 claude_communication = await communicate_results_to_claude(
                     session_id, catalog_results
                 )
-                catalog_results["results"]["claude_communication"] = claude_communication
-        
+                catalog_results["results"][
+                    "claude_communication"
+                ] = claude_communication
+
         # Execute with timeout and cancellation support
         operation_task = asyncio.create_task(main_operation())
-        
+
         try:
             await asyncio.wait_for(operation_task, timeout=operation_timeout)
         except asyncio.TimeoutError:
@@ -2319,31 +2577,25 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
                 except asyncio.CancelledError:
                     pass
             raise Exception(f"Operation timed out after {operation_timeout} seconds")
-        
+
         # Step 8: Generate MCP/React compatible response
         formatted_response = await format_semantic_catalog_response(
             catalog_results, response_format
         )
-        
+
         catalog_results["status"] = "completed"
         catalog_results["formatted_response"] = formatted_response
-        
+
         session.update_status("completed", "semantic_catalog_review")
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps(catalog_results, indent=2)
-        )]
-        
+
+        return [TextContent(type="text", text=json.dumps(catalog_results, indent=2))]
+
     except asyncio.CancelledError:
         logger.warning(f"Semantic catalog review cancelled for session {session_id}")
         catalog_results["status"] = "cancelled"
         catalog_results["error"] = "Operation was cancelled"
         session.update_status("cancelled", "semantic_catalog_review")
-        return [TextContent(
-            type="text",
-            text=json.dumps(catalog_results, indent=2)
-        )]
+        return [TextContent(type="text", text=json.dumps(catalog_results, indent=2))]
     except Exception as e:
         logger.error(f"Semantic catalog review failed: {e}")
         # Cancel ongoing operation if it exists
@@ -2354,50 +2606,49 @@ async def handle_semantic_catalog_review(arguments: Dict[str, Any]) -> List[Text
                 await operation_task
             except asyncio.CancelledError:
                 pass
-        
+
         catalog_results["status"] = "failed"
         catalog_results["error"] = str(e)
         session.update_status("failed", "semantic_catalog_review")
         session.error_count += 1
-        
-        raise McpError(
-            INTERNAL_ERROR,
-            f"Semantic catalog review failed: {str(e)}"
-        )
+
+        raise McpError(INTERNAL_ERROR, f"Semantic catalog review failed: {str(e)}")
 
 
 async def perform_high_resolution_execution(session_id: str) -> Dict[str, Any]:
     """Perform high-resolution code execution and analysis"""
-    
+
     execution_results = {
         "start_time": time.time(),
         "mode": "high_resolution",
         "analysis_depth": "comprehensive",
-        "protection_level": "hierarchical"
+        "protection_level": "hierarchical",
     }
-    
+
     try:
         # 1. Code quality analysis with AST parsing
         ast_analysis = await analyze_code_with_ast(session_id)
         execution_results["ast_analysis"] = ast_analysis
-        
+
         # 2. Function signature validation
         function_validation = await validate_function_signatures(session_id)
         execution_results["function_validation"] = function_validation
-        
+
         # 3. Import dependency analysis
         dependency_analysis = await analyze_dependencies(session_id)
         execution_results["dependency_analysis"] = dependency_analysis
-        
+
         # 4. Security vulnerability scanning
         security_scan = await perform_security_scan(session_id)
         execution_results["security_scan"] = security_scan
-        
-        execution_results["execution_time"] = time.time() - execution_results["start_time"]
+
+        execution_results["execution_time"] = (
+            time.time() - execution_results["start_time"]
+        )
         execution_results["status"] = "completed"
-        
+
         return execution_results
-        
+
     except Exception as e:
         execution_results["status"] = "failed"
         execution_results["error"] = str(e)
@@ -2405,62 +2656,62 @@ async def perform_high_resolution_execution(session_id: str) -> Dict[str, Any]:
 
 
 async def create_version_bumped_branch(
-    session_id: str, 
-    version_bump_type: str, 
-    base_branch: str, 
+    session_id: str,
+    version_bump_type: str,
+    base_branch: str,
     target_branch: Optional[str],
-    github_integration: bool = False
+    github_integration: bool = False,
 ) -> Dict[str, Any]:
     """Create a version-bumped branch"""
-    
+
     branch_results = {
         "start_time": time.time(),
         "base_branch": base_branch,
-        "version_bump_type": version_bump_type
+        "version_bump_type": version_bump_type,
     }
-    
+
     try:
         # 1. Get current version
         current_version = get_current_version()
-        
+
         # 2. Calculate new version
         new_version = calculate_new_version(current_version, version_bump_type)
         branch_results["current_version"] = current_version
         branch_results["new_version"] = new_version
-        
+
         # 3. Generate branch name if not provided
         if not target_branch:
             target_branch = f"version-{new_version}"
         branch_results["branch_name"] = target_branch
-        
+
         # 4. Create branch
         cmd = ["git", "checkout", "-b", target_branch, base_branch]
         returncode, stdout, stderr = await pipeline_server.run_command(cmd)
-        
+
         if returncode != 0:
             raise Exception(f"Failed to create branch: {stderr}")
-        
+
         # 5. Update version in files
         version_update_result = await update_version_files(new_version)
         branch_results["version_update"] = version_update_result
-        
+
         # 6. Commit changes
         commit_cmd = ["git", "commit", "-am", f"Bump version to {new_version}"]
         returncode, stdout, stderr = await pipeline_server.run_command(commit_cmd)
-        
+
         if returncode != 0:
             logger.warning(f"Commit failed (may be no changes): {stderr}")
-        
+
         # 7. GitHub integration (NEW FEATURE)
         if github_integration:
             github_result = await push_branch_to_github(target_branch, new_version)
             branch_results["github_push"] = github_result
-        
+
         branch_results["status"] = "completed"
         branch_results["execution_time"] = time.time() - branch_results["start_time"]
-        
+
         return branch_results
-        
+
     except Exception as e:
         branch_results["status"] = "failed"
         branch_results["error"] = str(e)
@@ -2468,55 +2719,52 @@ async def create_version_bumped_branch(
 
 
 async def perform_semantic_diff_analysis(
-    session_id: str, 
-    base_branch: str, 
-    target_branch: str, 
-    hierarchical_protection: bool
+    session_id: str, base_branch: str, target_branch: str, hierarchical_protection: bool
 ) -> Dict[str, Any]:
     """Perform semantic diff analysis between branches"""
-    
+
     diff_results = {
         "start_time": time.time(),
         "base_branch": base_branch,
         "target_branch": target_branch,
-        "hierarchical_protection": hierarchical_protection
+        "hierarchical_protection": hierarchical_protection,
     }
-    
+
     try:
         # 1. Get git diff between branches
         cmd = ["git", "diff", f"{base_branch}..{target_branch}", "--name-only"]
         returncode, stdout, stderr = await pipeline_server.run_command(cmd)
-        
+
         if returncode != 0:
             raise Exception(f"Git diff failed: {stderr}")
-        
-        changed_files = [f.strip() for f in stdout.split('\n') if f.strip()]
+
+        changed_files = [f.strip() for f in stdout.split("\n") if f.strip()]
         diff_results["changed_files"] = changed_files
-        
+
         # 2. Analyze each changed file semantically
         file_analyses = []
         for file_path in changed_files:
-            if file_path.endswith('.py'):
+            if file_path.endswith(".py"):
                 file_analysis = await analyze_file_semantic_changes(
                     file_path, base_branch, target_branch, hierarchical_protection
                 )
                 file_analyses.append(file_analysis)
-        
+
         diff_results["file_analyses"] = file_analyses
-        
+
         # 3. Generate semantic change summary
         change_summary = generate_semantic_change_summary(file_analyses)
         diff_results["change_summary"] = change_summary
-        
+
         # 4. Risk assessment
         risk_assessment = assess_change_risk(file_analyses, hierarchical_protection)
         diff_results["risk_assessment"] = risk_assessment
-        
+
         diff_results["status"] = "completed"
         diff_results["execution_time"] = time.time() - diff_results["start_time"]
-        
+
         return diff_results
-        
+
     except Exception as e:
         diff_results["status"] = "failed"
         diff_results["error"] = str(e)
@@ -2524,23 +2772,21 @@ async def perform_semantic_diff_analysis(
 
 
 async def perform_semantic_function_analysis(
-    session_id: str, 
-    include_function_review: bool, 
-    hierarchical_protection: bool
+    session_id: str, include_function_review: bool, hierarchical_protection: bool
 ) -> Dict[str, Any]:
     """Perform semantic function analysis"""
-    
+
     semantic_results = {
         "start_time": time.time(),
         "include_function_review": include_function_review,
-        "hierarchical_protection": hierarchical_protection
+        "hierarchical_protection": hierarchical_protection,
     }
-    
+
     try:
         # 1. Discover all Python functions
         functions = await discover_python_functions(pipeline_server.workspace_root)
         semantic_results["total_functions"] = len(functions)
-        
+
         # 2. Semantic function analysis
         function_analyses = []
         for function_info in functions:
@@ -2549,22 +2795,24 @@ async def perform_semantic_function_analysis(
                     function_info, hierarchical_protection
                 )
                 function_analyses.append(analysis)
-        
+
         semantic_results["function_analyses"] = function_analyses
-        
+
         # 3. Identify semantic patterns
         patterns = identify_semantic_patterns(function_analyses)
         semantic_results["semantic_patterns"] = patterns
-        
+
         # 4. Compliance scoring
         compliance_score = calculate_semantic_compliance_score(function_analyses)
         semantic_results["compliance_score"] = compliance_score
-        
+
         semantic_results["status"] = "completed"
-        semantic_results["execution_time"] = time.time() - semantic_results["start_time"]
-        
+        semantic_results["execution_time"] = (
+            time.time() - semantic_results["start_time"]
+        )
+
         return semantic_results
-        
+
     except Exception as e:
         semantic_results["status"] = "failed"
         semantic_results["error"] = str(e)
@@ -2572,44 +2820,47 @@ async def perform_semantic_function_analysis(
 
 
 async def perform_watchdog_compliance_review(
-    session_id: str, 
-    hierarchical_protection: bool
+    session_id: str, hierarchical_protection: bool
 ) -> Dict[str, Any]:
     """Perform watchdog compliance review"""
-    
+
     compliance_results = {
         "start_time": time.time(),
-        "hierarchical_protection": hierarchical_protection
+        "hierarchical_protection": hierarchical_protection,
     }
-    
+
     try:
         # 1. Security compliance checks
         security_compliance = await check_security_compliance(hierarchical_protection)
         compliance_results["security_compliance"] = security_compliance
-        
+
         # 2. Code quality compliance
-        quality_compliance = await check_code_quality_compliance(hierarchical_protection)
+        quality_compliance = await check_code_quality_compliance(
+            hierarchical_protection
+        )
         compliance_results["quality_compliance"] = quality_compliance
-        
+
         # 3. Documentation compliance
         doc_compliance = await check_documentation_compliance(hierarchical_protection)
         compliance_results["documentation_compliance"] = doc_compliance
-        
+
         # 4. Testing compliance
         test_compliance = await check_testing_compliance(hierarchical_protection)
         compliance_results["testing_compliance"] = test_compliance
-        
+
         # 5. Generate overall compliance score
-        overall_score = calculate_overall_compliance_score([
-            security_compliance, quality_compliance, doc_compliance, test_compliance
-        ])
+        overall_score = calculate_overall_compliance_score(
+            [security_compliance, quality_compliance, doc_compliance, test_compliance]
+        )
         compliance_results["overall_compliance_score"] = overall_score
-        
+
         compliance_results["status"] = "completed"
-        compliance_results["execution_time"] = time.time() - compliance_results["start_time"]
-        
+        compliance_results["execution_time"] = (
+            time.time() - compliance_results["start_time"]
+        )
+
         return compliance_results
-        
+
     except Exception as e:
         compliance_results["status"] = "failed"
         compliance_results["error"] = str(e)
@@ -2617,11 +2868,10 @@ async def perform_watchdog_compliance_review(
 
 
 async def format_semantic_catalog_response(
-    catalog_results: Dict[str, Any], 
-    response_format: str
+    catalog_results: Dict[str, Any], response_format: str
 ) -> Dict[str, Any]:
     """Format the response for MCP/React compatibility"""
-    
+
     if response_format == "mcp_compatible":
         return {
             "type": "mcp_semantic_catalog",
@@ -2634,10 +2884,12 @@ async def format_semantic_catalog_response(
             "meta": {
                 "tool": "semantic_catalog_review",
                 "high_resolution": catalog_results["config"]["high_resolution_mode"],
-                "hierarchical_protection": catalog_results["config"]["hierarchical_protection"]
-            }
+                "hierarchical_protection": catalog_results["config"][
+                    "hierarchical_protection"
+                ],
+            },
         }
-    
+
     elif response_format == "react":
         return {
             "component": "SemanticCatalogReview",
@@ -2647,19 +2899,17 @@ async def format_semantic_catalog_response(
                 "status": catalog_results["status"],
                 "results": catalog_results["results"],
                 "config": catalog_results["config"],
-                "timestamp": catalog_results["timestamp"]
+                "timestamp": catalog_results["timestamp"],
             },
-            "meta": {
-                "type": "react_component",
-                "version": "1.0"
-            }
+            "meta": {"type": "react_component", "version": "1.0"},
         }
-    
+
     else:  # json format
         return catalog_results
 
 
 # Helper functions for semantic analysis
+
 
 def get_current_version() -> str:
     """Get current version from pyproject.toml"""
@@ -2679,8 +2929,9 @@ def calculate_new_version(current_version: str, bump_type: str) -> str:
     """Calculate new version based on bump type"""
     try:
         import semantic_version
+
         current = semantic_version.Version(current_version)
-        
+
         if bump_type == "major":
             return str(current.next_major())
         elif bump_type == "minor":
@@ -2689,7 +2940,7 @@ def calculate_new_version(current_version: str, bump_type: str) -> str:
             return str(current.next_patch())
     except Exception:
         # Fallback to simple version increment
-        parts = current_version.split('.')
+        parts = current_version.split(".")
         if len(parts) >= 3:
             if bump_type == "major":
                 return f"{int(parts[0])+1}.0.0"
@@ -2703,82 +2954,84 @@ def calculate_new_version(current_version: str, bump_type: str) -> str:
 async def update_version_files(new_version: str) -> Dict[str, Any]:
     """Update version in project files"""
     update_results = {"files_updated": [], "errors": []}
-    
+
     try:
         # Update pyproject.toml
         version_file = pipeline_server.workspace_root / "pyproject.toml"
         if version_file.exists():
             with open(version_file, "r") as f:
                 content = f.read()
-            
+
             # Update version line
             new_content = re.sub(
-                r'version\s*=\s*"[^"]+"',
-                f'version = "{new_version}"',
-                content
+                r'version\s*=\s*"[^"]+"', f'version = "{new_version}"', content
             )
-            
+
             with open(version_file, "w") as f:
                 f.write(new_content)
-            
+
             update_results["files_updated"].append(str(version_file))
-        
+
         # Update __init__.py if exists
         init_file = pipeline_server.workspace_root / "src" / "__init__.py"
         if init_file.exists():
             with open(init_file, "r") as f:
                 content = f.read()
-            
+
             # Update __version__ line
             new_content = re.sub(
-                r'__version__\s*=\s*"[^"]+"',
-                f'__version__ = "{new_version}"',
-                content
+                r'__version__\s*=\s*"[^"]+"', f'__version__ = "{new_version}"', content
             )
-            
+
             with open(init_file, "w") as f:
                 f.write(new_content)
-            
+
             update_results["files_updated"].append(str(init_file))
-    
+
     except Exception as e:
         update_results["errors"].append(str(e))
-    
+
     return update_results
 
 
 async def analyze_code_with_ast(session_id: str) -> Dict[str, Any]:
     """Analyze code using AST parsing"""
     ast_results = {"files_analyzed": [], "total_nodes": 0, "node_types": {}}
-    
+
     try:
         python_files = list(pipeline_server.workspace_root.rglob("*.py"))
-        
+
         for file_path in python_files[:10]:  # Limit for performance
             try:
                 with open(file_path, "r") as f:
                     content = f.read()
-                
+
                 tree = ast.parse(content)
                 node_count = sum(1 for _ in ast.walk(tree))
-                
-                ast_results["files_analyzed"].append({
-                    "file": str(file_path.relative_to(pipeline_server.workspace_root)),
-                    "nodes": node_count
-                })
+
+                ast_results["files_analyzed"].append(
+                    {
+                        "file": str(
+                            file_path.relative_to(pipeline_server.workspace_root)
+                        ),
+                        "nodes": node_count,
+                    }
+                )
                 ast_results["total_nodes"] += node_count
-                
+
                 # Count node types
                 for node in ast.walk(tree):
                     node_type = type(node).__name__
-                    ast_results["node_types"][node_type] = ast_results["node_types"].get(node_type, 0) + 1
-                    
+                    ast_results["node_types"][node_type] = (
+                        ast_results["node_types"].get(node_type, 0) + 1
+                    )
+
             except Exception as e:
                 logger.warning(f"Failed to parse {file_path}: {e}")
-    
+
     except Exception as e:
         ast_results["error"] = str(e)
-    
+
     return ast_results
 
 
@@ -2788,7 +3041,7 @@ async def validate_function_signatures(session_id: str) -> Dict[str, Any]:
         "total_functions": 0,
         "valid_signatures": 0,
         "issues": [],
-        "status": "completed"
+        "status": "completed",
     }
 
 
@@ -2799,7 +3052,7 @@ async def analyze_dependencies(session_id: str) -> Dict[str, Any]:
         "external_dependencies": [],
         "internal_dependencies": [],
         "circular_dependencies": [],
-        "status": "completed"
+        "status": "completed",
     }
 
 
@@ -2809,77 +3062,82 @@ async def perform_security_scan(session_id: str) -> Dict[str, Any]:
         "vulnerabilities_found": 0,
         "security_score": 100,
         "recommendations": [],
-        "status": "completed"
+        "status": "completed",
     }
 
 
 async def analyze_file_semantic_changes(
-    file_path: str, 
-    base_branch: str, 
-    target_branch: str, 
-    hierarchical_protection: bool
+    file_path: str, base_branch: str, target_branch: str, hierarchical_protection: bool
 ) -> Dict[str, Any]:
     """Analyze semantic changes in a file"""
     return {
         "file": file_path,
         "semantic_changes": [],
         "risk_level": "low",
-        "status": "analyzed"
+        "status": "analyzed",
     }
 
 
-def generate_semantic_change_summary(file_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+def generate_semantic_change_summary(
+    file_analyses: List[Dict[str, Any]],
+) -> Dict[str, Any]:
     """Generate summary of semantic changes"""
     return {
         "total_files": len(file_analyses),
         "high_risk_changes": 0,
         "medium_risk_changes": 0,
         "low_risk_changes": len(file_analyses),
-        "summary": "No significant semantic changes detected"
+        "summary": "No significant semantic changes detected",
     }
 
 
-def assess_change_risk(file_analyses: List[Dict[str, Any]], hierarchical_protection: bool) -> Dict[str, Any]:
+def assess_change_risk(
+    file_analyses: List[Dict[str, Any]], hierarchical_protection: bool
+) -> Dict[str, Any]:
     """Assess risk of changes"""
     return {
         "overall_risk": "low",
         "risk_factors": [],
         "mitigation_recommendations": [],
-        "protection_level": "hierarchical" if hierarchical_protection else "standard"
+        "protection_level": "hierarchical" if hierarchical_protection else "standard",
     }
 
 
 async def discover_python_functions(workspace_path: Path) -> List[Dict[str, Any]]:
     """Discover all Python functions in workspace"""
     functions = []
-    
+
     try:
         for python_file in workspace_path.rglob("*.py"):
             try:
                 with open(python_file, "r") as f:
                     content = f.read()
-                
+
                 tree = ast.parse(content)
-                
+
                 for node in ast.walk(tree):
                     if isinstance(node, ast.FunctionDef):
-                        functions.append({
-                            "name": node.name,
-                            "file": str(python_file.relative_to(workspace_path)),
-                            "line": node.lineno,
-                            "args": [arg.arg for arg in node.args.args]
-                        })
-                        
+                        functions.append(
+                            {
+                                "name": node.name,
+                                "file": str(python_file.relative_to(workspace_path)),
+                                "line": node.lineno,
+                                "args": [arg.arg for arg in node.args.args],
+                            }
+                        )
+
             except Exception as e:
                 logger.warning(f"Failed to analyze {python_file}: {e}")
-                
+
     except Exception as e:
         logger.error(f"Function discovery failed: {e}")
-    
+
     return functions
 
 
-async def analyze_function_semantics(function_info: Dict[str, Any], hierarchical_protection: bool) -> Dict[str, Any]:
+async def analyze_function_semantics(
+    function_info: Dict[str, Any], hierarchical_protection: bool
+) -> Dict[str, Any]:
     """Analyze semantic properties of a function"""
     return {
         "function": function_info["name"],
@@ -2888,29 +3146,35 @@ async def analyze_function_semantics(function_info: Dict[str, Any], hierarchical
             "complexity": "low",
             "side_effects": "none_detected",
             "return_type": "inferred",
-            "docstring_quality": "good"
+            "docstring_quality": "good",
         },
         "compliance_score": 95,
-        "recommendations": []
+        "recommendations": [],
     }
 
 
-def identify_semantic_patterns(function_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+def identify_semantic_patterns(
+    function_analyses: List[Dict[str, Any]],
+) -> Dict[str, Any]:
     """Identify semantic patterns across functions"""
     return {
         "patterns_found": [],
         "anti_patterns": [],
         "consistency_score": 95,
-        "recommendations": []
+        "recommendations": [],
     }
 
 
-def calculate_semantic_compliance_score(function_analyses: List[Dict[str, Any]]) -> float:
+def calculate_semantic_compliance_score(
+    function_analyses: List[Dict[str, Any]],
+) -> float:
     """Calculate overall semantic compliance score"""
     if not function_analyses:
         return 100.0
-    
-    total_score = sum(analysis.get("compliance_score", 95) for analysis in function_analyses)
+
+    total_score = sum(
+        analysis.get("compliance_score", 95) for analysis in function_analyses
+    )
     return total_score / len(function_analyses)
 
 
@@ -2920,27 +3184,31 @@ async def check_security_compliance(hierarchical_protection: bool) -> Dict[str, 
         "score": 98,
         "issues": [],
         "recommendations": [],
-        "protection_level": "hierarchical" if hierarchical_protection else "standard"
+        "protection_level": "hierarchical" if hierarchical_protection else "standard",
     }
 
 
-async def check_code_quality_compliance(hierarchical_protection: bool) -> Dict[str, Any]:
+async def check_code_quality_compliance(
+    hierarchical_protection: bool,
+) -> Dict[str, Any]:
     """Check code quality compliance"""
     return {
         "score": 96,
         "issues": [],
         "recommendations": [],
-        "protection_level": "hierarchical" if hierarchical_protection else "standard"
+        "protection_level": "hierarchical" if hierarchical_protection else "standard",
     }
 
 
-async def check_documentation_compliance(hierarchical_protection: bool) -> Dict[str, Any]:
+async def check_documentation_compliance(
+    hierarchical_protection: bool,
+) -> Dict[str, Any]:
     """Check documentation compliance"""
     return {
         "score": 92,
         "issues": [],
         "recommendations": [],
-        "protection_level": "hierarchical" if hierarchical_protection else "standard"
+        "protection_level": "hierarchical" if hierarchical_protection else "standard",
     }
 
 
@@ -2950,24 +3218,29 @@ async def check_testing_compliance(hierarchical_protection: bool) -> Dict[str, A
         "score": 89,
         "issues": [],
         "recommendations": [],
-        "protection_level": "hierarchical" if hierarchical_protection else "standard"
+        "protection_level": "hierarchical" if hierarchical_protection else "standard",
     }
 
 
-def calculate_overall_compliance_score(compliance_checks: List[Dict[str, Any]]) -> float:
+def calculate_overall_compliance_score(
+    compliance_checks: List[Dict[str, Any]],
+) -> float:
     """Calculate overall compliance score"""
     if not compliance_checks:
         return 100.0
-    
+
     total_score = sum(check.get("score", 100) for check in compliance_checks)
     return total_score / len(compliance_checks)
 
 
 # NEW ENHANCED FEATURES IMPLEMENTATION
 
-async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bool) -> Dict[str, Any]:
+
+async def perform_semantic_auto_fix(
+    session_id: str, hierarchical_protection: bool
+) -> Dict[str, Any]:
     """Perform automatic fixing of detected issues with enhanced validation (NEW FEATURE)"""
-    
+
     autofix_results = {
         "start_time": time.time(),
         "session_id": session_id,
@@ -2975,50 +3248,59 @@ async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bo
         "auto_fixes_applied": 0,
         "issues_resolved": [],
         "max_fixes_limit": 100,  # Prevent runaway operations
-        "validation_passed": False
+        "validation_passed": False,
     }
-    
+
     try:
         # Configuration validation - Add stricter validation for auto-fix limits
         max_fixes = autofix_results["max_fixes_limit"]
         if max_fixes <= 0 or max_fixes > 1000:
-            raise ValueError(f"Invalid auto-fix limit: {max_fixes}. Must be between 1 and 1000.")
-        
+            raise ValueError(
+                f"Invalid auto-fix limit: {max_fixes}. Must be between 1 and 1000."
+            )
+
         # Get session and check for existing lint report
         session = pipeline_server.get_session(session_id)
         if not session:
             raise Exception(f"Session {session_id} not found")
-        
+
         autofix_results["validation_passed"] = True
-        
+
         # Find lint report
         lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
         if not lint_artifacts:
             # Run version keeper scan first
-            scan_result = await handle_version_keeper_scan({
-                "session_id": session_id,
-                "output_format": "json"
-            })
-            lint_artifacts = [a for a in session.artifacts if a["type"] == "lint_report"]
-        
+            scan_result = await handle_version_keeper_scan(
+                {"session_id": session_id, "output_format": "json"}
+            )
+            lint_artifacts = [
+                a for a in session.artifacts if a["type"] == "lint_report"
+            ]
+
         if lint_artifacts:
             # Apply quality patcher fixes automatically
-            fix_result = await handle_quality_patcher_fix({
-                "session_id": session_id,
-                "auto_apply": True,
-                "max_fixes": -1,  # Unlimited fixes
-                "claude_agent": True
-            })
-            
+            fix_result = await handle_quality_patcher_fix(
+                {
+                    "session_id": session_id,
+                    "auto_apply": True,
+                    "max_fixes": -1,  # Unlimited fixes
+                    "claude_agent": True,
+                }
+            )
+
             fix_data = json.loads(fix_result[0].text)
-            autofix_results["auto_fixes_applied"] = session.metrics.get("fixes_applied", 0)
-            autofix_results["issues_resolved"] = fix_data.get("results", {}).get("summary", {})
-        
+            autofix_results["auto_fixes_applied"] = session.metrics.get(
+                "fixes_applied", 0
+            )
+            autofix_results["issues_resolved"] = fix_data.get("results", {}).get(
+                "summary", {}
+            )
+
         autofix_results["status"] = "completed"
         autofix_results["execution_time"] = time.time() - autofix_results["start_time"]
-        
+
         return autofix_results
-        
+
     except Exception as e:
         autofix_results["status"] = "failed"
         autofix_results["error"] = str(e)
@@ -3026,28 +3308,34 @@ async def perform_semantic_auto_fix(session_id: str, hierarchical_protection: bo
         return autofix_results
 
 
-async def communicate_results_to_claude(session_id: str, catalog_results: Dict[str, Any]) -> Dict[str, Any]:
+async def communicate_results_to_claude(
+    session_id: str, catalog_results: Dict[str, Any]
+) -> Dict[str, Any]:
     """Communicate results including diffs and version keeper issues to Claude with endpoint validation (NEW FEATURE)"""
-    
+
     communication_results = {
         "start_time": time.time(),
         "session_id": session_id,
         "communication_status": "processing",
-        "endpoint_validated": False
+        "endpoint_validated": False,
     }
-    
+
     try:
         session = pipeline_server.get_session(session_id)
         if not session:
             raise Exception(f"Session {session_id} not found")
-        
+
         # Claude communication - Validate Claude endpoint availability before attempting communication
         if not CLAUDE_PROTOCOL_AVAILABLE:
             logger.warning(f"Claude protocol not available: {CLAUDE_PROTOCOL_ERROR}")
-            communication_results["communication_status"] = "claude_protocol_unavailable"
-            communication_results["error"] = f"Claude Agent Protocol not available: {CLAUDE_PROTOCOL_ERROR}"
+            communication_results["communication_status"] = (
+                "claude_protocol_unavailable"
+            )
+            communication_results["error"] = (
+                f"Claude Agent Protocol not available: {CLAUDE_PROTOCOL_ERROR}"
+            )
             return communication_results
-        
+
         # Test Claude endpoint availability
         try:
             protocol = get_protocol()
@@ -3057,9 +3345,11 @@ async def communicate_results_to_claude(session_id: str, catalog_results: Dict[s
         except Exception as endpoint_error:
             logger.error(f"Claude endpoint validation failed: {endpoint_error}")
             communication_results["communication_status"] = "endpoint_validation_failed"
-            communication_results["error"] = f"Claude endpoint validation failed: {str(endpoint_error)}"
+            communication_results["error"] = (
+                f"Claude endpoint validation failed: {str(endpoint_error)}"
+            )
             return communication_results
-        
+
         # Prepare communication payload for Claude
         claude_payload = {
             "type": "semantic_catalog_results",
@@ -3068,153 +3358,176 @@ async def communicate_results_to_claude(session_id: str, catalog_results: Dict[s
             "summary": {
                 "action_performed": catalog_results["action"],
                 "status": catalog_results["status"],
-                "execution_time": time.time() - catalog_results["timestamp"]
-            }
+                "execution_time": time.time() - catalog_results["timestamp"],
+            },
         }
-        
+
         # Include version keeper issues if available
         if session.metrics.get("total_issues_found", 0) > 0:
             claude_payload["version_keeper_issues"] = {
                 "total_issues": session.metrics["total_issues_found"],
                 "fixes_applied": session.metrics.get("fixes_applied", 0),
-                "remaining_issues": session.metrics.get("remaining_issues", 0)
+                "remaining_issues": session.metrics.get("remaining_issues", 0),
             }
-        
+
         # Include diff analysis if available
         if "diff_analysis" in catalog_results.get("results", {}):
             diff_data = catalog_results["results"]["diff_analysis"]
             claude_payload["diff_summary"] = {
                 "changed_files": diff_data.get("changed_files", []),
                 "change_summary": diff_data.get("change_summary", {}),
-                "risk_assessment": diff_data.get("risk_assessment", {})
+                "risk_assessment": diff_data.get("risk_assessment", {}),
             }
-        
+
         # Include branch information if available
         if "version_branch" in catalog_results.get("results", {}):
             branch_data = catalog_results["results"]["version_branch"]
             claude_payload["branch_info"] = {
                 "branch_name": branch_data.get("branch_name"),
                 "version_bump": f"{branch_data.get('current_version')} → {branch_data.get('new_version')}",
-                "github_pushed": branch_data.get("github_push", {}).get("status") == "success"
+                "github_pushed": branch_data.get("github_push", {}).get("status")
+                == "success",
             }
-        
+
         # Include compliance scores
         compliance_scores = []
         for result_key, result_data in catalog_results.get("results", {}).items():
             if "compliance" in result_key and isinstance(result_data, dict):
                 if "overall_compliance_score" in result_data:
-                    compliance_scores.append({
-                        "category": result_key,
-                        "score": result_data["overall_compliance_score"]
-                    })
-        
+                    compliance_scores.append(
+                        {
+                            "category": result_key,
+                            "score": result_data["overall_compliance_score"],
+                        }
+                    )
+
         if compliance_scores:
             claude_payload["compliance_summary"] = compliance_scores
-        
+
         # Use Claude Agent Protocol if available
         if session.claude_protocol and CLAUDE_PROTOCOL_AVAILABLE:
             task = session.claude_protocol.create_task(
-                TaskType.LINT_FIX,
-                context=claude_payload,
-                priority=1
+                TaskType.LINT_FIX, context=claude_payload, priority=1
             )
-            
+
             session.claude_protocol.record_observation(
                 task.task_id,
                 {
                     "semantic_catalog_results": claude_payload,
-                    "communication_timestamp": time.time()
-                }
+                    "communication_timestamp": time.time(),
+                },
             )
-            
+
             communication_results["claude_protocol_task_id"] = task.task_id
             communication_results["communication_method"] = "claude_agent_protocol"
         else:
             communication_results["communication_method"] = "direct_payload"
-        
+
         communication_results["payload_sent"] = claude_payload
         communication_results["communication_status"] = "success"
-        communication_results["execution_time"] = time.time() - communication_results["start_time"]
-        
+        communication_results["execution_time"] = (
+            time.time() - communication_results["start_time"]
+        )
+
         return communication_results
-        
+
     except Exception as e:
         communication_results["communication_status"] = "failed"
         communication_results["error"] = str(e)
-        communication_results["execution_time"] = time.time() - communication_results["start_time"]
+        communication_results["execution_time"] = (
+            time.time() - communication_results["start_time"]
+        )
         return communication_results
 
 
 async def push_branch_to_github(branch_name: str, version: str) -> Dict[str, Any]:
     """Push branch to GitHub with enhanced error handling for API failures (NEW FEATURE)"""
-    
+
     github_results = {
         "start_time": time.time(),
         "branch_name": branch_name,
         "version": version,
         "github_integration": True,
         "retry_attempts": 0,
-        "max_retries": 3
+        "max_retries": 3,
     }
-    
+
     try:
         # Error handling - More robust error handling for GitHub API failures
         max_retries = github_results["max_retries"]
-        
+
         for attempt in range(max_retries + 1):
             github_results["retry_attempts"] = attempt
-            
+
             try:
                 # First, push the branch to remote
                 push_cmd = ["git", "push", "-u", "origin", branch_name]
                 returncode, stdout, stderr = await pipeline_server.run_command(push_cmd)
-                
+
                 if returncode != 0:
                     # Try to create the remote branch if it doesn't exist
                     if "does not exist" in stderr or "no upstream" in stderr:
-                        create_cmd = ["git", "push", "--set-upstream", "origin", branch_name]
-                        returncode, stdout, stderr = await pipeline_server.run_command(create_cmd)
-                
+                        create_cmd = [
+                            "git",
+                            "push",
+                            "--set-upstream",
+                            "origin",
+                            branch_name,
+                        ]
+                        returncode, stdout, stderr = await pipeline_server.run_command(
+                            create_cmd
+                        )
+
                 if returncode == 0:
                     github_results["push_status"] = "success"
                     github_results["remote_url"] = await get_remote_url()
-                    
+
                     # Try to create a pull request using GitHub CLI if available
                     try:
-                        pr_result = await create_github_pull_request(branch_name, version)
+                        pr_result = await create_github_pull_request(
+                            branch_name, version
+                        )
                         if pr_result:
                             github_results["pull_request"] = pr_result
                     except Exception as pr_error:
-                        logger.warning(f"Pull request creation failed (non-critical): {pr_error}")
+                        logger.warning(
+                            f"Pull request creation failed (non-critical): {pr_error}"
+                        )
                         github_results["pull_request_error"] = str(pr_error)
-                    
+
                     break  # Success, exit retry loop
-                
+
                 else:
                     # GitHub API failure - implement retry logic
                     if attempt < max_retries:
-                        wait_time = 2 ** attempt  # Exponential backoff
-                        logger.warning(f"GitHub push failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {stderr}")
+                        wait_time = 2**attempt  # Exponential backoff
+                        logger.warning(
+                            f"GitHub push failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {stderr}"
+                        )
                         await asyncio.sleep(wait_time)
                         continue
                     else:
-                        raise Exception(f"GitHub push failed after {max_retries + 1} attempts: {stderr}")
-                        
+                        raise Exception(
+                            f"GitHub push failed after {max_retries + 1} attempts: {stderr}"
+                        )
+
             except Exception as github_error:
                 if attempt < max_retries:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"GitHub operation failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {github_error}")
+                    wait_time = 2**attempt
+                    logger.warning(
+                        f"GitHub operation failed (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {github_error}"
+                    )
                     await asyncio.sleep(wait_time)
                     continue
                 else:
                     raise github_error
             github_results["push_status"] = "failed"
             github_results["error"] = stderr
-        
+
         github_results["execution_time"] = time.time() - github_results["start_time"]
-        
+
         return github_results
-        
+
     except Exception as e:
         github_results["push_status"] = "failed"
         github_results["error"] = str(e)
@@ -3234,47 +3547,55 @@ async def get_remote_url() -> Optional[str]:
     return None
 
 
-async def create_github_pull_request(branch_name: str, version: str) -> Optional[Dict[str, Any]]:
+async def create_github_pull_request(
+    branch_name: str, version: str
+) -> Optional[Dict[str, Any]]:
     """Create a GitHub pull request for the version branch"""
     try:
         # Check if GitHub CLI is available
         check_cmd = ["gh", "--version"]
         returncode, stdout, stderr = await pipeline_server.run_command(check_cmd)
-        
+
         if returncode != 0:
-            return {"status": "gh_cli_not_available", "message": "GitHub CLI not installed"}
-        
+            return {
+                "status": "gh_cli_not_available",
+                "message": "GitHub CLI not installed",
+            }
+
         # Create pull request
         pr_cmd = [
-            "gh", "pr", "create",
-            "--title", f"Version bump to {version}",
-            "--body", f"Automated version bump to {version} via semantic catalog tool",
-            "--base", "main",
-            "--head", branch_name
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            f"Version bump to {version}",
+            "--body",
+            f"Automated version bump to {version} via semantic catalog tool",
+            "--base",
+            "main",
+            "--head",
+            branch_name,
         ]
-        
+
         returncode, stdout, stderr = await pipeline_server.run_command(pr_cmd)
-        
+
         if returncode == 0:
             pr_url = stdout.strip()
             return {
                 "status": "created",
                 "url": pr_url,
                 "title": f"Version bump to {version}",
-                "branch": branch_name
+                "branch": branch_name,
             }
         else:
             return {
                 "status": "failed",
                 "error": stderr,
-                "attempted_command": " ".join(pr_cmd)
+                "attempted_command": " ".join(pr_cmd),
             }
-    
+
     except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+        return {"status": "error", "error": str(e)}
 
 
 async def main():
@@ -3285,7 +3606,9 @@ async def main():
         logger.error("Workspace validation failed")
         sys.exit(1)
 
-    logger.info("Starting Enhanced Pipeline MCP Server with SEMANTIC CATALOG INTEGRATION...")
+    logger.info(
+        "Starting Enhanced Pipeline MCP Server with SEMANTIC CATALOG INTEGRATION..."
+    )
     logger.info("Tools available: 13 (now with Semantic Catalog Review)")
     logger.info("MCP Protocol: v1.0")
     logger.info(f"Workspace: {pipeline_server.workspace_root}")
@@ -3305,9 +3628,10 @@ async def main():
             InitializationOptions(
                 server_name="pipeline-mcp-server",
                 server_version="1.0.0",
-                capabilities=pipeline_server.server_capabilities
-            )
+                capabilities=pipeline_server.server_capabilities,
+            ),
         )
+
 
 if __name__ == "__main__":
     try:

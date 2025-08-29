@@ -16,18 +16,24 @@ __description__ = "Universal MCP server management system with Claude Code integ
 try:
     import sys
     from pathlib import Path
-    pipeline_server_path = Path(__file__).parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+
+    pipeline_server_path = (
+        Path(__file__).parent.parent / "mcp-tools" / "pipeline-mcp" / "src"
+    )
     sys.path.insert(0, str(pipeline_server_path))
     import main as pipeline_mcp_server
 except ImportError:
     pipeline_mcp_server = None
-from . import auto_discovery_system
-from . import claude_code_mcp_bridge
-from . import install_mcp_system
+from . import auto_discovery_system, claude_code_mcp_bridge, install_mcp_system
 
 # Configuration and environment detection
 try:
-    from .config import config_manager, environment_detector, platform_adapter, runtime_profiler
+    from .config import (
+        config_manager,
+        environment_detector,
+        platform_adapter,
+        runtime_profiler,
+    )
 except ImportError:
     # Graceful degradation if config modules are not available
     config_manager = None
@@ -45,29 +51,25 @@ except ImportError:
 __all__ = [
     # Version info
     "__version__",
-    "__author__", 
+    "__author__",
     "__email__",
     "__description__",
-    
     # Main modules
     "pipeline_mcp_server",
-    "auto_discovery_system", 
+    "auto_discovery_system",
     "claude_code_mcp_bridge",
     "install_mcp_system",
-    
     # Configuration
     "config_manager",
     "environment_detector",
-    "platform_adapter", 
+    "platform_adapter",
     "runtime_profiler",
-    
     # Docker
     "health_check",
-    
     # Core functions
     "get_system_info",
     "initialize_system",
-    "validate_installation"
+    "validate_installation",
 ]
 
 
@@ -84,10 +86,10 @@ def get_system_info():
             "installer": True,
             "config_manager": config_manager is not None,
             "environment_detector": environment_detector is not None,
-            "docker_integration": health_check is not None
-        }
+            "docker_integration": health_check is not None,
+        },
     }
-    
+
     # Add environment detection if available
     if environment_detector:
         try:
@@ -96,22 +98,18 @@ def get_system_info():
                 "platform": env_info.platform,
                 "architecture": env_info.architecture,
                 "is_docker": env_info.is_docker,
-                "is_kubernetes": env_info.is_kubernetes
+                "is_kubernetes": env_info.is_kubernetes,
             }
         except Exception:
             info["environment"] = {"status": "detection_failed"}
-    
+
     return info
 
 
 def initialize_system(config_path=None):
     """Initialize the MCP system with optional configuration"""
-    initialization_status = {
-        "success": True,
-        "components": {},
-        "errors": []
-    }
-    
+    initialization_status = {"success": True, "components": {}, "errors": []}
+
     try:
         # Initialize configuration manager
         if config_manager:
@@ -121,8 +119,10 @@ def initialize_system(config_path=None):
                 initialization_status["components"]["config"] = True
             except Exception as e:
                 initialization_status["components"]["config"] = False
-                initialization_status["errors"].append(f"Config initialization failed: {e}")
-        
+                initialization_status["errors"].append(
+                    f"Config initialization failed: {e}"
+                )
+
         # Initialize environment detection
         if environment_detector:
             try:
@@ -130,8 +130,10 @@ def initialize_system(config_path=None):
                 initialization_status["components"]["environment_detector"] = True
             except Exception as e:
                 initialization_status["components"]["environment_detector"] = False
-                initialization_status["errors"].append(f"Environment detection failed: {e}")
-        
+                initialization_status["errors"].append(
+                    f"Environment detection failed: {e}"
+                )
+
         # Initialize runtime profiler
         if runtime_profiler:
             try:
@@ -140,61 +142,72 @@ def initialize_system(config_path=None):
             except Exception as e:
                 initialization_status["components"]["runtime_profiler"] = False
                 initialization_status["errors"].append(f"Runtime profiler failed: {e}")
-                
+
     except Exception as e:
         initialization_status["success"] = False
         initialization_status["errors"].append(f"System initialization failed: {e}")
-    
+
     return initialization_status
 
 
 def validate_installation():
     """Validate the MCP system installation and dependencies"""
-    validation_results = {
-        "valid": True,
-        "components": {},
-        "issues": []
-    }
-    
+    validation_results = {"valid": True, "components": {}, "issues": []}
+
     # Check core modules
     core_modules = [
         "pipeline_mcp_server",
         "auto_discovery_system",
-        "claude_code_mcp_bridge", 
-        "install_mcp_system"
+        "claude_code_mcp_bridge",
+        "install_mcp_system",
     ]
-    
+
     for module_name in core_modules:
         try:
             module = globals().get(module_name)
             validation_results["components"][module_name] = module is not None
             if module is None:
-                validation_results["issues"].append(f"Core module {module_name} not available")
+                validation_results["issues"].append(
+                    f"Core module {module_name} not available"
+                )
         except Exception as e:
             validation_results["components"][module_name] = False
-            validation_results["issues"].append(f"Module {module_name} validation failed: {e}")
-    
+            validation_results["issues"].append(
+                f"Module {module_name} validation failed: {e}"
+            )
+
     # Check optional components
     optional_components = {
         "config_manager": config_manager,
         "environment_detector": environment_detector,
         "platform_adapter": platform_adapter,
         "runtime_profiler": runtime_profiler,
-        "docker_health_check": health_check
+        "docker_health_check": health_check,
     }
-    
+
     for comp_name, comp_module in optional_components.items():
         validation_results["components"][comp_name] = comp_module is not None
         if comp_module is None:
-            validation_results["issues"].append(f"Optional component {comp_name} not available")
-    
+            validation_results["issues"].append(
+                f"Optional component {comp_name} not available"
+            )
+
     # Determine overall validity
-    required_components = ["pipeline_mcp_server", "auto_discovery_system", "claude_code_mcp_bridge"]
-    missing_required = [comp for comp in required_components 
-                       if not validation_results["components"].get(comp, False)]
-    
+    required_components = [
+        "pipeline_mcp_server",
+        "auto_discovery_system",
+        "claude_code_mcp_bridge",
+    ]
+    missing_required = [
+        comp
+        for comp in required_components
+        if not validation_results["components"].get(comp, False)
+    ]
+
     if missing_required:
         validation_results["valid"] = False
-        validation_results["issues"].append(f"Missing required components: {missing_required}")
-    
+        validation_results["issues"].append(
+            f"Missing required components: {missing_required}"
+        )
+
     return validation_results

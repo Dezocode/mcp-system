@@ -6,7 +6,6 @@ and performance optimization
 """
 
 import difflib
-from src.config.cross_platform import cross_platform
 import json
 import os
 import re
@@ -19,6 +18,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
+
+from src.config.cross_platform import cross_platform
 
 # Import protocol if available
 try:
@@ -162,9 +163,7 @@ class EnhancedClaudeQualityPatcher:
             cmd.extend(["--session-dir", str(self.session_dir)])
 
         try:
-            subprocess.run(
-                cmd, capture_output=True, text=True, cwd=self.repo_path
-            )
+            subprocess.run(cmd, capture_output=True, text=True, cwd=self.repo_path)
 
             # Find the newly generated report
             reports = list(output_dir.glob("claude-lint-report-*.json"))
@@ -707,23 +706,23 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
 
     def _get_fix_instruction(self, code: str, message: str, action: str) -> str:
         """Get specific fix instruction for linting code"""
-        if code == 'W292':  # no newline at end of file
+        if code == "W292":  # no newline at end of file
             return "Add a newline at the end of the file"
-        elif code == 'W291':  # trailing whitespace
+        elif code == "W291":  # trailing whitespace
             return "Remove trailing whitespace from the line"
-        elif code == 'W293':  # blank line contains whitespace
+        elif code == "W293":  # blank line contains whitespace
             return "Remove whitespace from the blank line"
-        elif code.startswith('E501'):  # line too long
+        elif code.startswith("E501"):  # line too long
             return "Break the long line into multiple lines (max 88 chars)"
-        elif code.startswith('F401'):  # unused import
+        elif code.startswith("F401"):  # unused import
             return "Remove the unused import statement"
-        elif code.startswith('E722'):  # bare except
+        elif code.startswith("E722"):  # bare except
             return "Specify the exception type instead of using bare 'except:'"
-        elif code.startswith('F541'):  # f-string missing placeholders
+        elif code.startswith("F541"):  # f-string missing placeholders
             return "Convert f-string to regular string or add placeholders"
-        elif code.startswith('E203'):  # whitespace before ':'
+        elif code.startswith("E203"):  # whitespace before ':'
             return "Remove whitespace before the colon"
-        elif code.startswith('F841'):  # local variable assigned but never used
+        elif code.startswith("F841"):  # local variable assigned but never used
             return "Remove the unused variable or add underscore prefix"
         else:
             return f"Fix the {code} violation: {message}"
@@ -1653,8 +1652,9 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
             return {
                 "success": False,
                 "claude_output": None,
-                "error": ("Claude CLI not available - running inside "
-                          "Claude Code session"),
+                "error": (
+                    "Claude CLI not available - running inside " "Claude Code session"
+                ),
                 "file_modified": False,
                 "execution_time": 0,
             }
@@ -2334,7 +2334,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
             return {
                 "legitimately_skipped": True,
                 "reason": f"All 5 validation methods confirm: "
-                          f"{', '.join(reasons[:2])}...",
+                f"{', '.join(reasons[:2])}...",
                 "validation_details": validation_methods,
             }
         else:
@@ -2346,7 +2346,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
             return {
                 "legitimately_skipped": False,
                 "reason": f"Only {confirmed_count}/5 methods confirmed skip. "
-                          f"Failed: {', '.join(failing_methods)}",
+                f"Failed: {', '.join(failing_methods)}",
                 "validation_details": validation_methods,
             }
 
@@ -2375,7 +2375,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
                         return {
                             "skip_legitimate": True,
                             "reason": f"No duplicate {func_name} found "
-                                      f"(count: {count})",
+                            f"(count: {count})",
                         }
 
             return {
@@ -2403,7 +2403,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
                         return {
                             "skip_legitimate": True,
                             "reason": f"Content inspection: only {occurrences} "
-                                      f"occurrence of {func_name}",
+                            f"occurrence of {func_name}",
                         }
 
             return {
@@ -2561,7 +2561,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
         print("⚡ Apply fixes in priority order for optimal results")
 
         if self.protocol:
-            success_rate = self.protocol.get_status_summary()['success_rate']
+            success_rate = self.protocol.get_status_summary()["success_rate"]
             print(f"📊 Protocol Status: {success_rate:.1%} success rate")
 
         print("=" * 80)
@@ -2635,7 +2635,7 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
         print("2. Work through fixes in priority order (Fix #1, #2, #3, etc.)")
         print("3. For each fix completed, record observation:")
         if self.protocol:
-            print('   f"{cross_platform.get_command(\"python\")} "-c "')
+            print('   f"{cross_platform.get_command("python")} "-c "')
             print("   from scripts.claude_agent_protocol import get_protocol")
             print("   protocol = get_protocol()")
             print(
@@ -2792,15 +2792,13 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
                     print("   ⚠️  Claude CLI succeeded but file not modified")
             else:
                 sync_success = False
-                error_msg = claude_result.get('error', 'Unknown error')
+                error_msg = claude_result.get("error", "Unknown error")
                 print(f"   ❌ Claude CLI failed: {error_msg}")
 
                 # Special handling when running inside Claude Code
                 if "Claude CLI not available" in claude_result.get("error", ""):
                     print("   🔗 DETECTED: Running inside Claude Code session")
-                    print(
-                        "   🎯 ENHANCED PROMPTING: Providing direct fix instructions"
-                    )
+                    print("   🎯 ENHANCED PROMPTING: Providing direct fix instructions")
 
                     # Enhanced prompting for Claude Code context
                     self._provide_enhanced_claude_code_instructions(
@@ -3097,13 +3095,13 @@ REQUIRED ACTION: Review the original issue description and apply the appropriate
 
     def save_session_log(self):
         """Save session log for tracking"""
-        log_dir = (self.repo_path / ".claude_patches" /
-                   "logs")
+        log_dir = self.repo_path / ".claude_patches" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # ISO-8601
-        log_file = (self.repo_path / "sessions" /
-                    f"claude_patch_session_{timestamp}.json")
+        log_file = (
+            self.repo_path / "sessions" / f"claude_patch_session_{timestamp}.json"
+        )
 
         session_data = {
             "session_info": {
@@ -3129,51 +3127,62 @@ def generate_quality_patcher_json_report(patcher, session_results, report):
     from datetime import datetime, timezone
 
     # Calculate metrics
-    total_fixes_attempted = (patcher.fixes_applied +
-                             patcher.fixes_failed +
-                             patcher.fixes_skipped)
-    success_rate = ((patcher.fixes_applied / total_fixes_attempted * 100)
-                    if total_fixes_attempted > 0 else 0)
+    total_fixes_attempted = (
+        patcher.fixes_applied + patcher.fixes_failed + patcher.fixes_skipped
+    )
+    success_rate = (
+        (patcher.fixes_applied / total_fixes_attempted * 100)
+        if total_fixes_attempted > 0
+        else 0
+    )
 
     # Extract remaining issues from session results
     remaining_issues = 0
-    if hasattr(patcher, 'lint_report') and patcher.lint_report:
-        remaining_issues = max(0, (patcher.lint_report.get("total_issues", 0) -
-                                   patcher.fixes_applied))
+    if hasattr(patcher, "lint_report") and patcher.lint_report:
+        remaining_issues = max(
+            0, (patcher.lint_report.get("total_issues", 0) - patcher.fixes_applied)
+        )
 
     json_report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "session_id": getattr(patcher, 'session_id',
-                              f"quality-patcher-{int(time.time())}"),
+        "session_id": getattr(
+            patcher, "session_id", f"quality-patcher-{int(time.time())}"
+        ),
         "summary": {
-            "total_issues": (patcher.lint_report.get("total_issues", 0)
-                             if hasattr(patcher, 'lint_report') and
-                             patcher.lint_report else 0),
+            "total_issues": (
+                patcher.lint_report.get("total_issues", 0)
+                if hasattr(patcher, "lint_report") and patcher.lint_report
+                else 0
+            ),
             "fixes_applied": patcher.fixes_applied,
             "fixes_failed": patcher.fixes_failed,
             "fixes_skipped": patcher.fixes_skipped,
             "remaining_issues": remaining_issues,
-            "success_rate": round(success_rate, 2)
+            "success_rate": round(success_rate, 2),
         },
         "details": {
             "fixes_attempted": total_fixes_attempted,
             "max_fixes_limit": patcher.max_fixes,
             "session_duration": round(time.time() - patcher.start_time, 2),
             "performance_metrics": patcher.performance_metrics,
-            "fix_timings": (patcher.fix_timings[-10:]
-                            if patcher.fix_timings else [])  # Last 10 timings
+            "fix_timings": (
+                patcher.fix_timings[-10:] if patcher.fix_timings else []
+            ),  # Last 10 timings
         },
         "performance": {
             "duration_seconds": round(time.time() - patcher.start_time, 2),
             "fixes_per_minute": patcher.performance_metrics.get("fixes_per_minute", 0),
             "average_fix_time": patcher.performance_metrics.get("average_fix_time", 0),
-            "success_rate": round(success_rate, 2)
+            "success_rate": round(success_rate, 2),
         },
         "recommendations": [
             f"Applied {patcher.fixes_applied} fixes successfully",
-            (f"Remaining issues: {remaining_issues}" if remaining_issues > 0
-             else "All addressable issues resolved"),
-        ]
+            (
+                f"Remaining issues: {remaining_issues}"
+                if remaining_issues > 0
+                else "All addressable issues resolved"
+            ),
+        ],
     }
 
     # Add session results if available
@@ -3181,7 +3190,7 @@ def generate_quality_patcher_json_report(patcher, session_results, report):
         json_report["session_results"] = session_results
 
     # Add original lint report reference if available
-    if hasattr(patcher, 'lint_report_path') and patcher.lint_report_path:
+    if hasattr(patcher, "lint_report_path") and patcher.lint_report_path:
         json_report["source_lint_report"] = str(patcher.lint_report_path)
 
     return json_report
@@ -3252,14 +3261,13 @@ def generate_quality_patcher_json_report(patcher, session_results, report):
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable debug mode - show full Claude prompts and detailed "
-         "information",
+    help="Enable debug mode - show full Claude prompts and detailed " "information",
 )
 @click.option(
     "--background",
     is_flag=True,
     help="Background execution mode - apply fixes silently in background "
-         "with periodic status updates",
+    "with periodic status updates",
 )
 @click.option(
     "--monitor-lint",
@@ -3310,71 +3318,76 @@ def main(
 ):
     """
     Enhanced Claude Quality Patcher v2.0 - Protocol Integrated
-    
+
     Automatically applies quality fixes to code based on lint reports with Claude integration.
-    
+
     Examples:
         # Basic dry run to see what would be fixed
         python scripts/claude_quality_patcher.py --dry-run
-        
+
         # Apply fixes with debug output
         python scripts/claude_quality_patcher.py --debug --max-fixes=10
-        
+
         # Claude agent mode for manual review
         python scripts/claude_quality_patcher.py --claude-agent --batch-mode
-        
+
         # Automated background processing
         python scripts/claude_quality_patcher.py --auto-mode --background --max-fixes=50
-        
+
         # Generate fresh report and apply fixes
         python scripts/claude_quality_patcher.py --fresh-report --auto-apply
     """
-    
+
     # Configure logging based on debug mode
     import logging
+
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     logger = logging.getLogger(__name__)
-    
+
     if debug:
         logger.debug("Debug mode enabled - verbose output will be shown")
         logger.debug(f"CLI Arguments: max_fixes={max_fixes}, auto_mode={auto_mode}")
 
     print("🤖 Enhanced Claude Quality Patcher v2.0")
     print("=" * 60)
-    
+
     # Input validation
     try:
         if max_fixes <= 0:
             logger.error(f"max_fixes must be positive integer, got: {max_fixes}")
             sys.exit(1)
-            
+
         if max_fixes > 1000:
-            logger.warning(f"Large max_fixes value: {max_fixes}. This may take a long time.")
-            
+            logger.warning(
+                f"Large max_fixes value: {max_fixes}. This may take a long time."
+            )
+
         if output_file:
             output_file_path = Path(output_file)
             if not output_file_path.parent.exists():
-                logger.error(f"Output directory does not exist: {output_file_path.parent}")
+                logger.error(
+                    f"Output directory does not exist: {output_file_path.parent}"
+                )
                 sys.exit(1)
-                
+
         if session_dir:
             session_dir_path = Path(session_dir)
             if not session_dir_path.exists():
                 logger.warning(f"Creating session directory: {session_dir_path}")
                 session_dir_path.mkdir(parents=True, exist_ok=True)
-                
+
         if lint_report and not Path(lint_report).exists():
             logger.error(f"Specified lint report does not exist: {lint_report}")
             sys.exit(1)
-            
+
         if debug:
             logger.debug("Input validation completed successfully")
-            
+
     except Exception as e:
         logger.error(f"Input validation failed: {e}")
         if debug:
@@ -3414,8 +3427,7 @@ def main(
         print("🔄 Generating fresh lint report...")
         integration_success = patcher.auto_integrate_with_version_keeper()
 
-        if (not integration_success and
-                not patcher.lint_report_path):
+        if not integration_success and not patcher.lint_report_path:
             print("❌ Failed to generate or find lint report")
             print("💡 Try running manually:")
             print(
@@ -3463,9 +3475,7 @@ def main(
             priority = fix_item.get("priority", 4)
             category = fix_item.get("category", "unknown")
 
-            priority_emoji = (
-                "🔴" if priority == 1 else "🟡" if priority == 2 else "🟢"
-            )
+            priority_emoji = "🔴" if priority == 1 else "🟡" if priority == 2 else "🟢"
 
             print(
                 f"{i}. {priority_emoji} [{category.upper()}] "
@@ -3536,15 +3546,13 @@ def main(
     # Generate JSON output for pipeline integration
     if output_format == "json":
         json_report = generate_quality_patcher_json_report(
-            patcher=patcher,
-            session_results=session_results,
-            report=report
+            patcher=patcher, session_results=session_results, report=report
         )
 
         if output_file:
             output_path = Path(output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(json_report, f, indent=2, default=str)
             print(f"\\n📊 JSON report saved to: {output_path}")
         else:

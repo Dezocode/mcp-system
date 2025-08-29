@@ -5,12 +5,13 @@ Focused on providing EXACTLY what GitHub Actions and MCP Server need
 """
 
 import json
-import time
+import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
+
 import click
-import subprocess
 
 
 class MinimalVersionKeeper:
@@ -20,8 +21,9 @@ class MinimalVersionKeeper:
         self.current_version = "1.0.0"
         self.git_branch = "main"
 
-    def run_comprehensive_lint(self, session_dir=None, output_format="text",
-                               output_file=None):
+    def run_comprehensive_lint(
+        self, session_dir=None, output_format="text", output_file=None
+    ):
         """Run comprehensive linting and return results"""
 
         # Simulate comprehensive linting
@@ -41,20 +43,22 @@ class MinimalVersionKeeper:
                 ["flake8", "--format=json", "."],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
             if result.stdout:
                 try:
                     flake8_output = json.loads(result.stdout)
                     for item in flake8_output:
-                        issues.append({
-                            "type": "quality",
-                            "tool": "flake8",
-                            "file": item.get("filename", "unknown"),
-                            "line": item.get("line_number", 0),
-                            "message": item.get("text", ""),
-                            "code": item.get("code", "")
-                        })
+                        issues.append(
+                            {
+                                "type": "quality",
+                                "tool": "flake8",
+                                "file": item.get("filename", "unknown"),
+                                "line": item.get("line_number", 0),
+                                "message": item.get("text", ""),
+                                "code": item.get("code", ""),
+                            }
+                        )
                         total_issues += 1
                 except json.JSONDecodeError:
                     pass
@@ -72,30 +76,36 @@ class MinimalVersionKeeper:
                 "total_issues": total_issues,
                 "fixes_applied": 0,
                 "remaining_issues": total_issues,
-                "success_rate": 0.0 if total_issues > 0 else 100.0
+                "success_rate": 0.0 if total_issues > 0 else 100.0,
             },
             "details": {
                 "quality_issues": {
                     "flake8": {
                         "passed": total_issues == 0,
-                        "issues": issues[:10]  # Limit for performance
+                        "issues": issues[:10],  # Limit for performance
                     }
                 },
                 "security_issues": {},
                 "duplicate_issues": {},
-                "connection_issues": {}
+                "connection_issues": {},
             },
             "performance": {
                 "duration_seconds": 2.5,
                 "files_analyzed": len(list(Path(".").glob("**/*.py"))),
-                "issues_per_second": total_issues / 2.5 if total_issues > 0 else 0
+                "issues_per_second": total_issues / 2.5 if total_issues > 0 else 0,
             },
             "recommendations": [
-                (f"Found {total_issues} issues to fix" if total_issues > 0
-                 else "No issues found"),
-                ("Run quality patcher to apply automated fixes" if total_issues > 0
-                 else "Code quality is good")
-            ]
+                (
+                    f"Found {total_issues} issues to fix"
+                    if total_issues > 0
+                    else "No issues found"
+                ),
+                (
+                    "Run quality patcher to apply automated fixes"
+                    if total_issues > 0
+                    else "Code quality is good"
+                ),
+            ],
         }
 
         # Output handling
@@ -103,7 +113,7 @@ class MinimalVersionKeeper:
             if output_file:
                 output_path = Path(output_file)
                 output_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(output_path, 'w') as f:
+                with open(output_path, "w") as f:
                     json.dump(lint_report, f, indent=2)
                 print(f"📊 JSON report saved to: {output_path}")
             else:
@@ -252,7 +262,7 @@ def main(
         lint_report = keeper.run_comprehensive_lint(
             session_dir=session_dir,
             output_format=output_format,
-            output_file=output_file
+            output_file=output_file,
         )
 
         print("✅ Lint-only mode complete")

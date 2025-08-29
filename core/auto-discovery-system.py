@@ -280,18 +280,14 @@ class MCPAutoDiscovery:
                         continue
 
                     if item.is_file():
-                        scan_results["files"].append(
-                            str(item.relative_to(path))
-                        )
+                        scan_results["files"].append(str(item.relative_to(path)))
 
                         # Scan file contents for keywords (small files only)
                         if item.stat().st_size < 1024 * 1024:  # 1MB limit
                             self.scan_file_contents(item, scan_results)
 
                     elif item.is_dir() and depth < max_depth:
-                        scan_results["directories"].append(
-                            str(item.relative_to(path))
-                        )
+                        scan_results["directories"].append(str(item.relative_to(path)))
                         scan_recursive(item, depth + 1)
 
             except PermissionError:
@@ -371,8 +367,7 @@ class MCPAutoDiscovery:
                 keywords,
             ) in keywords_to_check.items():
                 count = sum(
-                    content.lower().count(keyword.lower())
-                    for keyword in keywords
+                    content.lower().count(keyword.lower()) for keyword in keywords
                 )
                 if count > 0:
                     if env_type not in scan_results["keywords"]:
@@ -488,11 +483,7 @@ class MCPAutoDiscovery:
             matches = []
             for pattern in patterns:
                 matches.extend(
-                    [
-                        key
-                        for key in os.environ.keys()
-                        if key.startswith(pattern)
-                    ]
+                    [key for key in os.environ.keys() if key.startswith(pattern)]
                 )
             if matches:
                 env_indicators[env_type] = matches
@@ -596,8 +587,7 @@ class MCPAutoDiscovery:
                 max_score += len(patterns["files"]) * 10
                 for file_pattern in patterns["files"]:
                     if any(
-                        file_pattern in f
-                        for f in analysis["scan_results"]["files"]
+                        file_pattern in f for f in analysis["scan_results"]["files"]
                     ):
                         score += 10
 
@@ -640,9 +630,7 @@ class MCPAutoDiscovery:
             # Calculate confidence percentage
             if max_score > 0:
                 confidence = (score / max_score) * 100
-                if (
-                    confidence > 10
-                ):  # Only include environments with >10% confidence
+                if confidence > 10:  # Only include environments with >10% confidence
                     scores[env_type] = confidence
 
         # Sort by confidence
@@ -654,9 +642,7 @@ class MCPAutoDiscovery:
             )
         )
         analysis["detected_environments"] = [
-            env
-            for env, score in analysis["confidence_scores"].items()
-            if score > 25
+            env for env, score in analysis["confidence_scores"].items() if score > 25
         ]
 
     def generate_suggestions(self, analysis: Dict[str, Any]):
@@ -796,12 +782,8 @@ Project: {analysis['path']}
 """
 
         for env_type, confidence in analysis["confidence_scores"].items():
-            status = (
-                "✅" if env_type in analysis["detected_environments"] else "🔍"
-            )
-            report += (
-                f"{status} **{env_type.title()}**: {confidence:.1f}% conf\n"
-            )
+            status = "✅" if env_type in analysis["detected_environments"] else "🔍"
+            report += f"{status} **{env_type.title()}**: {confidence:.1f}% conf\n"
 
         platform = analysis["system_info"]["platform"]
         arch = analysis["system_info"]["architecture"]
@@ -832,8 +814,9 @@ Project: {analysis['path']}
 
         # Extract complex expression to avoid E122 indentation issues
         running_processes_text = (
-            ', '.join(analysis['running_processes'])
-            if analysis['running_processes'] else 'None detected'
+            ", ".join(analysis["running_processes"])
+            if analysis["running_processes"]
+            else "None detected"
         )
 
         report += f"""
@@ -856,13 +839,9 @@ Project: {analysis['path']}
 """
 
         installed_tools = [
-            tool
-            for tool, installed in analysis["installed_tools"].items()
-            if installed
+            tool for tool, installed in analysis["installed_tools"].items() if installed
         ]
-        tools_str = (
-            ", ".join(installed_tools) if installed_tools else "None detected"
-        )
+        tools_str = ", ".join(installed_tools) if installed_tools else "None detected"
         report += f"{tools_str}\n"
 
         return report
@@ -926,9 +905,7 @@ def main_auto_discovery():
         print("=" * 50)
         print(f"📁 Path: {discovery.current_dir}")
         print(f"🔍 Detected: {', '.join(analysis['detected_environments'])}")
-        print(
-            f"💡 Suggested servers: {', '.join(analysis['suggested_servers'])}"
-        )
+        print(f"💡 Suggested servers: {', '.join(analysis['suggested_servers'])}")
         print("\n📊 Full report available in: .mcp/discovery-report.md")
 
 

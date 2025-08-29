@@ -13,11 +13,11 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
-from dataclasses import dataclass, asdict
 
 try:
     import aiofiles
@@ -26,8 +26,8 @@ except ImportError:
     aiofiles = None
 
 try:
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
     WATCHDOG_AVAILABLE = True
 except ImportError:
     # Create dummy classes if watchdog not available
@@ -1750,12 +1750,14 @@ Provides webhook registration and handling capabilities
 """
 
 import asyncio
-import json
-import hmac
 import hashlib
-from typing import Any, List, Dict, Optional
-import mcp.types as types
+import hmac
+import json
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
+import mcp.types as types
+
 
 class WebhooksModule:
     """Webhook registration and handling capabilities"""
@@ -1925,8 +1927,10 @@ Provides real-time data streaming capabilities
 import asyncio
 import json
 import time
-from typing import Any, List, Dict, Optional, AsyncGenerator
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
 import mcp.types as types
+
 
 class StreamingModule:
     """Real-time streaming capabilities"""

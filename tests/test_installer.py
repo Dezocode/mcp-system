@@ -23,13 +23,13 @@ class TestMCPInstaller(unittest.TestCase):
         """Clean up temporary directories"""
         os.environ["HOME"] = self.original_home
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_installer_prerequisites(self):
         """Test prerequisite checking"""
         # This would normally check Python version, Git, etc.
         self.assertTrue(True)  # Placeholder for actual prerequisite tests
-
 
     def test_directory_creation(self):
         """Test that installer creates necessary directories"""
@@ -65,7 +65,7 @@ class TestMCPInstaller(unittest.TestCase):
         new_config = {
             "mcpServers": {
                 "existing-server": {"command": "existing-command"},
-                "mcp-universal": {"command": "mcp-universal", "args": ["router"]}
+                "mcp-universal": {"command": "mcp-universal", "args": ["router"]},
             }
         }
 
@@ -104,7 +104,7 @@ class TestMCPInstaller(unittest.TestCase):
         # Test template creation functionality
         template_dir = self.temp_home / "templates"
         template_dir.mkdir()
-        
+
         # Create a basic template
         template_file = template_dir / "basic_server.py"
         template_content = '''#!/usr/bin/env python3
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     main()
 '''
         template_file.write_text(template_content)
-        
+
         self.assertTrue(template_file.exists())
         self.assertIn("Template server", template_file.read_text())
 
@@ -126,23 +126,23 @@ if __name__ == "__main__":
         # Test upgrade system functionality
         upgrade_dir = self.temp_home / "upgrades"
         upgrade_dir.mkdir()
-        
+
         # Create a basic upgrade module
         upgrade_manifest = {
             "version": "1.0.0",
             "modules": ["logging", "auth", "cache"],
-            "compatibility": ["python-fastmcp"]
+            "compatibility": ["python-fastmcp"],
         }
-        
+
         manifest_file = upgrade_dir / "upgrade_manifest.json"
         with open(manifest_file, "w") as f:
             json.dump(upgrade_manifest, f)
-        
+
         self.assertTrue(manifest_file.exists())
-        
+
         with open(manifest_file, "r") as f:
             loaded_manifest = json.load(f)
-        
+
         self.assertEqual(loaded_manifest["version"], "1.0.0")
         self.assertIn("logging", loaded_manifest["modules"])
 
@@ -150,26 +150,26 @@ if __name__ == "__main__":
         """Integration test for full installation process"""
         # Simulate full installation process
         install_success = True
-        
+
         # Create basic installation structure
         try:
             mcp_dir = self.temp_home / ".mcp-system"
             mcp_dir.mkdir()
-            
+
             # Create manifest
             manifest = {
                 "installation_date": "2025-01-01",
                 "version": "1.0.0",
-                "components": ["universal_launcher", "bridge", "router"]
+                "components": ["universal_launcher", "bridge", "router"],
             }
-            
+
             manifest_file = mcp_dir / "installation_manifest.json"
             with open(manifest_file, "w") as f:
                 json.dump(manifest, f)
-                
+
         except Exception:
             install_success = False
-        
+
         self.assertTrue(install_success)
 
 

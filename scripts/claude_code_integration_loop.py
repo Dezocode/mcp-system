@@ -9,9 +9,9 @@ shell=False, proper error handling, input sanitization, and privilege dropping
 """
 
 import json
-from src.config.cross_platform import cross_platform
 import re
 import signal
+
 # Security: subprocess calls use absolute paths, validated args, timeouts,
 # shell=False, proper error handling, input sanitization, privilege dropping
 import subprocess
@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
+
+from src.config.cross_platform import cross_platform
 
 # Import protocol if available
 try:
@@ -94,13 +96,11 @@ class EnhancedClaudeCodeIntegrationLoop:
             "max_quality_issues": 0,  # Fix ALL quality issues
             "max_duplicates": 0,  # Remove ALL duplicates
             "require_all_fixes": True,  # Process ALL available fixes
-            "react_cycles_completed": 0
+            "react_cycles_completed": 0,
         }
 
         # Performance tracking
-        self.version_keeper_path = (
-            self.repo_path / "scripts" / "version_keeper.py"
-        )
+        self.version_keeper_path = self.repo_path / "scripts" / "version_keeper.py"
         self.performance_metrics = {
             "start_time": time.time(),
             "phase_timings": {},
@@ -384,9 +384,7 @@ class EnhancedClaudeCodeIntegrationLoop:
                 "success": False,
                 "error": "No lint report found",
             }
-        lint_reports = list(
-            self.reports_dir.glob("claude-lint-report-*.json")
-        )
+        lint_reports = list(self.reports_dir.glob("claude-lint-report-*.json"))
 
         if not lint_reports:
             return 0
@@ -524,8 +522,7 @@ class EnhancedClaudeCodeIntegrationLoop:
 
     def needs_claude_fixes(self, analysis: Dict[str, Any]) -> bool:
         """Check if Claude-guided fixes are needed"""
-        return (not analysis.get("success") or
-                analysis.get("auto_fixable", 0) == 0)
+        return not analysis.get("success") or analysis.get("auto_fixable", 0) == 0
 
     def run_claude_guided_fixes(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Run Claude-guided fixes for manual issues"""
@@ -1213,8 +1210,9 @@ class EnhancedClaudeCodeIntegrationLoop:
             print(f"   📊 CYCLE {cycle} RESULTS:")
             print(f"   📊 Fixes applied: {fixes_applied}")
             print(f"   📊 Issues remaining: {remaining_issues}")
-            progress_pct = ((current_issues - remaining_issues) /
-                            max(1, current_issues)) * 100
+            progress_pct = (
+                (current_issues - remaining_issues) / max(1, current_issues)
+            ) * 100
             print(f"   📈 Progress: {progress_pct:.1f}% improvement")
 
             if remaining_issues > 0:
@@ -1295,7 +1293,7 @@ class EnhancedClaudeCodeIntegrationLoop:
             ),
             "average_cycle_duration": (
                 total_duration / len(cycle_results) if cycle_results else 0
-            )
+            ),
         }
 
     def generate_comprehensive_final_report(self, final_summary: Dict[str, Any]):
@@ -1523,7 +1521,7 @@ processing cycles.
                             "step": "create_development_branch",
                             "success": False,
                             "error": f"Failed to track development branch: "
-                                     f"{track_result.stderr}",
+                            f"{track_result.stderr}",
                             "action": "track_existing_development",
                         }
             else:
@@ -1541,7 +1539,7 @@ processing cycles.
                         "step": "create_development_branch",
                         "success": False,
                         "error": f"Failed to create development branch: "
-                                 f"{create_result.stderr}",
+                        f"{create_result.stderr}",
                         "action": "create_new_development",
                     }
 
@@ -1579,7 +1577,7 @@ processing cycles.
         print()
         print(f"   • Fixes Applied: {stats.get('total_fixes_applied', 0)}")
         print(f"   • Processing Cycles: {stats.get('total_cycles', 0)}")
-        runtime = self.format_duration(final_summary.get('total_runtime_seconds', 0))
+        runtime = self.format_duration(final_summary.get("total_runtime_seconds", 0))
         print(f"   • Total Runtime: {runtime}")
         print()
         print()
@@ -1689,7 +1687,7 @@ processing cycles.
                         "step": "final_validation",
                         "success": False,
                         "error": f"Still {final_issues} issues remaining - "
-                                 f"pipeline halted",
+                        f"pipeline halted",
                         "action": "issues_still_remaining",
                         "remaining_issues": final_issues,
                     }
@@ -2067,10 +2065,7 @@ The pipeline encountered issues and could not complete successfully.
 
 """
 
-        _ = (
-            self.repo_path /
-            f"development-release-{timestamp}.json"
-        )
+        _ = self.repo_path / f"development-release-{timestamp}.json"
 
         if not success:
             report_content += """
@@ -2096,7 +2091,7 @@ The pipeline encountered issues and could not complete successfully.
             f.write(report_content)
 
         print(f"📋 PIPELINE COMPLETION REPORT: {report_file}")
-        published_status = '✅ YES' if published else '❌ NO'
+        published_status = "✅ YES" if published else "❌ NO"
         print(f"🚀 DEVELOPMENT BRANCH PUBLISHED: {published_status}")
 
         # Console summary
@@ -2104,13 +2099,16 @@ The pipeline encountered issues and could not complete successfully.
         print()
         print("=" * 70)
         print(f"✅ Overall Success: {'YES' if success else 'NO'}")
-        print(f"📱 Development Branch: "
-              f"{'PUBLISHED' if published else 'NOT PUBLISHED'}")
-        duration = self.format_duration(pipeline_result.get('total_duration', 0))
+        print(
+            f"📱 Development Branch: "
+            f"{'PUBLISHED' if published else 'NOT PUBLISHED'}"
+        )
+        duration = self.format_duration(pipeline_result.get("total_duration", 0))
         print(f"⏱️  Duration: {duration}")
-        completed_steps = len([s for s in pipeline_result.get('steps', [])
-                              if s.get('success')])
-        total_steps = len(pipeline_result.get('steps', []))
+        completed_steps = len(
+            [s for s in pipeline_result.get("steps", []) if s.get("success")]
+        )
+        total_steps = len(pipeline_result.get("steps", []))
         print(f"🔧 Steps Completed: {completed_steps}/{total_steps}")
         print("=" * 70)
 
@@ -2249,7 +2247,7 @@ def main(
             print()
             print(f"   Target issues: {target_issues}")
             print(f"   Max cycles: {max_cycles}")
-            publish_status = 'enabled' if publish_pipeline else 'disabled'
+            publish_status = "enabled" if publish_pipeline else "disabled"
             print(f"   Pipeline publishing: {publish_status}")
             print()
 
@@ -2266,7 +2264,7 @@ def main(
             print()
             print(f"   Max iterations: {max_iterations}")
             print(f"   Auto-fix threshold: {auto_fix_threshold}")
-            integration_status = 'enabled' if claude_integration else 'disabled'
+            integration_status = "enabled" if claude_integration else "disabled"
             print(f"   Claude integration: {integration_status}")
             print(f"   Quality threshold: {quality_threshold} issues")
             print(f"   Target branch: {branch or 'auto-detected'}")
@@ -2296,7 +2294,7 @@ def main(
             print("🔄 CONTINUOUS RERUN MODE ENABLED")
             print(f"🎯 Target: {target_issues} issues remaining")
             print(f"🔢 Max cycles: {max_cycles}")
-            publishing_status = 'ENABLED' if publish_pipeline else 'DISABLED'
+            publishing_status = "ENABLED" if publish_pipeline else "DISABLED"
             print(f"🚀 Pipeline Publishing: {publishing_status}")
 
             # Set pipeline publishing flag on the loop system
@@ -2319,8 +2317,10 @@ def main(
                     f"📱 Development Branch: "
                     f"{'PUBLISHED' if branch_published else 'NOT PUBLISHED'}"
                 )
-                print("\n🎉 SUCCESS! ALL ISSUES RESOLVED + DEVELOPMENT BRANCH "
-                      "PUBLISHED!")
+                print(
+                    "\n🎉 SUCCESS! ALL ISSUES RESOLVED + DEVELOPMENT BRANCH "
+                    "PUBLISHED!"
+                )
                 print("=" * 70)
                 print("🏆 Final Results:")
                 print(
@@ -2380,7 +2380,7 @@ def main(
         print(f"   Check logs in: {loop_system.session_dir}")
         print(f"   Session ID: {loop_system.loop_session_id}")
         if hasattr(loop_system, "performance_metrics"):
-            fixes_count = loop_system.performance_metrics.get('fixes_applied', 0)
+            fixes_count = loop_system.performance_metrics.get("fixes_applied", 0)
             print(f"   Fixes applied: {fixes_count}")
         sys.exit(1)
 

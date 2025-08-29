@@ -1,0 +1,345 @@
+{
+  "timestamp": "2025-08-27T03:06:02.726282+00:00",
+  "session_id": "quality-patcher-1756263962",
+  "summary": {
+    "total_issues": 0,
+    "fixes_applied": 0,
+    "fixes_failed": 10,
+    "fixes_skipped": 0,
+    "remaining_issues": 0,
+    "success_rate": 0.0
+  },
+  "details": {
+    "fixes_attempted": 10,
+    "max_fixes_limit": 999999,
+    "session_duration": 201.7,
+    "performance_metrics": {
+      "fixes_per_minute": 0,
+      "success_rate": 0,
+      "average_fix_time": 0,
+      "issues_by_complexity": {}
+    },
+    "fix_timings": []
+  },
+  "performance": {
+    "duration_seconds": 201.7,
+    "fixes_per_minute": 0,
+    "average_fix_time": 0,
+    "success_rate": 0.0
+  },
+  "recommendations": [
+    "Applied 0 fixes successfully",
+    "All addressable issues resolved"
+  ],
+  "session_results": {
+    "session_start": "2025-08-26T22:02:41.052141",
+    "fixes_processed": [
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/rapid_fix.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/rapid_fix.py:132 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [132, 307] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220241/rapid_fix_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220241.py.backup",
+        "timestamp": "2025-08-26T22:03:02.768950"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/demo_mcp_tools_standardization.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/demo_mcp_tools_standardization.py:19 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [19, 307] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220302/demo_mcp_tools_standardization_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220302.py.backup",
+        "timestamp": "2025-08-26T22:03:17.809369"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/mcp-file-sync-manager.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/mcp-file-sync-manager.py:571 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [307, 571] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220317/mcp-file-sync-manager_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220317.py.backup",
+        "timestamp": "2025-08-26T22:03:40.898993"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/src/claude_code_mcp_bridge.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/src/claude_code_mcp_bridge.py:159 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [159, 307] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220340/claude_code_mcp_bridge_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220340.py.backup",
+        "timestamp": "2025-08-26T22:04:00.240652"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/src/install_mcp_system.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/src/install_mcp_system.py:120 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [120, 307] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220400/install_mcp_system_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220400.py.backup",
+        "timestamp": "2025-08-26T22:04:20.099752"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function main in /home/dezocode/mcp-system/src/auto_discovery_system.py",
+            "claude_prompt": "Please remove the duplicate function 'main' from /home/dezocode/mcp-system/src/auto_discovery_system.py:227 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:307"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [227, 307] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220420/auto_discovery_system_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220420.py.backup",
+        "timestamp": "2025-08-26T22:04:42.560113"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function __init__ in /home/dezocode/mcp-system/src/crafter_mcp_server.py",
+            "claude_prompt": "Please remove the duplicate function '__init__' from /home/dezocode/mcp-system/src/crafter_mcp_server.py:38 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:15"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [15, 38] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220442/crafter_mcp_server_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220442.py.backup",
+        "timestamp": "2025-08-26T22:05:04.950917"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function load_config in /home/dezocode/mcp-system/core/mcp-manager.py",
+            "claude_prompt": "Please remove the duplicate function 'load_config' from /home/dezocode/mcp-system/core/mcp-manager.py:30 as it already exists in /home/dezocode/mcp-system/mcp-file-sync-manager.py:183"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [30, 183] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220505/mcp-manager_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220505.py.backup",
+        "timestamp": "2025-08-26T22:05:23.265354"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function __init__ in /home/dezocode/mcp-system/core/mcp-router.py",
+            "claude_prompt": "Please remove the duplicate function '__init__' from /home/dezocode/mcp-system/core/mcp-router.py:18 as it already exists in /home/dezocode/mcp-system/surgical_fix_challenge.py:15"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [15, 18] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220523/mcp-router_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220523.py.backup",
+        "timestamp": "2025-08-26T22:05:42.004400"
+      },
+      {
+        "fix_item": {
+          "priority": 2,
+          "category": "duplicates",
+          "fix": {
+            "type": "remove_duplicate",
+            "description": "Remove duplicate function __init__ in /home/dezocode/mcp-system/core/mcp-upgrader.py",
+            "claude_prompt": "Please remove the duplicate function '__init__' from /home/dezocode/mcp-system/core/mcp-upgrader.py:63 as it already exists in /home/dezocode/mcp-system/core/mcp-manager.py:20"
+          }
+        },
+        "status": "failed",
+        "reason": "claude_did_not_apply_fix",
+        "validation": {
+          "syntax_valid": true,
+          "fix_applied": true,
+          "file_modified": true,
+          "errors": [],
+          "warnings": []
+        },
+        "line_validation": {
+          "valid_changes": true,
+          "unauthorized_changes": [],
+          "target_lines_modified": false,
+          "errors": [
+            "Target lines [20, 63] were not modified"
+          ]
+        },
+        "backup_path": "/home/dezocode/mcp-system/.claude_patches/quality_patcher_backups/vunknown/unknown/20250826_220542/mcp-upgrader_vunknown_unknown_p2_duplicates_remove_duplicate_20250826_220542.py.backup",
+        "timestamp": "2025-08-26T22:06:02.724827"
+      }
+    ],
+    "fixes_applied": 0,
+    "fixes_skipped": 0,
+    "fixes_failed": 10,
+    "total_available": 10,
+    "session_end": "2025-08-26T22:06:02.724848"
+  },
+  "source_lint_report": "full_scan.json"
+}

@@ -75,9 +75,7 @@ class MCPTester:
                 )
 
             # Check if server responds
-            response = requests.get(
-                f"http://localhost:{port}/health", timeout=5
-            )
+            response = requests.get(f"http://localhost:{port}/health", timeout=5)
 
             if response.status_code == 200:
                 return TestResult(
@@ -211,9 +209,7 @@ class MCPTester:
                 duration=time.time() - start_time,
             )
 
-    async def run_custom_test(
-        self, server_name: str, test_config: Dict
-    ) -> TestResult:
+    async def run_custom_test(self, server_name: str, test_config: Dict) -> TestResult:
         """Run a custom test based on configuration"""
         start_time = time.time()
 
@@ -226,9 +222,7 @@ class MCPTester:
                 args = test_config.get("args", {})
                 expected = test_config.get("expected")
 
-                result = await self.test_tool_execution(
-                    server_name, tool_name, args
-                )
+                result = await self.test_tool_execution(server_name, tool_name, args)
 
                 # Check expected results if provided
                 if expected and result.status == "pass":
@@ -236,9 +230,7 @@ class MCPTester:
                     response_text = str(result.details.get("result", ""))
                     if expected not in response_text:
                         result.status = "fail"
-                        result.message = (
-                            f"Expected '{expected}' not found in response"
-                        )
+                        result.message = f"Expected '{expected}' not found in response"
 
                 result.name = test_name
                 return result
@@ -309,25 +301,19 @@ class MCPTester:
         # MCP protocol test
         protocol_result = await self.test_mcp_protocol(server_name)
         results.append(protocol_result)
-        print(
-            f"  Protocol: {protocol_result.status} - {protocol_result.message}"
-        )
+        print(f"  Protocol: {protocol_result.status} - {protocol_result.message}")
 
         # Common tool tests
         common_tools = ["hello_world", "get_status"]
         for tool in common_tools:
             tool_result = await self.test_tool_execution(server_name, tool)
             results.append(tool_result)
-            print(
-                f"  Tool {tool}: {tool_result.status} - {tool_result.message}"
-            )
+            print(f"  Tool {tool}: {tool_result.status} - {tool_result.message}")
 
         # Custom tests if provided
         if test_suite and test_suite.tests:
             for test_config in test_suite.tests:
-                custom_result = await self.run_custom_test(
-                    server_name, test_config
-                )
+                custom_result = await self.run_custom_test(server_name, test_config)
                 results.append(custom_result)
                 print(
                     f"  {custom_result.name}: {custom_result.status} - "
@@ -351,9 +337,7 @@ class MCPTester:
                 "passed": passed,
                 "failed": failed,
                 "skipped": skipped,
-                "success_rate": (
-                    f"{(passed/total*100):.1f}%" if total > 0 else "0%"
-                ),
+                "success_rate": (f"{(passed/total*100):.1f}%" if total > 0 else "0%"),
                 "total_duration": f"{total_duration:.2f}s",
             },
             "results": [asdict(r) for r in results],
@@ -472,9 +456,7 @@ Examples:
         help="Start server before testing if not running",
     )
     parser.add_argument("--report", help="Save detailed report to JSON file")
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
 
@@ -497,9 +479,7 @@ Examples:
         # Start server if requested
         if args.start:
             if not tester.start_server_if_needed(server_name):
-                print(
-                    f"Skipping tests for {server_name} due to startup failure"
-                )
+                print(f"Skipping tests for {server_name} due to startup failure")
                 continue
 
         # Get test suite

@@ -2,14 +2,16 @@
 Tests for final-demo MCP server
 """
 
-import pytest
 import asyncio
 import json
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 from mcp.server.fastmcp import Context
 
 # Import your server modules here
 # from src.main import hello_world, get_status, example_tool
+
 
 @pytest.mark.asyncio
 async def test_hello_world():
@@ -25,6 +27,7 @@ async def test_hello_world():
     # Test with custom name
     result = await hello_world(ctx, name="Alice")
     assert "Hello, Alice!" in result
+
 
 @pytest.mark.asyncio
 async def test_get_status():
@@ -43,6 +46,7 @@ async def test_get_status():
     assert status_data["initialized"] is True
     assert status_data["port"] == 8055
 
+
 @pytest.mark.asyncio
 async def test_example_tool():
     """Test the example_tool"""
@@ -55,5 +59,6 @@ async def test_example_tool():
     # Test with both parameters
     result = await example_tool(ctx, param1="test", param2=20)
     assert "Processed test with value 20" == result
+
 
 # Add more tests for your custom tools here

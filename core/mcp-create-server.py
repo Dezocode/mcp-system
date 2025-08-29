@@ -101,25 +101,25 @@ SERVER_VERSION = "0.1.0"
 class {server_name.title().replace("-", "")}Server:
     """
     Official MCP Server implementation for {server_name}.
-    
+
     Follows Anthropic MCP protocol specification:
     - Uses stdio transport (recommended by Anthropic)
     - Implements standard MCP capabilities
     - Provides proper error handling
     """
-    
+
     def __init__(self):
         self.server = Server(SERVER_NAME)
         self.setup_handlers()
-    
+
     def setup_handlers(self):
         """Set up MCP protocol handlers following official patterns."""
-        
+
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
             """
             List available tools.
-            
+
             Returns the tools offered by this server.
             """
             return [
@@ -173,11 +173,11 @@ class {server_name.title().replace("-", "")}Server:
         ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
             """
             Handle tool calls.
-            
+
             Args:
                 name: The name of the tool to call
                 arguments: The arguments for the tool
-                
+
             Returns:
                 The result of the tool call
             """
@@ -200,10 +200,10 @@ class {server_name.title().replace("-", "")}Server:
     async def hello_world(self, name: str = "World") -> list[types.TextContent]:
         """
         Say hello to someone.
-        
+
         Args:
             name: The name to greet
-            
+
         Returns:
             A greeting message
         """
@@ -213,7 +213,7 @@ class {server_name.title().replace("-", "")}Server:
     async def get_status(self) -> list[types.TextContent]:
         """
         Get server status information.
-        
+
         Returns:
             Server status information in JSON format
         """
@@ -231,11 +231,11 @@ class {server_name.title().replace("-", "")}Server:
     async def example_tool(self, param1: str, param2: int = 10) -> list[types.TextContent]:
         """
         Example tool demonstrating parameter handling.
-        
+
         Args:
             param1: A required string parameter
             param2: An optional integer parameter (default: 10)
-            
+
         Returns:
             Result of the operation
         """
@@ -263,7 +263,7 @@ async def main():
     """Main entry point for the MCP server."""
     logger.info(f"Starting {{SERVER_NAME}} v{{SERVER_VERSION}}")
     logger.info("Using stdio transport (Anthropic MCP standard)")
-    
+
     server = {server_name.title().replace("-", "")}Server()
     await server.run()
 
@@ -689,7 +689,7 @@ CMD ["python", "src/main.py"]
 
 services:
   {server_name}:
-    build: 
+    build:
       context: .
       args:
         BUILD_DATE: ${{BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}}
@@ -702,7 +702,7 @@ services:
     # volumes:
     #   - ./data:/app/data
     #   - ./.env:/app/.env
-    
+
     # Uncomment if your MCP server needs external services
     # depends_on:
     #   - database
@@ -790,18 +790,18 @@ class TestMCPServer:
         """Test the list_tools handler."""
         # Mock the server's list_tools handler
         tools = await server.server._tool_handlers["list_tools"]()
-        
+
         assert len(tools) == 3
-        
+
         # Check hello_world tool
         hello_tool = next(tool for tool in tools if tool.name == "hello_world")
         assert hello_tool.description == "Say hello to someone"
         assert "name" in hello_tool.inputSchema["properties"]
-        
+
         # Check get_status tool
         status_tool = next(tool for tool in tools if tool.name == "get_status")
         assert status_tool.description == "Get server status information"
-        
+
         # Check example_tool
         example_tool = next(tool for tool in tools if tool.name == "example_tool")
         assert example_tool.description == "Example tool demonstrating parameter handling"
@@ -830,7 +830,7 @@ class TestMCPServer:
         result = await server.get_status()
         assert len(result) == 1
         assert result[0].type == "text"
-        
+
         # Parse the JSON response
         status_data = json.loads(result[0].text)
         assert status_data["server"] == "{server_name}"
@@ -857,22 +857,22 @@ class TestMCPServer:
     async def test_call_tool_handler(self, server):
         """Test the call_tool handler with various scenarios."""
         call_tool_handler = server.server._tool_handlers["call_tool"]
-        
+
         # Test hello_world
         result = await call_tool_handler("hello_world", {{"name": "Test"}})
         assert len(result) == 1
         assert "Hello, Test!" in result[0].text
-        
+
         # Test with empty arguments
         result = await call_tool_handler("hello_world", {{}})
         assert len(result) == 1
         assert "Hello, World!" in result[0].text
-        
+
         # Test with None arguments
         result = await call_tool_handler("hello_world", None)
         assert len(result) == 1
         assert "Hello, World!" in result[0].text
-        
+
         # Test unknown tool
         with pytest.raises(ValueError, match="Unknown tool"):
             await call_tool_handler("unknown_tool", {{}})
@@ -881,7 +881,7 @@ class TestMCPServer:
     async def test_tool_error_handling(self, server):
         """Test error handling in tool calls."""
         call_tool_handler = server.server._tool_handlers["call_tool"]
-        
+
         # Test with invalid parameters (should raise appropriate error)
         with pytest.raises(TypeError):
             await call_tool_handler("example_tool", {{"param2": "not_an_int"}})
@@ -891,17 +891,17 @@ class TestMCPServer:
         assert hasattr(server, 'server')
         assert server.server.name == "{server_name}"
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_mcp_protocol_compliance(self, server):
         """Test MCP protocol compliance."""
         # Test that tools return proper MCP content types
         result = await server.hello_world()
         assert all(isinstance(content, types.TextContent) for content in result)
         assert all(content.type == "text" for content in result)
-        
+
         result = await server.get_status()
         assert all(isinstance(content, types.TextContent) for content in result)
-        
+
         result = await server.example_tool("test")
         assert all(isinstance(content, types.TextContent) for content in result)
 
@@ -914,23 +914,23 @@ class TestMCPIntegration:
     async def test_full_workflow(self):
         """Test a complete MCP workflow."""
         server = {server_name.title().replace("-", "")}Server()
-        
+
         # List tools
         tools = await server.server._tool_handlers["list_tools"]()
         assert len(tools) > 0
-        
+
         # Call each tool
         call_tool = server.server._tool_handlers["call_tool"]
-        
+
         # Test hello_world
         result = await call_tool("hello_world", {{"name": "Integration Test"}})
         assert "Integration Test" in result[0].text
-        
+
         # Test get_status
         result = await call_tool("get_status", {{}})
         status = json.loads(result[0].text)
         assert status["server"] == "{server_name}"
-        
+
         # Test example_tool
         result = await call_tool("example_tool", {{"param1": "integration", "param2": 42}})
         assert "integration" in result[0].text
@@ -1487,9 +1487,7 @@ mcp {server_name} start
 
         # Check if path exists
         if path.exists() and not force:
-            response = input(
-                f"Directory {path} already exists. Continue? (y/N): "
-            )
+            response = input(f"Directory {path} already exists. Continue? (y/N): ")
             if response.lower() != "y":
                 return False
 
@@ -1537,7 +1535,7 @@ mcp {server_name} start
         # Try project config first, then fall back to home directory
         project_config = Path("configs/.mcp-servers.json")
         home_config = Path.home() / ".mcp-servers.json"
-        
+
         # Prefer project config if it exists or if we're in a project
         if project_config.parent.exists() or Path("mcp-setup").exists():
             config_file = project_config
@@ -1623,16 +1621,22 @@ Examples:
     )
     parser.add_argument("--description", "-d", help="Server description")
     parser.add_argument("--path", help="Custom path (default: mcp-tools/<name>)")
-    parser.add_argument("--complexity", "-c", 
-                       choices=["simple", "standard", "advanced", "enterprise"],
-                       default="simple",
-                       help="Complexity level (affects generated features)")
-    parser.add_argument("--force", "-f", action="store_true",
-                       help="Overwrite existing files")
-    parser.add_argument("--with-tests", action="store_true",
-                       help="Include test scaffolding")
-    parser.add_argument("--with-docs", action="store_true",
-                       help="Include documentation templates")
+    parser.add_argument(
+        "--complexity",
+        "-c",
+        choices=["simple", "standard", "advanced", "enterprise"],
+        default="simple",
+        help="Complexity level (affects generated features)",
+    )
+    parser.add_argument(
+        "--force", "-f", action="store_true", help="Overwrite existing files"
+    )
+    parser.add_argument(
+        "--with-tests", action="store_true", help="Include test scaffolding"
+    )
+    parser.add_argument(
+        "--with-docs", action="store_true", help="Include documentation templates"
+    )
     parser.add_argument(
         "--list-templates",
         action="store_true",

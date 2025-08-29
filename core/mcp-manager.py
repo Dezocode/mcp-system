@@ -179,9 +179,7 @@ class MCPManager:
                     "message": f"Server started on port {server.get('port')}",
                 }
             else:
-                stderr = (
-                    process.stderr.read().decode() if process.stderr else ""
-                )
+                stderr = process.stderr.read().decode() if process.stderr else ""
                 return {
                     "success": False,
                     "error": f"Server failed to start: {stderr}",

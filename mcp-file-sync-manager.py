@@ -29,116 +29,167 @@ class MCPFileSyncManager(FileSystemEventHandler):
             # CORE DIRECTORY - Core MCP system files (HIGHEST PRIORITY)
             "core/": {
                 "patterns": [
-                    "mcp-*.py", "claude-*.py", "auto-discovery-system.py",
-                    "direct-mem0-usage.py"
+                    "mcp-*.py",
+                    "claude-*.py",
+                    "auto-discovery-system.py",
+                    "direct-mem0-usage.py",
                 ],
                 "exclude_patterns": [
                     "mcp-file-sync-manager.py"  # This stays in root as utility
                 ],
                 "description": "Core MCP system files",
-                "priority": 2
+                "priority": 2,
             },
             # Core system scripts (SECOND PRIORITY)
             "scripts/": {
                 "patterns": [
-                    "*_keeper.py", "*_agent*.py", "*_loop.py", "claude_*.py",
-                    "*quality_patcher.py", "*version_keeper.py"
+                    "*_keeper.py",
+                    "*_agent*.py",
+                    "*_loop.py",
+                    "claude_*.py",
+                    "*quality_patcher.py",
+                    "*version_keeper.py",
                 ],
                 "description": "Core system scripts and agents",
-                "priority": 2
+                "priority": 2,
             },
             "installers/": {
                 "patterns": ["install*.py", "setup*.py", "*installer*.py"],
                 "description": "Installation and setup scripts",
-                "priority": 3
+                "priority": 3,
             },
             # BIN - Only shell scripts and executables (NOT Python files)
             "bin/": {
                 "patterns": ["run-*", "*.sh", "quick-*"],
                 "exclude_patterns": ["*.py"],  # NO Python files in bin/
                 "description": "Shell scripts and executable binaries only",
-                "priority": 4
+                "priority": 4,
             },
             "configs/": {
                 "patterns": [
-                    ".gitignore", ".flake8", "pyproject.toml", "settings.json",
-                    "installation-manifest.json", "trace-enforcement.json",
-                    "versions.json", "claude_desktop_config.json"
+                    ".gitignore",
+                    ".flake8",
+                    "pyproject.toml",
+                    "settings.json",
+                    "installation-manifest.json",
+                    "trace-enforcement.json",
+                    "versions.json",
+                    "claude_desktop_config.json",
                 ],
                 "exclude_patterns": [],  # NO EXCLUSIONS - ONLY EXACT MATCHES ALLOWED
                 "description": "Core configuration files only - EXACT MATCHES ONLY",
-                "priority": 9  # LOWEST PRIORITY - sessions should get files first
+                "priority": 9,  # LOWEST PRIORITY - sessions should get files first
             },
             "reports/": {
                 "patterns": [
-                    "*report*.json", "*lint*.json", "*audit*.json",
-                    "bandit-*.json", "safety-*.json"
+                    "*report*.json",
+                    "*lint*.json",
+                    "*audit*.json",
+                    "bandit-*.json",
+                    "safety-*.json",
                 ],
                 "description": "Generated reports and analysis files",
-                "priority": 6
+                "priority": 6,
             },
             "sessions/": {
                 "patterns": [
-                    "*session*.json", "*patch*.json", "*state*.json",
-                    "*checkpoint*.json", "*agent*.json", "*-agent-*.json",
-                    "*metadata*.json", "claude_patch_*.json"
+                    "*session*.json",
+                    "*patch*.json",
+                    "*state*.json",
+                    "*checkpoint*.json",
+                    "*agent*.json",
+                    "*-agent-*.json",
+                    "*metadata*.json",
+                    "claude_patch_*.json",
                 ],
                 "description": (
                     "Session and pipeline state files, agent states, and metadata"
                 ),
-                "priority": 1  # HIGHEST PRIORITY - get agent/metadata files FIRST
+                "priority": 1,  # HIGHEST PRIORITY - get agent/metadata files FIRST
             },
             "docs/": {
                 "patterns": ["*.md", "README*", "*guide*", "*documentation*"],
                 "exclude_patterns": ["CLAUDE.md"],
                 "description": "Documentation files",
-                "priority": 8
+                "priority": 8,
             },
             "utils/": {
                 "patterns": ["*util*.py", "*helper*.py", "*tool*.py"],
                 "description": "Utility and helper scripts",
-                "priority": 9
+                "priority": 9,
             },
             "tests/": {
                 "patterns": ["test_*.py", "*_test.py", "conftest.py"],
                 "description": "Test files",
-                "priority": 10
+                "priority": 10,
             },
             ".mcp-system-backups-disconnected/": {
                 "patterns": [
-                    "*.backup", "*_backup*", "*-backup*", "*.bak", "*.orig", "*.old",
-                    "*-enhanced*", "*_enhanced*", "*-v[0-9]*", "*_v[0-9]*",
-                    "*_original*", "*_updated*", "*legacy*"
+                    "*.backup",
+                    "*_backup*",
+                    "*-backup*",
+                    "*.bak",
+                    "*.orig",
+                    "*.old",
+                    "*-enhanced*",
+                    "*_enhanced*",
+                    "*-v[0-9]*",
+                    "*_v[0-9]*",
+                    "*_original*",
+                    "*_updated*",
+                    "*legacy*",
                 ],
-                "description": "Backup and legacy files"
+                "description": "Backup and legacy files",
             },
             ".mcp-system-trash-internal/auto-removed/system/": {
                 "patterns": [
-                    ".DS_Store", "Thumbs.db", ".gitkeep", "*.tmp", "*.temp",
-                    "*.swp", "*.swo", "*~", ".#*"
+                    ".DS_Store",
+                    "Thumbs.db",
+                    ".gitkeep",
+                    "*.tmp",
+                    "*.temp",
+                    "*.swp",
+                    "*.swo",
+                    "*~",
+                    ".#*",
                 ],
-                "description": "System generated and temporary files"
+                "description": "System generated and temporary files",
             },
             ".mcp-system-trash-internal/auto-removed/cache/": {
                 "patterns": [
-                    "*.pyc", "*.pyo", "*.egg-info", ".pytest_cache", "__pycache__",
-                    "*.cache", ".coverage", "node_modules"
+                    "*.pyc",
+                    "*.pyo",
+                    "*.egg-info",
+                    ".pytest_cache",
+                    "__pycache__",
+                    "*.cache",
+                    ".coverage",
+                    "node_modules",
                 ],
-                "description": "Cache and compiled files"
+                "description": "Cache and compiled files",
             },
             ".mcp-system-trash-internal/auto-removed/logs/": {
                 "patterns": [
-                    "*.log", "*.trace", "*.debug", "pipeline-daemon-*.log",
-                    ".pipeline-*.log", "audit-*.log", "error-*.log"
+                    "*.log",
+                    "*.trace",
+                    "*.debug",
+                    "pipeline-daemon-*.log",
+                    ".pipeline-*.log",
+                    "audit-*.log",
+                    "error-*.log",
                 ],
-                "description": "Log and debug files"
+                "description": "Log and debug files",
             },
             ".mcp-system-trash-internal/auto-removed/temp/": {
                 "patterns": [
-                    "*.pid", "*.lock", "*.socket", "*.monitor.pid", ".running"
+                    "*.pid",
+                    "*.lock",
+                    "*.socket",
+                    "*.monitor.pid",
+                    ".running",
                 ],
-                "description": "Lock and process files"
-            }
+                "description": "Lock and process files",
+            },
         }
 
         # File type rules
@@ -155,24 +206,51 @@ class MCPFileSyncManager(FileSystemEventHandler):
         # CRITICAL: Never move these essential files
         self.protected_files = {
             # Core system files
-            "pyproject.toml", "package.json", "package-lock.json", "requirements.txt",
-            "setup.py", "setup.cfg", "Cargo.toml", "go.mod", "pom.xml",
+            "pyproject.toml",
+            "package.json",
+            "package-lock.json",
+            "requirements.txt",
+            "setup.py",
+            "setup.cfg",
+            "Cargo.toml",
+            "go.mod",
+            "pom.xml",
             # Configuration files
-            "CLAUDE.md", ".claude-instructions.md", ".mcp-sync-config.json",
-            ".mcp-pipeline-state.json", ".claude-fixes.json",
+            "CLAUDE.md",
+            ".claude-instructions.md",
+            ".mcp-sync-config.json",
+            ".mcp-pipeline-state.json",
+            ".claude-fixes.json",
             # Git and version control
-            ".gitignore", ".gitattributes", ".gitmodules",
+            ".gitignore",
+            ".gitattributes",
+            ".gitmodules",
             # CI/CD
-            ".github", "Dockerfile", "docker-compose.yml",
+            ".github",
+            "Dockerfile",
+            "docker-compose.yml",
             # Essential scripts
-            "run-pipeline", "run-direct-pipeline", "run-pipeline-claude-interactive"
+            "run-pipeline",
+            "run-direct-pipeline",
+            "run-pipeline-claude-interactive",
         }
 
         # CRITICAL: Never move files in these directories
         self.protected_directories = {
-            ".git", "venv", "env", ".venv",
-            "src", "lib", "core", "scripts", "bin", "docs", "tests",
-            ".github", ".claude", "configs"
+            ".git",
+            "venv",
+            "env",
+            ".venv",
+            "src",
+            "lib",
+            "core",
+            "scripts",
+            "bin",
+            "docs",
+            "tests",
+            ".github",
+            ".claude",
+            "configs",
         }
 
         self.observer = Observer()
@@ -183,7 +261,7 @@ class MCPFileSyncManager(FileSystemEventHandler):
     def load_config(self):
         """Load sync configuration"""
         if self.config_file.exists():
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file, "r") as f:
                 config = json.load(f)
                 self.directory_rules.update(config.get("directory_rules", {}))
                 self.file_type_rules.update(config.get("file_type_rules", {}))
@@ -193,9 +271,9 @@ class MCPFileSyncManager(FileSystemEventHandler):
         config = {
             "directory_rules": self.directory_rules,
             "file_type_rules": self.file_type_rules,
-            "last_updated": time.time()
+            "last_updated": time.time(),
         }
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, "w") as f:
             json.dump(config, f, indent=2)
 
     def is_protected_file(self, file_path: Path) -> bool:
@@ -214,12 +292,16 @@ class MCPFileSyncManager(FileSystemEventHandler):
                 return True
 
         # Additional safety checks
-        if file_name.startswith('.env'):  # Environment files
+        if file_name.startswith(".env"):  # Environment files
             return True
-        if file_name.endswith('.key') or file_name.endswith('.pem'):  # Security keys
+        if file_name.endswith(".key") or file_name.endswith(".pem"):  # Security keys
             return True
-        if ('config' in file_name.lower() and
-                file_path.suffix in ['.json', '.yaml', '.yml', '.toml']):
+        if "config" in file_name.lower() and file_path.suffix in [
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+        ]:
             return True
 
         return False
@@ -240,9 +322,9 @@ class MCPFileSyncManager(FileSystemEventHandler):
         current_dir = str(relative_path.parent)
 
         # Check backup patterns first (highest priority)
-        backup_patterns = (
-            self.directory_rules[".mcp-system-backups-disconnected/"]["patterns"]
-        )
+        backup_patterns = self.directory_rules[".mcp-system-backups-disconnected/"][
+            "patterns"
+        ]
         for pattern in backup_patterns:
             if self._matches_pattern(file_name, pattern):
                 target_dir = self.backup_dir
@@ -272,12 +354,12 @@ class MCPFileSyncManager(FileSystemEventHandler):
 
             # Special hardcoded protection for configs directory
             if target_dir == "configs/" and (
-                file_name.endswith("agent.json") or
-                "-agent-" in file_name or
-                "metadata" in file_name or
-                "patch" in file_name or
-                "session" in file_name or
-                "state" in file_name
+                file_name.endswith("agent.json")
+                or "-agent-" in file_name
+                or "metadata" in file_name
+                or "patch" in file_name
+                or "session" in file_name
+                or "state" in file_name
             ):
                 continue
 
@@ -286,7 +368,7 @@ class MCPFileSyncManager(FileSystemEventHandler):
                 target_path = self.project_root / target_dir
 
                 current_normalized = current_dir if current_dir != "." else ""
-                target_normalized = target_dir.rstrip('/')
+                target_normalized = target_dir.rstrip("/")
 
                 if current_normalized != target_normalized:
                     return target_path / file_name
@@ -296,6 +378,7 @@ class MCPFileSyncManager(FileSystemEventHandler):
     def _matches_pattern(self, filename: str, pattern: str) -> bool:
         """Check if filename matches pattern (supports wildcards)"""
         import fnmatch
+
         return fnmatch.fnmatch(filename, pattern)
 
     def extract_timestamp_from_filename(self, filename: str) -> Optional[Dict]:
@@ -329,7 +412,7 @@ class MCPFileSyncManager(FileSystemEventHandler):
                         "datetime": dt,
                         "timestamp": dt.timestamp(),
                         "iso": dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                        "readable": dt.strftime("%Y-%m-%d %H:%M:%S")
+                        "readable": dt.strftime("%Y-%m-%d %H:%M:%S"),
                     }
                 except ValueError:
                     continue
@@ -363,7 +446,7 @@ class MCPFileSyncManager(FileSystemEventHandler):
                 "action": "moved",
                 "source": str(source),
                 "target": str(target),
-                "reason": "directory_organization"
+                "reason": "directory_organization",
             }
             self.sync_log.append(log_entry)
 
@@ -443,11 +526,11 @@ Total file moves: {len(self.sync_log)}
 
         for entry in self.sync_log[-10:]:
             timestamp = entry.get(
-                'timestamp_readable',
-                time.strftime('%H:%M:%S', time.localtime(entry['timestamp']))
+                "timestamp_readable",
+                time.strftime("%H:%M:%S", time.localtime(entry["timestamp"])),
             )
-            source = Path(entry['source']).name
-            target_dir = Path(entry['target']).parent.name
+            source = Path(entry["source"]).name
+            target_dir = Path(entry["target"]).parent.name
             report += f"- {timestamp}: {source} → {target_dir}/\n"
 
         return report
@@ -458,7 +541,7 @@ Total file moves: {len(self.sync_log)}
         """Add new directory organization rule"""
         self.directory_rules[directory] = {
             "patterns": patterns,
-            "description": description
+            "description": description,
         }
         self.save_config()
         print(f"✅ Added rule for {directory}: {patterns}")
@@ -472,7 +555,7 @@ Total file moves: {len(self.sync_log)}
             print(f"\n📁 {directory}")
             print(f"   Description: {rules.get('description', 'No description')}")
             print(f"   Patterns: {rules.get('patterns', [])}")
-            if 'exclude_patterns' in rules:
+            if "exclude_patterns" in rules:
                 print(f"   Excludes: {rules['exclude_patterns']}")
 
     def _ensure_trash_structure(self):
@@ -485,7 +568,7 @@ Total file moves: {len(self.sync_log)}
             self.trash_dir / "conditional" / "databases",
             self.trash_dir / "conditional" / "binaries",
             self.trash_dir / "conditional" / "unknown",
-            self.trash_dir / "metadata"
+            self.trash_dir / "metadata",
         ]
 
         for dir_path in trash_dirs:
@@ -498,12 +581,14 @@ Total file moves: {len(self.sync_log)}
 
         if not moved_files_log.exists():
             moved_files_log.write_text(
-                '{"moved_files": [], "created_at": "' +
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '"}'
+                '{"moved_files": [], "created_at": "'
+                + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                + '"}'
             )
 
         if not restore_guide.exists():
-            restore_guide.write_text("""# File Restoration Guide
+            restore_guide.write_text(
+                """# File Restoration Guide
 
 ## How to Restore Files
 
@@ -523,7 +608,8 @@ Total file moves: {len(self.sync_log)}
 - Never delete files from `conditional/` without review
 - Files older than 30 days in `auto-removed/` can be safely deleted
 - Always check `moved-files.json` before permanent deletion
-""")
+"""
+            )
 
     def clean_non_functional_files(self):
         """Clean up non-functional files by moving to trash"""
@@ -573,9 +659,11 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="MCP File Sync Manager")
-    parser.add_argument("action", choices=[
-        "scan", "monitor", "report", "rules", "add-rule", "clean"
-    ], help="Action to perform")
+    parser.add_argument(
+        "action",
+        choices=["scan", "monitor", "report", "rules", "add-rule", "clean"],
+        help="Action to perform",
+    )
     parser.add_argument("--directory", help="Directory for add-rule action")
     parser.add_argument(
         "--patterns", nargs="+", help="File patterns for add-rule action"
@@ -599,9 +687,7 @@ def main():
             print("❌ --directory and --patterns required for add-rule")
             return
         sync_manager.add_directory_rule(
-            args.directory,
-            args.patterns,
-            args.description or ""
+            args.directory, args.patterns, args.description or ""
         )
     elif args.action == "clean":
         sync_manager.clean_non_functional_files()

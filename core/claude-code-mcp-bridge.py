@@ -5,12 +5,13 @@ Automatically detects Claude Code usage and provides seamless MCP integration
 """
 
 import json
-from src.config.cross_platform import cross_platform
 import os
 import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from src.config.cross_platform import cross_platform
 
 
 class ClaudeCodeMCPBridge:
@@ -195,9 +196,7 @@ class ClaudeCodeMCPBridge:
                 with open(claude_config_path, "r") as f:
                     existing_config = json.load(f)
             except json.JSONDecodeError:
-                print(
-                    "⚠️  Existing Claude config invalid, backing up and creating new"
-                )
+                print("⚠️  Existing Claude config invalid, backing up and creating new")
                 backup_path = claude_config_path.with_suffix(".backup.json")
                 claude_config_path.rename(backup_path)
                 existing_config = {}
@@ -231,9 +230,7 @@ class ClaudeCodeMCPBridge:
                 existing_config["mcpServers"][unique_name] = server_config
 
         # Add system integration config
-        existing_config["mcp_system_integration"] = new_config[
-            "mcp_system_integration"
-        ]
+        existing_config["mcp_system_integration"] = new_config["mcp_system_integration"]
 
         # Write merged configuration
         try:
@@ -294,7 +291,9 @@ class ClaudeCodeMCPBridge:
             # 1. Check if MCP system is installed
             if not self.mcp_system_dir.exists():
                 print("❌ MCP system not found. Please install first with:")
-                print(f"    {cross_platform.get_command('python')} install-mcp-system.py")
+                print(
+                    f"    {cross_platform.get_command('python')} install-mcp-system.py"
+                )
                 return False
 
             # 2. Create project MCP configuration
@@ -510,9 +509,7 @@ seamless MCP integration without requiring special permissions.
         print(f"\n📁 Project types: {', '.join(status['project_types'])}")
 
         if status["project_launchers"]:
-            print(
-                f"🚀 Available launchers: {', '.join(status['project_launchers'])}"
-            )
+            print(f"🚀 Available launchers: {', '.join(status['project_launchers'])}")
 
         if status["claude_config_found"]:
             config_path = self.get_claude_config_path()

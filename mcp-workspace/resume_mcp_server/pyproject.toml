@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume_mcp_server"
+version = "1.0.0"
+description = "MCP Server for resume_mcp_server"
+authors = [{name = "MCP Crafter", email = "admin@example.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.scripts]
+resume_mcp_server = "src.main:main"

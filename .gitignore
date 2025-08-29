@@ -179,4 +179,4 @@ bandit-report.json
 test-agent-123.json
 
 # Autofix results (temporary)
-autofix-results/
+autofix-results/autofix-reports/autofix-report-*.json

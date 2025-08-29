@@ -108,13 +108,9 @@ class MCPUpgrader:
 
     def _detect_template(self, path: Path) -> str:
         """Detect server template type"""
-        if (path / "pyproject.toml").exists() and (
-            path / "src" / "main.py"
-        ).exists():
+        if (path / "pyproject.toml").exists() and (path / "src" / "main.py").exists():
             return "python-fastmcp"
-        elif (path / "package.json").exists() and (
-            path / "src" / "index.ts"
-        ).exists():
+        elif (path / "package.json").exists() and (path / "src" / "index.ts").exists():
             return "typescript-node"
         elif (path / "main.py").exists():
             return "minimal-python"
@@ -238,9 +234,7 @@ class MCPUpgrader:
                     ),
                 },
                 "commands": ["pip install -r requirements-logging.txt"],
-                "rollback_commands": [
-                    "pip uninstall -y structlog prometheus-client"
-                ],
+                "rollback_commands": ["pip uninstall -y structlog prometheus-client"],
             },
             {
                 "id": "authentication",
@@ -260,9 +254,7 @@ class MCPUpgrader:
                     ),
                 },
                 "commands": ["pip install -r requirements-auth.txt"],
-                "rollback_commands": [
-                    "pip uninstall -y pyjwt cryptography"
-                ],
+                "rollback_commands": ["pip uninstall -y pyjwt cryptography"],
             },
             {
                 "id": "caching-redis",
@@ -301,9 +293,7 @@ class MCPUpgrader:
                     "pip install -r requirements-db.txt",
                     "alembic init migrations",
                 ],
-                "rollback_commands": [
-                    "pip uninstall -y alembic sqlalchemy"
-                ],
+                "rollback_commands": ["pip uninstall -y alembic sqlalchemy"],
             },
             {
                 "id": "monitoring-metrics",
@@ -321,9 +311,7 @@ class MCPUpgrader:
                     "requirements-metrics.txt": "prometheus-client>=0.17.0",
                 },
                 "commands": ["pip install -r requirements-metrics.txt"],
-                "rollback_commands": [
-                    "pip uninstall -y prometheus-client"
-                ],
+                "rollback_commands": ["pip uninstall -y prometheus-client"],
             },
             {
                 "id": "api-versioning",
@@ -406,8 +394,7 @@ class MCPUpgrader:
                 "version": module.version,
                 "missing_requirements": missing_requirements,
                 "conflicts": conflicts,
-                "can_install": len(missing_requirements) == 0
-                and len(conflicts) == 0,
+                "can_install": len(missing_requirements) == 0 and len(conflicts) == 0,
             }
 
             analysis["available_upgrades"].append(upgrade_info)
@@ -448,9 +435,7 @@ class MCPUpgrader:
             "installed_modules": server.installed_modules,
         }
 
-        (backup_path / "metadata.json").write_text(
-            json.dumps(metadata, indent=2)
-        )
+        (backup_path / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
         print(f"✅ Backup created: {backup_path}")
         return str(backup_path)
@@ -498,9 +483,7 @@ class MCPUpgrader:
 
             # Check if already installed
             if module_id in server.installed_modules:
-                result.warnings.append(
-                    f"Module {module_id} already installed"
-                )
+                result.warnings.append(f"Module {module_id} already installed")
                 return result
 
             # Check requirements
@@ -530,9 +513,7 @@ class MCPUpgrader:
             if dry_run:
                 result.success = True
                 result.modules_applied = [module_id]
-                print(
-                    f"✅ Dry run successful for {module_id} on {server_name}"
-                )
+                print(f"✅ Dry run successful for {module_id} on {server_name}")
                 return result
 
             # Create backup
@@ -610,9 +591,7 @@ class MCPUpgrader:
         # Update in-memory server info
         server.installed_modules.append(module_id)
 
-    def rollback_module(
-        self, server_name: str, module_id: str
-    ) -> UpgradeResult:
+    def rollback_module(self, server_name: str, module_id: str) -> UpgradeResult:
         """Rollback an upgrade module"""
         start_time = time.time()
         result = UpgradeResult(
@@ -662,9 +641,7 @@ class MCPUpgrader:
             self._remove_from_server_manifest(server_name, module_id)
 
             result.success = True
-            print(
-                f"✅ Successfully rolled back {module_id} from {server_name}"
-            )
+            print(f"✅ Successfully rolled back {module_id} from {server_name}")
 
         except Exception as e:
             result.errors.append(f"Rollback error: {str(e)}")
@@ -674,9 +651,7 @@ class MCPUpgrader:
 
         return result
 
-    def _remove_from_server_manifest(
-        self, server_name: str, module_id: str
-    ):
+    def _remove_from_server_manifest(self, server_name: str, module_id: str):
         """Remove module from server manifest"""
         server = self.servers[server_name]
         manifest_path = server.path / ".mcp-upgrades.json"
@@ -715,27 +690,19 @@ class MCPUpgrader:
         # Sort modules by dependencies
         sorted_modules = self._sort_modules_by_dependencies(module_ids)
 
-        print(
-            f"Upgrading {server_name} with modules: {', '.join(sorted_modules)}"
-        )
+        print(f"Upgrading {server_name} with modules: {', '.join(sorted_modules)}")
 
         for module_id in sorted_modules:
-            result = self.apply_upgrade_module(
-                server_name, module_id, dry_run
-            )
+            result = self.apply_upgrade_module(server_name, module_id, dry_run)
             results.append(result)
 
             if not result.success:
-                print(
-                    f"❌ Failed to apply {module_id}, stopping batch upgrade"
-                )
+                print(f"❌ Failed to apply {module_id}, stopping batch upgrade")
                 break
 
         return results
 
-    def _sort_modules_by_dependencies(
-        self, module_ids: List[str]
-    ) -> List[str]:
+    def _sort_modules_by_dependencies(self, module_ids: List[str]) -> List[str]:
         """Sort modules by their dependency requirements"""
         sorted_modules = []
         remaining = set(module_ids)
@@ -838,12 +805,7 @@ class MCPUpgrader:
                             "description": module.description,
                             "confidence": (
                                 "high"
-                                if sum(
-                                    1
-                                    for k in keywords
-                                    if k in prompt_lower
-                                )
-                                > 1
+                                if sum(1 for k in keywords if k in prompt_lower) > 1
                                 else "medium"
                             ),
                         }
@@ -863,21 +825,14 @@ class MCPUpgrader:
                 for mod in suggestions["suggested_modules"]
                 if (
                     server.template
-                    in self.available_modules[
-                        mod["module_id"]
-                    ].compatibility
-                    or "all"
-                    in self.available_modules[
-                        mod["module_id"]
-                    ].compatibility
+                    in self.available_modules[mod["module_id"]].compatibility
+                    or "all" in self.available_modules[mod["module_id"]].compatibility
                 )
             ]
 
         return suggestions
 
-    def list_available_modules(
-        self, template_filter: str = None
-    ) -> List[Dict]:
+    def list_available_modules(self, template_filter: str = None) -> List[Dict]:
         """List all available upgrade modules"""
         modules = []
 
@@ -885,10 +840,7 @@ class MCPUpgrader:
             module_id,
             module,
         ) in self.available_modules.items():
-            if (
-                template_filter
-                and template_filter not in module.compatibility
-            ):
+            if template_filter and template_filter not in module.compatibility:
                 continue
 
             modules.append(
@@ -1553,9 +1505,7 @@ Examples:
         """,
     )
 
-    subparsers = parser.add_subparsers(
-        dest="command", help="Available commands"
-    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Analyze command
     analyze_parser = subparsers.add_parser(
@@ -1567,21 +1517,13 @@ Examples:
     suggest_parser = subparsers.add_parser(
         "suggest", help="Suggest upgrades based on prompt"
     )
-    suggest_parser.add_argument(
-        "prompt", help="Description of what you need"
-    )
-    suggest_parser.add_argument(
-        "server", nargs="?", help="Server name (optional)"
-    )
+    suggest_parser.add_argument("prompt", help="Description of what you need")
+    suggest_parser.add_argument("server", nargs="?", help="Server name (optional)")
 
     # Install command
-    install_parser = subparsers.add_parser(
-        "install", help="Install upgrade modules"
-    )
+    install_parser = subparsers.add_parser("install", help="Install upgrade modules")
     install_parser.add_argument("server", help="Server name")
-    install_parser.add_argument(
-        "modules", nargs="+", help="Module IDs to install"
-    )
+    install_parser.add_argument("modules", nargs="+", help="Module IDs to install")
     install_parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -1589,25 +1531,19 @@ Examples:
     )
 
     # Rollback command
-    rollback_parser = subparsers.add_parser(
-        "rollback", help="Rollback upgrade module"
-    )
+    rollback_parser = subparsers.add_parser("rollback", help="Rollback upgrade module")
     rollback_parser.add_argument("server", help="Server name")
     rollback_parser.add_argument("module", help="Module ID to rollback")
 
     # List modules command
-    list_parser = subparsers.add_parser(
-        "list-modules", help="List available modules"
-    )
+    list_parser = subparsers.add_parser("list-modules", help="List available modules")
     list_parser.add_argument("--template", help="Filter by template")
 
     # Install custom module command
     custom_parser = subparsers.add_parser(
         "install-module", help="Install custom module"
     )
-    custom_parser.add_argument(
-        "module_file", help="Path to module JSON file"
-    )
+    custom_parser.add_argument("module_file", help="Path to module JSON file")
 
     args = parser.parse_args()
 
@@ -1622,15 +1558,11 @@ Examples:
         print(json.dumps(analysis, indent=2))
 
     elif args.command == "suggest":
-        suggestions = upgrader.suggest_upgrades_for_prompt(
-            args.prompt, args.server
-        )
+        suggestions = upgrader.suggest_upgrades_for_prompt(args.prompt, args.server)
         print(json.dumps(suggestions, indent=2))
 
     elif args.command == "install":
-        results = upgrader.batch_upgrade(
-            args.server, args.modules, args.dry_run
-        )
+        results = upgrader.batch_upgrade(args.server, args.modules, args.dry_run)
 
         print(f"\\nUpgrade Results for {args.server}:")
         print("=" * 50)
@@ -1638,7 +1570,7 @@ Examples:
         for result in results:
             status = "✅ SUCCESS" if result.success else "❌ FAILED"
             module_name = (
-                result.modules_applied[0] if result.modules_applied else 'Unknown'
+                result.modules_applied[0] if result.modules_applied else "Unknown"
             )
             print(f"{status} {module_name}")
 

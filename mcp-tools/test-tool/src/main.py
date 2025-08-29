@@ -10,10 +10,11 @@ import asyncio
 import json
 import logging
 from typing import Any, Sequence
-from mcp.server import Server, NotificationOptions
-from mcp.server.models import InitializationOptions
+
 import mcp.server.stdio
 import mcp.types as types
+from mcp.server import NotificationOptions, Server
+from mcp.server.models import InitializationOptions
 from pydantic import AnyUrl
 
 # Configure logging
@@ -24,28 +25,29 @@ logger = logging.getLogger("test-tool")
 SERVER_NAME = "test-tool"
 SERVER_VERSION = "0.1.0"
 
+
 class TestToolServer:
     """
     Official MCP Server implementation for test-tool.
-    
+
     Follows Anthropic MCP protocol specification:
     - Uses stdio transport (recommended by Anthropic)
     - Implements standard MCP capabilities
     - Provides proper error handling
     """
-    
+
     def __init__(self):
         self.server = Server(SERVER_NAME)
         self.setup_handlers()
-    
+
     def setup_handlers(self):
         """Set up MCP protocol handlers following official patterns."""
-        
+
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
             """
             List available tools.
-            
+
             Returns the tools offered by this server.
             """
             return [
@@ -57,20 +59,16 @@ class TestToolServer:
                         "properties": {
                             "name": {
                                 "type": "string",
-                                "description": "The name to greet"
+                                "description": "The name to greet",
                             }
                         },
-                        "required": []
-                    }
+                        "required": [],
+                    },
                 ),
                 types.Tool(
                     name="get_status",
                     description="Get server status information",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
+                    inputSchema={"type": "object", "properties": {}, "required": []},
                 ),
                 types.Tool(
                     name="example_tool",
@@ -80,17 +78,17 @@ class TestToolServer:
                         "properties": {
                             "param1": {
                                 "type": "string",
-                                "description": "A required string parameter"
+                                "description": "A required string parameter",
                             },
                             "param2": {
                                 "type": "integer",
                                 "description": "An optional integer parameter",
-                                "default": 10
-                            }
+                                "default": 10,
+                            },
                         },
-                        "required": ["param1"]
-                    }
-                )
+                        "required": ["param1"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -99,11 +97,11 @@ class TestToolServer:
         ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
             """
             Handle tool calls.
-            
+
             Args:
                 name: The name of the tool to call
                 arguments: The arguments for the tool
-                
+
             Returns:
                 The result of the tool call
             """
@@ -126,10 +124,10 @@ class TestToolServer:
     async def hello_world(self, name: str = "World") -> list[types.TextContent]:
         """
         Say hello to someone.
-        
+
         Args:
             name: The name to greet
-            
+
         Returns:
             A greeting message
         """
@@ -139,7 +137,7 @@ class TestToolServer:
     async def get_status(self) -> list[types.TextContent]:
         """
         Get server status information.
-        
+
         Returns:
             Server status information in JSON format
         """
@@ -148,20 +146,20 @@ class TestToolServer:
             "version": SERVER_VERSION,
             "status": "running",
             "description": "MCP server for test-tool",
-            "capabilities": [
-                "tools"
-            ]
+            "capabilities": ["tools"],
         }
         return [types.TextContent(type="text", text=json.dumps(status, indent=2))]
 
-    async def example_tool(self, param1: str, param2: int = 10) -> list[types.TextContent]:
+    async def example_tool(
+        self, param1: str, param2: int = 10
+    ) -> list[types.TextContent]:
         """
         Example tool demonstrating parameter handling.
-        
+
         Args:
             param1: A required string parameter
             param2: An optional integer parameter (default: 10)
-            
+
         Returns:
             Result of the operation
         """
@@ -179,9 +177,9 @@ class TestToolServer:
                     server_version=SERVER_VERSION,
                     capabilities=self.server.get_capabilities(
                         notification_options=NotificationOptions(),
-                        experimental_capabilities={}
-                    )
-                )
+                        experimental_capabilities={},
+                    ),
+                ),
             )
 
 
@@ -189,7 +187,7 @@ async def main():
     """Main entry point for the MCP server."""
     logger.info(f"Starting {SERVER_NAME} v{SERVER_VERSION}")
     logger.info("Using stdio transport (Anthropic MCP standard)")
-    
+
     server = TestToolServer()
     await server.run()
 

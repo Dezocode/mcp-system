@@ -524,15 +524,15 @@ class ClaudeAgentProtocol:
         """Generate structured instruction for Claude"""
         context_str = json.dumps(task.context, indent=2)
         actions_str = chr(10).join(
-            f'  {i + 1}. {action}' for i, action in enumerate(task.expected_actions)
+            f"  {i + 1}. {action}" for i, action in enumerate(task.expected_actions)
         )
         constraints_str = (
-            json.dumps(task.constraints, indent=2) if task.constraints else 'None'
+            json.dumps(task.constraints, indent=2) if task.constraints else "None"
         )
         success_criteria_str = (
             json.dumps(task.success_criteria, indent=2)
             if task.success_criteria
-            else 'Complete actions'
+            else "Complete actions"
         )
 
         instruction = f"""

@@ -66,18 +66,14 @@ class MCPMem0Client:
                 "arguments": {"query": query, "limit": limit},
             },
         )
-        return result.get("content", [{}])[0].get(
-            "text", "Error searching memories"
-        )
+        return result.get("content", [{}])[0].get("text", "Error searching memories")
 
     async def get_all_memories(self) -> str:
         """Get all memories"""
         result = await self.send_request(
             "tools/call", {"name": "get_all_memories", "arguments": {}}
         )
-        return result.get("content", [{}])[0].get(
-            "text", "Error retrieving memories"
-        )
+        return result.get("content", [{}])[0].get("text", "Error retrieving memories")
 
     async def delete_memory(self, memory_id: str) -> str:
         """Delete a specific memory"""
@@ -85,18 +81,14 @@ class MCPMem0Client:
             "tools/call",
             {"name": "delete_memory", "arguments": {"memory_id": memory_id}},
         )
-        return result.get("content", [{}])[0].get(
-            "text", "Error deleting memory"
-        )
+        return result.get("content", [{}])[0].get("text", "Error deleting memory")
 
     async def delete_all_memories(self) -> str:
         """Delete all memories"""
         result = await self.send_request(
             "tools/call", {"name": "delete_all_memories", "arguments": {}}
         )
-        return result.get("content", [{}])[0].get(
-            "text", "Error deleting memories"
-        )
+        return result.get("content", [{}])[0].get("text", "Error deleting memories")
 
 
 async def main():

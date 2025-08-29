@@ -30,13 +30,15 @@ except ImportError:
 
 
 class MCPVersionKeeper:
-    def __init__(self, repo_path: Path = None, session_dir: Path = None, config_path: Path = None):
+    def __init__(
+        self, repo_path: Path = None, session_dir: Path = None, config_path: Path = None
+    ):
         self.repo_path = repo_path or Path.cwd()
         self.version_file = self.repo_path / "pyproject.toml"
         self.changelog_file = self.repo_path / "CHANGELOG.md"
         self.package_dir = self.repo_path / "src"
         self.docs_dir = self.repo_path / "docs"
-        
+
         # Load configuration
         self.config = self.load_config(config_path)
 
@@ -52,40 +54,35 @@ class MCPVersionKeeper:
             if claude_session.exists():
                 self.protocol = get_protocol(claude_session)
                 print(f"✅ Protocol integration enabled")
-                
+
     def load_config(self, config_path: Path = None) -> Dict[str, Any]:
         """Load configuration from file with defaults"""
         default_config = {
-            "timeout": {
-                "subprocess": 120,
-                "build": 300,
-                "test": 600
-            },
+            "timeout": {"subprocess": 120, "build": 300, "test": 600},
             "linting": {
                 "tools": ["black", "isort", "mypy", "flake8", "pylint"],
                 "max_issues": 1000,
-                "exclude_patterns": ["*.backup.py", "*_old.py"]
+                "exclude_patterns": ["*.backup.py", "*_old.py"],
             },
-            "output": {
-                "progress_bars": True,
-                "verbose": False
-            }
+            "output": {"progress_bars": True, "verbose": False},
         }
-        
+
         # Try to load from various locations
         config_locations = []
         if config_path:
             config_locations.append(config_path)
-        config_locations.extend([
-            self.repo_path / ".mcp-version-keeper.json",
-            self.repo_path / "configs" / "version-keeper.json",
-            Path.home() / ".mcp" / "version-keeper.json"
-        ])
-        
+        config_locations.extend(
+            [
+                self.repo_path / ".mcp-version-keeper.json",
+                self.repo_path / "configs" / "version-keeper.json",
+                Path.home() / ".mcp" / "version-keeper.json",
+            ]
+        )
+
         for config_file in config_locations:
             if config_file.exists():
                 try:
-                    with open(config_file, 'r') as f:
+                    with open(config_file, "r") as f:
                         user_config = json.load(f)
                     # Deep merge with defaults
                     self._deep_update(default_config, user_config)
@@ -93,13 +90,17 @@ class MCPVersionKeeper:
                     break
                 except Exception as e:
                     print(f"⚠️ Failed to load config from {config_file}: {e}")
-                    
+
         return default_config
-    
+
     def _deep_update(self, base_dict: Dict, update_dict: Dict) -> None:
         """Deep update dictionary"""
         for key, value in update_dict.items():
-            if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
+            if (
+                key in base_dict
+                and isinstance(base_dict[key], dict)
+                and isinstance(value, dict)
+            ):
                 self._deep_update(base_dict[key], value)
             else:
                 base_dict[key] = value
@@ -350,12 +351,12 @@ class MCPVersionKeeper:
         print("  📦 Dependency validation...")
         if output_dir:
             checks["pip_audit"] = self.run_command(
-                    f"--output={output_dir}/pip-audit-report.json",
+                f"--output={output_dir}/pip-audit-report.json",
                 [
                     "pip-audit",
                     "--format=json",
                     f"--output=configs/pip-audit-report.json",
-                ]
+                ],
             )
         else:
             checks["pip_audit"] = self.run_command(
@@ -566,7 +567,9 @@ class MCPVersionKeeper:
                 current_content,
             )
             if removed_functions:
-                changes.extend([f"Removed function: {func}" for func in removed_functions])
+                changes.extend(
+                    [f"Removed function: {func}" for func in removed_functions]
+                )
 
             removed_classes = set(base_classes) - set(current_classes)
             if removed_classes:
@@ -576,6 +579,7 @@ class MCPVersionKeeper:
 
         except Exception:
             return []
+
     def build_package(self) -> bool:
         """Build distribution package"""
         print("📦 Building package...")
@@ -632,11 +636,14 @@ class MCPVersionKeeper:
                     timeout=120,  # 2 minutes timeout
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
             except subprocess.TimeoutExpired:
                 print(f"⚠️ Virtual environment creation timed out after 2 minutes")
-                return {"passed": False, "error": "Timeout creating virtual environment"}
+                return {
+                    "passed": False,
+                    "error": "Timeout creating virtual environment",
+                }
             except subprocess.CalledProcessError as e:
                 print(f"⚠️ Failed to create virtual environment: {e.stderr}")
                 return {"passed": False, "error": f"venv creation failed: {e.stderr}"}
@@ -792,8 +799,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     file_hashes[file_hash] = py_file
 
                 # Skip files that contain template content (Jinja2, etc.) that would break AST parsing
-                if any(template_marker in content for template_marker in ['{%', '{{', '%}', '}}']):
-                    print(f"  ⏭️ Skipping template file {py_file.name} (contains Jinja2 syntax)")
+                if any(
+                    template_marker in content
+                    for template_marker in ["{%", "{{", "%}", "}}"]
+                ):
+                    print(
+                        f"  ⏭️ Skipping template file {py_file.name} (contains Jinja2 syntax)"
+                    )
                     continue
 
                 # Parse AST to find functions and classes with proper context
@@ -811,28 +823,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 if func_signature in functions_map:
                                     # Only flag as duplicate if it's truly the same function in different files
                                     # Skip if same file (could be legitimate overloads)
-                                    if str(py_file) != str(functions_map[func_signature]["file"]):
+                                    if str(py_file) != str(
+                                        functions_map[func_signature]["file"]
+                                    ):
                                         # Check if this is a legitimate duplicate vs legacy code
                                         func1_info = {
                                             "function": child.name,
-                                            "file": str(functions_map[func_signature]["file"]),
-                                            "line": functions_map[func_signature]["line"]
+                                            "file": str(
+                                                functions_map[func_signature]["file"]
+                                            ),
+                                            "line": functions_map[func_signature][
+                                                "line"
+                                            ],
                                         }
                                         func2_info = {
                                             "function": child.name,
                                             "file": str(py_file),
-                                            "line": child.lineno
+                                            "line": child.lineno,
                                         }
-                                        
+
                                         # Only add to duplicates if it's legacy code, not legitimate different classes
-                                        if not self.is_legitimate_duplicate_vs_legacy(func1_info, func2_info):
+                                        if not self.is_legitimate_duplicate_vs_legacy(
+                                            func1_info, func2_info
+                                        ):
                                             duplicates["duplicate_functions"].append(
                                                 {
                                                     "function": child.name,
                                                     "signature": func_signature,
-                                                    "file1": str(functions_map[func_signature]["file"]),
+                                                    "file1": str(
+                                                        functions_map[func_signature][
+                                                            "file"
+                                                        ]
+                                                    ),
                                                     "file2": str(py_file),
-                                                    "line1": functions_map[func_signature]["line"],
+                                                    "line1": functions_map[
+                                                        func_signature
+                                                    ]["line"],
                                                     "line2": child.lineno,
                                                 }
                                             )
@@ -874,16 +900,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                 func1_info = {
                                     "function": node.name,
                                     "file": str(functions_map[func_signature]["file"]),
-                                    "line": functions_map[func_signature]["line"]
+                                    "line": functions_map[func_signature]["line"],
                                 }
                                 func2_info = {
                                     "function": node.name,
                                     "file": str(py_file),
-                                    "line": node.lineno
+                                    "line": node.lineno,
                                 }
-                                
+
                                 # Only add to duplicates if it's legacy code, not legitimate different implementations
-                                if not self.is_legitimate_duplicate_vs_legacy(func1_info, func2_info):
+                                if not self.is_legitimate_duplicate_vs_legacy(
+                                    func1_info, func2_info
+                                ):
                                     duplicates["duplicate_functions"].append(
                                         {
                                             "function": node.name,
@@ -892,7 +920,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                                                 functions_map[func_signature]["file"]
                                             ),
                                             "file2": str(py_file),
-                                            "line1": functions_map[func_signature]["line"],
+                                            "line1": functions_map[func_signature][
+                                                "line"
+                                            ],
                                             "line2": node.lineno,
                                         }
                                     )
@@ -935,13 +965,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         if duplicates["redundant_files"]:
             duplicates["recommendations"].append("Remove redundant file copies")
         return duplicates
+
     def should_skip_file(self, file_path: Path, exclude_backups: bool = False) -> bool:
         """Check if file should be skipped during duplicate detection"""
-        
+
         # ALWAYS skip these patterns (including backup files by default)
         skip_patterns = [
             "__pycache__",
-            ".git", 
+            ".git",
             "venv",
             "env",
             ".pytest_cache",
@@ -950,7 +981,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             "build",
             # BACKUP/LEGACY PATTERNS - Always skip these
             "backups/",
-            ".claude_patches/", 
+            ".claude_patches/",
             ".backup",
             "_backup",
             "-backup",
@@ -958,17 +989,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             "-enhanced",  # Skip old enhanced files
             "_enhanced",
             ".orig",
-            ".old", 
+            ".old",
             "v1.0-original/",
-            "-v1", "-v2", "_v1", "_v2",  # Versioned files
-            "_original", "_updated",
-            "legacy/", "-legacy", "_legacy",
+            "-v1",
+            "-v2",
+            "_v1",
+            "_v2",  # Versioned files
+            "_original",
+            "_updated",
+            "legacy/",
+            "-legacy",
+            "_legacy",
         ]
-        
+
         for pattern in skip_patterns:
             if pattern in str(file_path):
                 return True
-        
+
         return False
 
     def is_likely_false_positive(self, func_name: str, file_path: Path) -> bool:
@@ -1012,15 +1049,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             "join",  # string methods
             "append",
             "extend",
-            "add_argument", "parse_args",  # argparse
+            "add_argument",
+            "parse_args",  # argparse
             "remove",
-            "lower", "upper", "strip", "split", "join",  # string methods
+            "lower",
+            "upper",
+            "strip",
+            "split",
+            "join",  # string methods
             "pop",  # list methods
-            "append", "extend", "remove", "pop",  # list methods
+            "append",
+            "extend",
+            "remove",
+            "pop",  # list methods
             "get",
-            "get", "keys", "values", "items", "update",  # dict methods
+            "get",
             "keys",
-            "read", "write", "close", "exists", "mkdir",  # file/path methods
+            "values",
+            "items",
+            "update",  # dict methods
+            "keys",
+            "read",
+            "write",
+            "close",
+            "exists",
+            "mkdir",  # file/path methods
             "values",
             "items",
             "update",  # dict methods
@@ -1063,7 +1116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     return True
 
             # Check for common duplicate code scenarios
-            if any(pattern in str(file_path) for pattern in ["enhanced", "v2", "backup", "original"]):
+            if any(
+                pattern in str(file_path)
+                for pattern in ["enhanced", "v2", "backup", "original"]
+            ):
                 # In enhanced/versioned files, undefined functions might be calling old code
                 return True
 
@@ -1072,7 +1128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         return False
 
-    def get_function_signature(self, node: ast.FunctionDef, class_name: str = None) -> str:
+    def get_function_signature(
+        self, node: ast.FunctionDef, class_name: str = None
+    ) -> str:
         """Generate unique signature for function node"""
         args = [arg.arg for arg in node.args.args]
         signature = f"{node.name}({', '.join(args)})"
@@ -1080,51 +1138,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             signature = f"{class_name}.{signature}"
         return signature
 
-    def is_legitimate_duplicate_vs_legacy(self, func1_info: dict, func2_info: dict) -> bool:
+    def is_legitimate_duplicate_vs_legacy(
+        self, func1_info: dict, func2_info: dict
+    ) -> bool:
         """
         Determine if detected duplicate is legitimate (different valid implementations)
         vs legacy code that should be removed.
-        
+
         Returns True if this is a legitimate duplicate (keep both)
         Returns False if this is legacy code (one should be removed)
         """
         file1 = Path(func1_info["file"])
         file2 = Path(func2_info["file"])
         func_name = func1_info["function"]
-        
+
         # ALWAYS LEGITIMATE: Common method names that appear across different classes/modules
-        if func_name in ["__init__", "__str__", "__repr__", "__enter__", "__exit__", 
-                        "run", "execute", "process", "main", "start", "stop", 
-                        "setup", "cleanup", "init", "handle", "validate"]:
+        if func_name in [
+            "__init__",
+            "__str__",
+            "__repr__",
+            "__enter__",
+            "__exit__",
+            "run",
+            "execute",
+            "process",
+            "main",
+            "start",
+            "stop",
+            "setup",
+            "cleanup",
+            "init",
+            "handle",
+            "validate",
+        ]:
             # These are legitimate different implementations
             return True
-            
+
         # ALWAYS LEGITIMATE: Different top-level directories (different modules)
         if len(file1.parts) > 1 and len(file2.parts) > 1:
             # Check if in completely different top-level modules
             if file1.parts[0] != file2.parts[0]:
                 return True
-                
+
         # LEGACY PATTERNS: Clear indicators of old/backup code
         legacy_indicators = [
-            "_backup", "_old", "_legacy", "_v1", "_v2", "_copy", 
-            "_original", "_working", "_1", "_2", "backup/", "old/"
+            "_backup",
+            "_old",
+            "_legacy",
+            "_v1",
+            "_v2",
+            "_copy",
+            "_original",
+            "_working",
+            "_1",
+            "_2",
+            "backup/",
+            "old/",
         ]
-        
+
         file1_str = str(file1).lower()
         file2_str = str(file2).lower()
-        
+
         for indicator in legacy_indicators:
             if indicator in file1_str or indicator in file2_str:
                 # One file is clearly a backup/old version
                 return False
-                
+
         # SPECIFIC PATTERNS: Check for version keeper duplicates
         if func_name == "detect_duplicate_implementations":
             # Multiple version keeper files - check which is the main one
             if "version_keeper_1.py" in file1_str or "version_keeper_1.py" in file2_str:
                 return False  # version_keeper_1.py is legacy
-                
+
         # Same directory with similar function names = likely legacy
         if file1.parent == file2.parent:
             # Check if one file is clearly newer/enhanced version
@@ -1134,11 +1219,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     return False  # file2 is legacy
                 if indicator in file2_str and indicator not in file1_str:
                     return False  # file1 is legacy
-            
+
             # Same directory, same function name, no clear enhancement pattern
             # This is likely a real duplicate that needs attention
             return False
-            
+
         # Different directories, different purposes = legitimate
         return True
 
@@ -1212,22 +1297,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         # Import tqdm for progress indicators
         try:
             from tqdm import tqdm
+
             use_progress = True
         except ImportError:
             use_progress = False
-            
+
         for pattern_info in competing_patterns:
             pattern = pattern_info["pattern"]
             found_files = []
 
             # Get all Python files first for progress tracking
             python_files = list(self.repo_path.rglob("*.py"))
-            
+
             if use_progress and len(python_files) > 100:
-                file_iterator = tqdm(python_files, desc=f"Scanning for {pattern}", leave=False)
+                file_iterator = tqdm(
+                    python_files, desc=f"Scanning for {pattern}", leave=False
+                )
             else:
                 file_iterator = python_files
-                
+
             for py_file in file_iterator:
                 if re.search(
                     pattern,
@@ -1260,10 +1348,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         # Update protocol if available
         if self.protocol:
-            self.protocol.update_phase("linting", {
-                "lint_type": "quick" if quick_check else "comprehensive",
-                "started_at": datetime.now().isoformat()
-            })
+            self.protocol.update_phase(
+                "linting",
+                {
+                    "lint_type": "quick" if quick_check else "comprehensive",
+                    "started_at": datetime.now().isoformat(),
+                },
+            )
 
         lint_report = {
             "version": self.current_version,
@@ -1297,7 +1388,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             "flake8",
             "pylint",
         ]
-        
+
         for tool in quality_tools:
             success, stdout, stderr = self.run_quality_check_with_details(tool)
             lint_report["quality_issues"][tool] = {
@@ -1306,9 +1397,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 "stderr": stderr,
                 "fixes": self.generate_tool_fixes(tool, stdout, stderr),
             }
-        
+
         lint_report["fix_commands"] = self.generate_fix_commands(lint_report)
-        lint_report["validation_report"] = self.validate_lint_recommendations(lint_report)
+        lint_report["validation_report"] = self.validate_lint_recommendations(
+            lint_report
+        )
 
         # Run security checks with detailed output
         security_tools = ["bandit", "safety"]
@@ -1320,18 +1413,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 "stderr": stderr,
                 "fixes": self.generate_security_fixes(tool, stdout, stderr),
             }
-        
+
         # Run duplicate detection
         lint_report["duplicate_issues"] = self.detect_duplicate_implementations()
-        
+
         # Calculate total issues
-        total_issues = sum([
-            len(tool_data.get("fixes", [])) 
-            for tool_data in lint_report["quality_issues"].values()
-        ]) + sum([
-            len(tool_data.get("fixes", [])) 
-            for tool_data in lint_report["security_issues"].values()
-        ])
+        total_issues = sum(
+            [
+                len(tool_data.get("fixes", []))
+                for tool_data in lint_report["quality_issues"].values()
+            ]
+        ) + sum(
+            [
+                len(tool_data.get("fixes", []))
+                for tool_data in lint_report["security_issues"].values()
+            ]
+        )
 
         # Run connections linting
         lint_report["connection_issues"] = self.run_connections_linter()
@@ -1380,25 +1477,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 ),
             }
 
-        # Save detailed report
+            # Save detailed report
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         if output_dir:
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")  # ISO-8601 compatible
             report_file = output_dir / f"claude-lint-report-{timestamp}.json"
-            
+
             if self.protocol:
-                self.protocol.update_phase("linting_complete", {
-                    "issues_remaining": total_issues,
-                    "lint_report": str(report_file),
-                })
+                self.protocol.update_phase(
+                    "linting_complete",
+                    {
+                        "issues_remaining": total_issues,
+                        "lint_report": str(report_file),
+                    },
+                )
             with open(report_file, "w") as f:
                 json.dump(lint_report, f, indent=2)
-            
+
             print(f"📊 Lint report saved to: {report_file}")
             lint_report["report_file"] = str(report_file)
-            
+
         # Protocol integration - update state and create tasks
         if self.protocol:
             self.protocol.update_phase(
@@ -1415,12 +1515,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             for tool, data in lint_report["quality_issues"].items():
                 for fix in data.get("fixes", []):
                     if fix.get("type") == "auto_fix":
-                        critical_fixes.append({
-                            "tool": tool,
-                            "command": fix.get("command", ""),
-                            "description": fix.get("description", ""),
-                            "severity": "error"
-                        })
+                        critical_fixes.append(
+                            {
+                                "tool": tool,
+                                "command": fix.get("command", ""),
+                                "description": fix.get("description", ""),
+                                "severity": "error",
+                            }
+                        )
 
             # Create tasks for the most critical fixes
             for fix in critical_fixes[:5]:
@@ -1428,10 +1530,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                     task_type="fix_quality_issue",
                     description=fix["description"],
                     priority="high",
-                    success_criteria={"fix_applied": True}
+                    success_criteria={"fix_applied": True},
                 )
-            
-            print(f"📋 Created {len(critical_fixes[:5])} priority fixing tasks in protocol")
+
+            print(
+                f"📋 Created {len(critical_fixes[:5])} priority fixing tasks in protocol"
+            )
 
         return lint_report
 
@@ -1622,7 +1726,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                         )
             except json.JSONDecodeError:
                 pass
-                
+
         elif tool == "safety":
             try:
                 if stdout:
@@ -1640,7 +1744,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                         )
             except json.JSONDecodeError:
                 pass
-                
+
         return fixes
 
     def generate_claude_recommendations(self, lint_report: Dict[str, Any]) -> List[str]:
@@ -1664,9 +1768,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             for result in lint_report["security_issues"].values()
         )
         if security_count > 0:
-            recommendations.append(
-                f"🔒 Address {security_count} security issues found"
-            )
+            recommendations.append(f"🔒 Address {security_count} security issues found")
 
         # Duplicate issues
         duplicates = lint_report["duplicate_issues"]
@@ -1691,11 +1793,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
             )
 
         return recommendations
-        
+
     def generate_fix_commands(self, lint_report: Dict[str, Any]) -> List[str]:
         """Generate automated fix commands"""
         commands = []
-        
+
         # Auto-fixable quality issues
         quality_issues = lint_report.get("quality_issues", {})
         if not lint_report["quality_issues"].get("black", {}).get("passed", True):
@@ -1911,10 +2013,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ImportFrom):
                         if node.module:
-                            module_path = self.resolve_module_path(
-                                node.module,
-                                py_file
-                            )
+                            module_path = self.resolve_module_path(node.module, py_file)
                             if module_path and not module_path.exists():
                                 connections_report["broken_imports"].append(
                                     {
@@ -2314,26 +2413,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         print(f"📊 Release report saved: {output_path}")
 
 
-def generate_json_report(keeper, session_id=None, claude_lint_report=None, duplicates=None, connections=None):
+def generate_json_report(
+    keeper, session_id=None, claude_lint_report=None, duplicates=None, connections=None
+):
     """Generate structured JSON report for pipeline integration"""
-    
+
     # Calculate total issues across all categories
     total_issues = 0
-    
+
     # Count Claude lint issues
     if claude_lint_report:
         total_issues += claude_lint_report.get("total_issues", 0)
-    
+
     # Count duplicate issues
     if duplicates:
         total_issues += len(duplicates.get("duplicate_functions", []))
-        total_issues += len(duplicates.get("competing_implementations", [])) * 2  # Weight competing implementations higher
-    
+        total_issues += (
+            len(duplicates.get("competing_implementations", [])) * 2
+        )  # Weight competing implementations higher
+
     # Count connection issues
     if connections:
         total_issues += len(connections.get("undefined_functions", []))
         total_issues += len(connections.get("broken_imports", []))
-    
+
     # Generate structured report
     json_report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -2344,36 +2447,58 @@ def generate_json_report(keeper, session_id=None, claude_lint_report=None, dupli
             "total_issues": total_issues,
             "fixes_applied": 0,  # This will be updated by quality patcher
             "remaining_issues": total_issues,  # Initially all issues remain
-            "success_rate": 0.0 if total_issues > 0 else 100.0
+            "success_rate": 0.0 if total_issues > 0 else 100.0,
         },
         "details": {
-            "quality_issues": claude_lint_report.get("quality_issues", {}) if claude_lint_report else {},
-            "security_issues": claude_lint_report.get("security_issues", {}) if claude_lint_report else {},
+            "quality_issues": (
+                claude_lint_report.get("quality_issues", {})
+                if claude_lint_report
+                else {}
+            ),
+            "security_issues": (
+                claude_lint_report.get("security_issues", {})
+                if claude_lint_report
+                else {}
+            ),
             "duplicate_issues": duplicates if duplicates else {},
-            "connection_issues": connections if connections else {}
+            "connection_issues": connections if connections else {},
         },
         "performance": {
-            "duration_seconds": claude_lint_report.get("performance", {}).get("duration_seconds", 0) if claude_lint_report else 0,
-            "files_analyzed": claude_lint_report.get("files_analyzed", 0) if claude_lint_report else 0,
-            "issues_per_second": claude_lint_report.get("performance", {}).get("issues_per_second", 0) if claude_lint_report else 0
+            "duration_seconds": (
+                claude_lint_report.get("performance", {}).get("duration_seconds", 0)
+                if claude_lint_report
+                else 0
+            ),
+            "files_analyzed": (
+                claude_lint_report.get("files_analyzed", 0) if claude_lint_report else 0
+            ),
+            "issues_per_second": (
+                claude_lint_report.get("performance", {}).get("issues_per_second", 0)
+                if claude_lint_report
+                else 0
+            ),
         },
-        "recommendations": []
+        "recommendations": [],
     }
-    
+
     # Add recommendations from each component
     if claude_lint_report and claude_lint_report.get("claude_recommendations"):
-        json_report["recommendations"].extend(claude_lint_report["claude_recommendations"])
-    
+        json_report["recommendations"].extend(
+            claude_lint_report["claude_recommendations"]
+        )
+
     if duplicates and duplicates.get("recommendations"):
         json_report["recommendations"].extend(duplicates["recommendations"])
-    
+
     if connections and connections.get("recommendations"):
         json_report["recommendations"].extend(connections["recommendations"])
-    
+
     # Add priority fixes from Claude lint if available
     if claude_lint_report and claude_lint_report.get("priority_fixes"):
-        json_report["priority_fixes"] = claude_lint_report["priority_fixes"][:10]  # Top 10 priority fixes
-    
+        json_report["priority_fixes"] = claude_lint_report["priority_fixes"][
+            :10
+        ]  # Top 10 priority fixes
+
     return json_report
 
 
@@ -2503,36 +2628,39 @@ def main(
 ):
     """
     MCP System Version Keeper - Enhanced with Protocol Integration
-    
+
     Manages versions, packaging, linting, and compatibility validation for MCP systems.
-    
+
     Examples:
         # Run comprehensive linting with debug output
         python scripts/version_keeper.py --comprehensive-lint --debug
-        
+
         # Generate JSON report for pipeline integration
         python scripts/version_keeper.py --claude-lint --output-format=json --output-file=report.json
-        
+
         # Quick lint check excluding false positives
         python scripts/version_keeper.py --quick-check --real-issues-only
-        
+
         # Version bump with validation
         python scripts/version_keeper.py --bump-type=patch --skip-tests
     """
-    
+
     # Configure logging based on debug mode
     import logging
+
     log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     logger = logging.getLogger(__name__)
-    
+
     if debug:
         logger.debug("Debug mode enabled - verbose output will be shown")
-        logger.debug(f"CLI Arguments: bump_type={bump_type}, output_format={output_format}")
+        logger.debug(
+            f"CLI Arguments: bump_type={bump_type}, output_format={output_format}"
+        )
 
     try:
         print("🚀 MCP System Version Keeper v2.0")
@@ -2544,7 +2672,7 @@ def main(
 
         print(f"📍 Current version: {keeper.current_version}")
         print(f"🌿 Current branch: {keeper.git_branch}")
-        
+
         if debug:
             logger.debug(f"Repository path: {keeper.repo_path}")
             logger.debug(f"Session directory: {session_path}")
@@ -2560,26 +2688,30 @@ def main(
         if output_file:
             output_file_path = Path(output_file)
             if not output_file_path.parent.exists():
-                logger.error(f"Output directory does not exist: {output_file_path.parent}")
+                logger.error(
+                    f"Output directory does not exist: {output_file_path.parent}"
+                )
                 sys.exit(1)
-                
+
         if session_dir:
             session_dir_path = Path(session_dir)
             if not session_dir_path.exists():
-                logger.warning(f"Session directory does not exist, creating: {session_dir_path}")
+                logger.warning(
+                    f"Session directory does not exist, creating: {session_dir_path}"
+                )
                 session_dir_path.mkdir(parents=True, exist_ok=True)
-                
+
         if output_format == "json" and not output_file:
             logger.warning("JSON output format specified but no output file provided")
-            
+
         # Validate bump type
         if bump_type not in ["major", "minor", "patch"]:
             logger.error(f"Invalid bump type: {bump_type}")
             sys.exit(1)
-            
+
         if debug:
             logger.debug("Input validation completed successfully")
-            
+
     except Exception as e:
         logger.error(f"Input validation failed: {e}")
         if debug:
@@ -2624,17 +2756,31 @@ def main(
             print("\n📊 DUPLICATE DETECTION RESULTS")
             print("=" * 50)
             print(f"🔄 Duplicate functions: {len(duplicates['duplicate_functions'])}")
-            print(f"⚡ Competing implementations: {len(duplicates['competing_implementations'])}")
-            
-        print("🎯 INTELLIGENT FILTERING: Focusing on real issues, excluding false positives")
-        
+            print(
+                f"⚡ Competing implementations: {len(duplicates['competing_implementations'])}"
+            )
+
+        print(
+            "🎯 INTELLIGENT FILTERING: Focusing on real issues, excluding false positives"
+        )
+
         if real_issues_only:
-            print("\n⏭️ Skipping duplicate detection (excluded by real-issues-only filter)")
-            duplicates = {"duplicate_functions": [], "competing_implementations": [], "similar_classes": [], "redundant_files": [], "recommendations": []}
+            print(
+                "\n⏭️ Skipping duplicate detection (excluded by real-issues-only filter)"
+            )
+            duplicates = {
+                "duplicate_functions": [],
+                "competing_implementations": [],
+                "similar_classes": [],
+                "redundant_files": [],
+                "recommendations": [],
+            }
 
         else:
             # Run duplicate detection normally
-            duplicates = keeper.detect_duplicate_implementations(exclude_backups, exclude_duplicates)
+            duplicates = keeper.detect_duplicate_implementations(
+                exclude_backups, exclude_duplicates
+            )
 
             if duplicates["recommendations"]:
                 print("\n💡 RECOMMENDATIONS:")
@@ -2674,8 +2820,10 @@ def main(
         # Run connections check
         if check_connections:
             print("\n🔍 Running connection analysis...")
-            connections = keeper.run_connections_linter(exclude_backups, real_issues_only)
-            
+            connections = keeper.run_connections_linter(
+                exclude_backups, real_issues_only
+            )
+
             if connections["recommendations"]:
                 print("\n💡 CONNECTION RECOMMENDATIONS:")
                 for rec in connections["recommendations"]:
@@ -2683,13 +2831,15 @@ def main(
 
         # Run Claude integrated linting
         if claude_lint:
-            print(f"\n🤖 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting...")
+            print(
+                f"\n🤖 Running {'quick' if quick_check else 'comprehensive'} Claude-integrated linting..."
+            )
             lint_report = keeper.run_claude_integrated_linting(
                 output_dir=Path(output_dir) if output_dir else None,
                 session_id=session_id,
                 quick_check=quick_check,
             )
-            
+
             # Process undefined functions
             for func in connections["undefined_functions"][:10]:  # Show first 10
                 print(f"  • {func['function']} in {func['file']}:{func['line']}")
@@ -2711,15 +2861,15 @@ def main(
                         if pfix["priority"] == 1
                         else ("🟡" if pfix["priority"] == 2 else "🟢")
                     )
-                    
+
             # Process broken imports
             for imp in connections["broken_imports"][:10]:  # Show first 10
                 print(f"  • {imp['module']} in {imp['file']}:{imp['line']}")
 
             # Show additional imports if applicable
-            if len(connections['broken_imports']) > 10:
+            if len(connections["broken_imports"]) > 10:
                 print(f"  ... and {len(connections['broken_imports']) - 10} more")
-                
+
             # Show Claude recommendations
             if lint_report["claude_recommendations"]:
                 print("\n🤖 CLAUDE RECOMMENDATIONS:")
@@ -2768,20 +2918,24 @@ def main(
                     keeper=keeper,
                     session_id=session_id,
                     claude_lint_report=lint_report if claude_lint else None,
-                    duplicates=duplicates if detect_duplicates and not exclude_duplicates else None,
-                    connections=connections if check_connections else None
+                    duplicates=(
+                        duplicates
+                        if detect_duplicates and not exclude_duplicates
+                        else None
+                    ),
+                    connections=connections if check_connections else None,
                 )
-                
+
                 if output_file:
                     output_path = Path(output_file)
                     output_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(output_path, 'w') as f:
+                    with open(output_path, "w") as f:
                         json.dump(json_report, f, indent=2, default=str)
                     print(f"\n📊 JSON report saved to: {output_path}")
                 else:
                     print("\n📊 JSON OUTPUT:")
                     print(json.dumps(json_report, indent=2, default=str))
-                    
+
             print("\n✅ Lint-only mode complete")
             return
 
@@ -2866,7 +3020,7 @@ def main(
         for rec in report["recommendations"]:
             print(f"  • {rec}")
 
-    # Apply changes if validation passes and not dry run  
+    # Apply changes if validation passes and not dry run
     if report["overall_status"] == "PASS" and not dry_run:
         print(f"\n🚀 Applying version update to {new_version}...")
 

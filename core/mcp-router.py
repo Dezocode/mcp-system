@@ -5,13 +5,14 @@ Analyzes user prompts and automatically selects/starts appropriate MCP servers
 """
 
 import argparse
-from src.config.cross_platform import cross_platform
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+
+from src.config.cross_platform import cross_platform
 
 
 class MCPRouter:
@@ -169,9 +170,7 @@ class MCPRouter:
             else:
                 print(f"Starting {server}...")
                 cmd = f"{cross_platform.get_path('home')}/mcp {server} start"
-                result = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True
-                )
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
                 results[server] = result.returncode == 0
 
                 if results[server]:
@@ -264,9 +263,7 @@ class MCPRouter:
                         print(f"   {i}. {server}: {config.get('name', 'Unknown')}")
 
                     # Ask if they want to start the servers
-                    response = (
-                        input("\nStart these servers? (y/n): ").strip().lower()
-                    )
+                    response = input("\nStart these servers? (y/n): ").strip().lower()
                     if response == "y":
                         results = self.start_required_servers(servers)
                         print("\nServer startup results:")
@@ -297,9 +294,7 @@ def main_router():
     parser.add_argument("--route", help="Route a request to appropriate server")
     parser.add_argument("--tool", help="Tool name for routing")
     parser.add_argument("--data", help="JSON data for the tool")
-    parser.add_argument(
-        "--interactive", action="store_true", help="Interactive mode"
-    )
+    parser.add_argument("--interactive", action="store_true", help="Interactive mode")
 
     args = parser.parse_args()
 
