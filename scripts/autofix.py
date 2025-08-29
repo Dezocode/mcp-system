@@ -1068,6 +1068,23 @@ class AutofixConfig:
         self.dependency_depth = 3  # How deep to analyze dependencies
         self.validation_levels = ["syntax", "imports", "execution", "safety"]
 
+        # Enhanced undefined function resolution settings
+        self.enable_smart_import_resolution = True
+        self.import_confidence_threshold = 0.8
+        self.max_import_suggestions = 5
+        self.enable_typo_correction = True
+        self.typo_similarity_threshold = 0.85
+
+        # Enhanced duplicate detection settings
+        self.enable_semantic_orphan_detection = True
+        self.protect_valid_patterns = True
+        self.orphan_confidence_threshold = 0.9
+        self.duplicate_similarity_threshold = 0.95
+
+        # Tool availability tracking (set during runtime)
+        self.available_tools = []
+        self.missing_tools = []
+
         # Load from config file if provided
         if config_file and config_file.exists():
             self._load_config(config_file)
@@ -1282,14 +1299,16 @@ class MCPAutofix:
 
     def install_tools(self) -> bool:
         """
-        Install required tools if not available
+        Enhanced tool installation with graceful degradation and better error handling
 
         Returns:
-            True if all tools are available, False otherwise
+            True if critical tools are available, False if none available
         """
-        self.log("Checking required tools availability...")
+        self.log("🔧 Checking required tools availability...")
         missing_tools = []
         available_tools = []
+        critical_tools = ["black", "isort"]  # Essential for basic functionality
+        optional_tools = ["bandit", "flake8", "mypy"]  # Nice to have but not critical
 
         for tool in self.config.tools_required:
             success, _, _ = self.run_command([sys.executable, "-m", tool, "--version"])
@@ -1303,47 +1322,68 @@ class MCPAutofix:
         if available_tools:
             self.log(f"Available tools: {', '.join(available_tools)}", "success")
 
+        # Check if we have critical tools
+        missing_critical = [tool for tool in missing_tools if tool in critical_tools]
+        missing_optional = [tool for tool in missing_tools if tool in optional_tools]
+
         if missing_tools:
             self.log(f"Missing tools: {', '.join(missing_tools)}", "warning")
+            
+            if missing_critical:
+                self.log(f"Critical tools missing: {', '.join(missing_critical)}", "error")
+            
+            if missing_optional:
+                self.log(f"Optional tools missing: {', '.join(missing_optional)} (autofix will run with reduced functionality)", "warning")
 
             if self.dry_run:
                 self.log("[DRY RUN] Would install missing tools", "info")
-                return True
+                return len(missing_critical) == 0  # Return True if no critical tools missing
 
-            self.log(f"Installing missing tools: {', '.join(missing_tools)}")
-
-            # Try to install missing tools
-            install_cmd = [sys.executable, "-m", "pip", "install"] + missing_tools
-            success, stdout, stderr = self.run_command(
-                install_cmd, f"Installing {', '.join(missing_tools)}"
-            )
-
-            if success:
-                self.log(
-                    f"Successfully installed: {', '.join(missing_tools)}", "success"
+            # Try to install missing tools with better error handling
+            tools_to_install = missing_tools.copy()
+            successfully_installed = []
+            
+            for tool in tools_to_install:
+                self.log(f"Installing {tool}...")
+                install_cmd = [sys.executable, "-m", "pip", "install", tool]
+                success, stdout, stderr = self.run_command(
+                    install_cmd, f"Installing {tool}"
                 )
 
-                # Verify installation
-                still_missing = []
-                for tool in missing_tools:
+                if success:
+                    # Verify installation immediately
                     verify_success, _, _ = self.run_command(
                         [sys.executable, "-m", tool, "--version"]
                     )
-                    if not verify_success:
-                        still_missing.append(tool)
+                    if verify_success:
+                        successfully_installed.append(tool)
+                        self.log(f"✓ Successfully installed and verified {tool}", "success")
+                        available_tools.append(tool)
+                        if tool in missing_tools:
+                            missing_tools.remove(tool)
+                    else:
+                        self.log(f"✗ {tool} installed but verification failed", "warning")
+                else:
+                    self.log(f"✗ Failed to install {tool}: {stderr}", "warning")
 
-                if still_missing:
-                    self.log(
-                        f"Failed to verify installation of: {', '.join(still_missing)}",
-                        "error",
-                    )
-                    return False
+            if successfully_installed:
+                self.log(f"Successfully installed: {', '.join(successfully_installed)}", "success")
 
-            else:
-                self.log(f"Failed to install tools: {stderr}", "error")
+            # Check if we still have missing critical tools
+            remaining_critical = [tool for tool in missing_tools if tool in critical_tools]
+            if remaining_critical:
+                self.log(f"Failed to install critical tools: {', '.join(remaining_critical)}", "error")
                 return False
 
-        self.log("All required tools are available", "success")
+        # Update configuration to reflect available tools
+        self.config.available_tools = available_tools
+        self.config.missing_tools = missing_tools
+        
+        if missing_tools:
+            self.log(f"Autofix will run with reduced functionality due to missing tools: {', '.join(missing_tools)}", "warning")
+        else:
+            self.log("All required tools are available", "success")
+        
         return True
 
     def analyze_issues_with_high_resolution(
@@ -2479,91 +2519,258 @@ class MCPAutofix:
 
     def run_security_scan(self) -> Dict:
         """
-        Run security analysis with bandit and enhanced reporting
-
+        Enhanced security analysis with graceful degradation and multiple fallbacks
+        
         Returns:
             Dictionary with security scan results
         """
-        self.log("Running security analysis with Bandit...")
-
-        # Use timestamped report file in reports directory
-        output_file = self.report_dir / f"bandit-report-{self.session_id}.json"
-
-        # Build bandit command with enhanced options
-        bandit_cmd = [
-            sys.executable,
-            "-m",
-            "bandit",
-            "-r",
-            str(self.repo_path),
-            "-f",
-            "json",
-            "-o",
-            str(output_file),
-            "--skip",
-            "B101",  # Skip assert_used test (often acceptable in tests)
-        ]
-
-        # Add exclusions for common non-security files
-        if self.config.skip_hidden_files:
-            bandit_cmd.extend(["--exclude", ".*,*/.*"])
-
-        success, stdout, stderr = self.run_command(
-            bandit_cmd, "Security vulnerability scan"
-        )
-
+        self.log("🛡️ Running enhanced security analysis...")
+        
         results = {
-            "scan_completed": success,
-            "report_file": str(output_file),
+            "scan_completed": False,
+            "primary_tool": None,
+            "fallback_used": False,
             "issues_found": 0,
             "issues_by_severity": {},
             "scan_timestamp": datetime.now().isoformat(),
+            "detailed_issues": [],
+            "errors": []
         }
 
-        if success:
-            self.log(f"Security scan completed: {output_file.name}", "success")
+        # Try primary tool (bandit) if available
+        if "bandit" in getattr(self.config, 'available_tools', []):
+            bandit_results = self._run_bandit_scan()
+            if bandit_results["success"]:
+                results.update(bandit_results)
+                results["primary_tool"] = "bandit"
+                results["scan_completed"] = True
+                return results
+            else:
+                results["errors"].append(f"Bandit scan failed: {bandit_results.get('error', 'Unknown error')}")
+        
+        # Fallback to manual security analysis
+        self.log("🔄 Using fallback manual security analysis...", "warning")
+        fallback_results = self._run_manual_security_scan()
+        results.update(fallback_results)
+        results["fallback_used"] = True
+        results["primary_tool"] = "manual_analysis"
+        results["scan_completed"] = True
+        
+        return results
 
-            # Parse and analyze results
-            try:
-                if output_file.exists():
-                    with open(output_file, "r") as f:
-                        report = json.load(f)
+    def _run_bandit_scan(self) -> Dict:
+        """Run bandit security scan"""
+        try:
+            # Use timestamped report file in reports directory
+            output_file = self.report_dir / f"bandit-report-{self.session_id}.json"
 
-                    issues = report.get("results", [])
-                    results["issues_found"] = len(issues)
+            # Build bandit command with enhanced options
+            bandit_cmd = [
+                sys.executable,
+                "-m",
+                "bandit",
+                "-r",
+                str(self.repo_path),
+                "-f",
+                "json",
+                "-o",
+                str(output_file),
+                "--skip",
+                "B101",  # Skip assert_used test (often acceptable in tests)
+            ]
 
-                    # Categorize by severity
-                    severity_counts = {}
-                    for issue in issues:
-                        severity = issue.get("issue_severity", "UNKNOWN")
-                        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            # Add exclusions for common non-security files
+            if self.config.skip_hidden_files:
+                bandit_cmd.extend(["--exclude", ".*,*/.*"])
 
-                    results["issues_by_severity"] = severity_counts
+            success, stdout, stderr = self.run_command(
+                bandit_cmd, "Security vulnerability scan"
+            )
 
-                    # Log summary
-                    if issues:
-                        self.log(f"Found {len(issues)} security issues", "warning")
-                        for severity, count in severity_counts.items():
-                            self.log(f"  {severity}: {count} issues", "verbose")
+            if success:
+                self.log(f"✅ Bandit scan completed: {output_file.name}", "success")
+
+                # Parse and analyze results
+                try:
+                    if output_file.exists():
+                        with open(output_file, "r") as f:
+                            report = json.load(f)
+
+                        issues = report.get("results", [])
+                        
+                        # Categorize by severity
+                        severity_counts = {}
+                        for issue in issues:
+                            severity = issue.get("issue_severity", "UNKNOWN")
+                            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+                        # Log summary
+                        if issues:
+                            self.log(f"Found {len(issues)} security issues", "warning")
+                            for severity, count in severity_counts.items():
+                                self.log(f"  {severity}: {count} issues", "verbose")
+                        else:
+                            self.log("No security issues found", "success")
+
+                        return {
+                            "success": True,
+                            "report_file": str(output_file),
+                            "issues_found": len(issues),
+                            "issues_by_severity": severity_counts,
+                            "detailed_issues": issues
+                        }
                     else:
-                        self.log("No security issues found", "success")
+                        return {"success": False, "error": "Report file not created"}
 
-                    # Store detailed results for later use
-                    results["detailed_issues"] = issues
+                except json.JSONDecodeError as e:
+                    return {"success": False, "error": f"JSON parse error: {e}"}
+                except Exception as e:
+                    return {"success": False, "error": f"Report parsing error: {e}"}
+            else:
+                return {"success": False, "error": stderr or "Bandit command failed"}
+                
+        except Exception as e:
+            return {"success": False, "error": f"Bandit execution error: {e}"}
 
-                else:
-                    self.log("Security report file not created", "warning")
-
-            except json.JSONDecodeError as e:
-                self.log(f"Invalid JSON in security report: {e}", "error")
-                results["error"] = f"JSON parse error: {e}"
+    def _run_manual_security_scan(self) -> Dict:
+        """
+        Manual security scan as fallback when bandit is not available
+        
+        Returns:
+            Dictionary with manual scan results
+        """
+        self.log("🔍 Performing manual security analysis...")
+        
+        issues = []
+        severity_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                file_issues = self._manual_security_check(py_file, content)
+                issues.extend(file_issues)
+                
+                for issue in file_issues:
+                    severity = issue.get("severity", "LOW")
+                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                
             except Exception as e:
-                self.log(f"Error processing security report: {e}", "error")
-                results["error"] = f"Processing error: {e}"
+                self.log(f"Error scanning {py_file} for security issues: {e}", "verbose")
+        
+        # Save manual scan report
+        report_file = self.report_dir / f"manual-security-report-{self.session_id}.json"
+        try:
+            with open(report_file, 'w') as f:
+                json.dump({
+                    "scan_type": "manual",
+                    "timestamp": datetime.now().isoformat(),
+                    "total_issues": len(issues),
+                    "issues_by_severity": severity_counts,
+                    "issues": issues
+                }, f, indent=2)
+        except Exception as e:
+            self.log(f"Failed to save manual security report: {e}", "warning")
+        
+        # Log summary
+        if issues:
+            self.log(f"Manual scan found {len(issues)} potential security issues", "warning")
+            for severity, count in severity_counts.items():
+                if count > 0:
+                    self.log(f"  {severity}: {count} issues", "verbose")
         else:
-            error_msg = f"Security scan failed: {stderr}"
-            self.log(error_msg, "error")
-            results["error"] = error_msg
+            self.log("Manual scan found no obvious security issues", "success")
+        
+        return {
+            "report_file": str(report_file),
+            "issues_found": len(issues),
+            "issues_by_severity": severity_counts,
+            "detailed_issues": issues
+        }
+
+    def _manual_security_check(self, file_path: Path, content: str) -> List[Dict]:
+        """
+        Perform manual security checks on file content
+        
+        Returns:
+            List of security issues found
+        """
+        issues = []
+        lines = content.split('\n')
+        
+        # Common security patterns to check
+        security_patterns = [
+            {
+                "pattern": r"shell\s*=\s*True",
+                "severity": "HIGH",
+                "type": "shell_injection",
+                "message": "subprocess call with shell=True detected"
+            },
+            {
+                "pattern": r"eval\s*\(",
+                "severity": "HIGH", 
+                "type": "code_injection",
+                "message": "Use of eval() detected"
+            },
+            {
+                "pattern": r"exec\s*\(",
+                "severity": "HIGH",
+                "type": "code_injection", 
+                "message": "Use of exec() detected"
+            },
+            {
+                "pattern": r"password\s*=\s*['\"][^'\"]+['\"]",
+                "severity": "HIGH",
+                "type": "hardcoded_password",
+                "message": "Hardcoded password detected"
+            },
+            {
+                "pattern": r"api[_-]?key\s*=\s*['\"][^'\"]+['\"]",
+                "severity": "HIGH",
+                "type": "hardcoded_secret",
+                "message": "Hardcoded API key detected"
+            },
+            {
+                "pattern": r"token\s*=\s*['\"][^'\"]+['\"]",
+                "severity": "MEDIUM",
+                "type": "hardcoded_secret",
+                "message": "Hardcoded token detected"
+            },
+            {
+                "pattern": r"open\s*\(\s*['\"][^'\"]*\.\.\/",
+                "severity": "MEDIUM",
+                "type": "path_traversal",
+                "message": "Potential path traversal detected"
+            },
+            {
+                "pattern": r"pickle\.loads?\s*\(",
+                "severity": "MEDIUM",
+                "type": "deserialization",
+                "message": "Unsafe pickle deserialization detected"
+            }
+        ]
+        
+        for line_num, line in enumerate(lines, 1):
+            for pattern_info in security_patterns:
+                if re.search(pattern_info["pattern"], line, re.IGNORECASE):
+                    issues.append({
+                        "filename": str(file_path),
+                        "line_number": line_num,
+                        "issue_text": line.strip(),
+                        "test_id": pattern_info["type"],
+                        "issue_severity": pattern_info["severity"],
+                        "issue_confidence": "MEDIUM",
+                        "more_info": pattern_info["message"],
+                        "line_range": [line_num]
+                    })
+        
+        return issues
 
         return results
 
@@ -3172,51 +3379,333 @@ def {func_call.name}(*args, **kwargs):
         return False
 
     def fix_undefined_functions(self) -> Dict:
-        """Resolve undefined functions using multiple strategies"""
-        self.log("Fixing undefined functions...")
-
-        # Step 1: Build complete function map from codebase
-        all_functions = self.scan_all_functions()
-
-        # Step 2: Find undefined calls using mypy output
-        quality_results = self.run_quality_analysis()
-        undefined_calls = self.parse_undefined_from_mypy(quality_results)
-
-        if not undefined_calls:
-            self.log("No undefined functions found", "success")
-            return {"undefined_calls": 0, "fixes_applied": 0}
-
-        # Step 3: Apply resolution strategies
-        fixes_applied = 0
-
-        for func_call in undefined_calls:
-            # Strategy 1: Check for typos (Levenshtein distance)
-            similar = self.find_similar_function(func_call, all_functions)
-            if similar:
-                if self.fix_typo(func_call, similar):
-                    fixes_applied += 1
-                continue
-
-            # Strategy 2: Missing imports
-            module = self.find_in_stdlib_or_installed(func_call)
-            if module:
-                if self.add_import(func_call.file, module):
-                    fixes_applied += 1
-                continue
-
-            # Strategy 3: Create stub with TODO
-            if self.create_function_stub(func_call):
-                fixes_applied += 1
-
-        self.fixes_applied += fixes_applied
-        if fixes_applied > 0:
-            self.log(f"Fixed {fixes_applied} undefined functions", "success")
-
-        return {
-            "undefined_calls": len(undefined_calls),
-            "fixes_applied": fixes_applied,
-            "remaining_issues": len(undefined_calls) - fixes_applied,
+        """
+        Enhanced undefined function resolution with smart import analysis
+        
+        Returns:
+            Dictionary with detailed resolution results
+        """
+        self.log("🔍 Fixing undefined functions with enhanced analysis...")
+        
+        results = {
+            "undefined_calls_found": 0,
+            "auto_fixed": 0,
+            "import_suggestions": 0,
+            "typo_corrections": 0,
+            "manual_review_required": 0,
+            "files_processed": 0,
+            "errors": [],
+            "detailed_fixes": []
         }
+
+        # Scan for undefined function calls
+        undefined_calls = self._scan_for_undefined_functions()
+        results["undefined_calls_found"] = len(undefined_calls)
+        
+        if not undefined_calls:
+            self.log("No undefined function calls found", "success")
+            return results
+
+        self.log(f"Found {len(undefined_calls)} undefined function calls")
+        
+        # Process each undefined call with enhanced analysis
+        processed_files = set()
+        
+        for call in undefined_calls:
+            file_path = Path(call.file)
+            processed_files.add(file_path)
+            
+            try:
+                # Try smart import resolution first
+                if self.config.enable_smart_import_resolution and hasattr(self, 'high_res_analyzer'):
+                    suggestion = self.high_res_analyzer.suggest_smart_import(call.name, file_path)
+                    
+                    if suggestion and suggestion.get("confidence", 0) >= self.config.import_confidence_threshold:
+                        if self._apply_import_suggestion(file_path, call, suggestion):
+                            results["auto_fixed"] += 1
+                            results["import_suggestions"] += 1
+                            results["detailed_fixes"].append({
+                                "type": "import_suggestion",
+                                "file": str(file_path),
+                                "line": call.line,
+                                "function": call.name,
+                                "fix": suggestion["import_statement"],
+                                "confidence": suggestion["confidence"]
+                            })
+                            self.log(f"✓ Fixed {call.name} in {file_path} with import: {suggestion['import_statement']}", "verbose")
+                            continue
+                
+                # Try typo correction if import resolution failed
+                if self.config.enable_typo_correction:
+                    correction = self._suggest_typo_correction(call, file_path)
+                    
+                    if correction and correction.get("confidence", 0) >= self.config.typo_similarity_threshold:
+                        if self._apply_typo_correction(file_path, call, correction):
+                            results["auto_fixed"] += 1
+                            results["typo_corrections"] += 1
+                            results["detailed_fixes"].append({
+                                "type": "typo_correction", 
+                                "file": str(file_path),
+                                "line": call.line,
+                                "original": call.name,
+                                "corrected": correction["suggested_name"],
+                                "confidence": correction["confidence"]
+                            })
+                            self.log(f"✓ Fixed typo {call.name} -> {correction['suggested_name']} in {file_path}", "verbose")
+                            continue
+                
+                # If no automatic fix possible, mark for manual review
+                results["manual_review_required"] += 1
+                results["detailed_fixes"].append({
+                    "type": "manual_review",
+                    "file": str(file_path),
+                    "line": call.line,
+                    "function": call.name,
+                    "context": call.context,
+                    "reason": "No automatic fix available"
+                })
+                
+            except Exception as e:
+                error_msg = f"Error processing {call.name} in {file_path}: {e}"
+                results["errors"].append(error_msg)
+                self.log(error_msg, "error")
+
+        results["files_processed"] = len(processed_files)
+        self.fixes_applied += results["auto_fixed"]
+        
+        # Summary
+        if results["auto_fixed"] > 0:
+            self.log(
+                f"✅ Resolved {results['auto_fixed']}/{results['undefined_calls_found']} undefined function calls "
+                f"({results['import_suggestions']} imports, {results['typo_corrections']} typos)",
+                "success"
+            )
+        
+        if results["manual_review_required"] > 0:
+            self.log(
+                f"⚠️ {results['manual_review_required']} undefined calls require manual review",
+                "warning"
+            )
+
+        return results
+
+    def _scan_for_undefined_functions(self) -> List[FunctionCall]:
+        """Enhanced scan for undefined function calls"""
+        undefined_calls = []
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                tree = ast.parse(content)
+                file_undefined = self._find_undefined_in_ast(tree, py_file)
+                undefined_calls.extend(file_undefined)
+                
+            except Exception as e:
+                self.log(f"Error scanning {py_file} for undefined functions: {e}", "verbose")
+        
+        return undefined_calls
+
+    def _find_undefined_in_ast(self, tree: ast.AST, file_path: Path) -> List[FunctionCall]:
+        """Find undefined function calls in AST"""
+        undefined = []
+        
+        # Get all defined names in this file
+        defined_names = self._get_defined_names(tree)
+        
+        # Get all imported names
+        imported_names = self._get_imported_names(tree)
+        
+        # Find undefined function calls
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func_name = None
+                
+                if isinstance(node.func, ast.Name):
+                    func_name = node.func.id
+                elif isinstance(node.func, ast.Attribute):
+                    if isinstance(node.func.value, ast.Name):
+                        # Check if the object is defined
+                        obj_name = node.func.value.id
+                        if obj_name not in defined_names and obj_name not in imported_names:
+                            func_name = f"{obj_name}.{node.func.attr}"
+                
+                if func_name and func_name not in defined_names and func_name not in imported_names:
+                    # Exclude built-in functions
+                    if func_name not in dir(__builtins__):
+                        undefined.append(FunctionCall(
+                            file=file_path,
+                            line=node.lineno,
+                            name=func_name,
+                            context=self._get_line_context(file_path, node.lineno)
+                        ))
+        
+        return undefined
+
+    def _get_defined_names(self, tree: ast.AST) -> Set[str]:
+        """Get all names defined in the AST"""
+        defined = set()
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                defined.add(node.name)
+            elif isinstance(node, ast.ClassDef):
+                defined.add(node.name)
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        defined.add(target.id)
+        
+        return defined
+
+    def _get_imported_names(self, tree: ast.AST) -> Set[str]:
+        """Get all imported names from the AST"""
+        imported = set()
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    name = alias.asname if alias.asname else alias.name
+                    imported.add(name)
+                    # Also add the base module name
+                    imported.add(alias.name.split('.')[0])
+            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    name = alias.asname if alias.asname else alias.name
+                    imported.add(name)
+        
+        return imported
+
+    def _get_line_context(self, file_path: Path, line_number: int) -> str:
+        """Get context around a specific line"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            if 1 <= line_number <= len(lines):
+                return lines[line_number - 1].strip()
+        except Exception:
+            pass
+        
+        return ""
+
+    def _apply_import_suggestion(self, file_path: Path, call: FunctionCall, suggestion: Dict) -> bool:
+        """Apply an import suggestion to fix undefined function"""
+        if self.dry_run:
+            self.log(f"[DRY RUN] Would add import: {suggestion['import_statement']}", "verbose")
+            return True
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            lines = content.split('\n')
+            
+            # Find the best place to insert the import
+            import_line = suggestion["import_statement"]
+            
+            # Look for existing imports to insert near them
+            insert_index = 0
+            for i, line in enumerate(lines):
+                if line.strip().startswith(('import ', 'from ')) and not line.strip().startswith('#'):
+                    insert_index = i + 1
+            
+            # Insert the import
+            lines.insert(insert_index, import_line)
+            new_content = '\n'.join(lines)
+            
+            # Validate syntax
+            try:
+                ast.parse(new_content)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                return True
+            except SyntaxError:
+                self.log(f"Syntax error after adding import to {file_path}", "warning")
+                return False
+                
+        except Exception as e:
+            self.log(f"Error applying import suggestion to {file_path}: {e}", "error")
+            return False
+
+    def _suggest_typo_correction(self, call: FunctionCall, file_path: Path) -> Optional[Dict]:
+        """Suggest typo corrections for undefined function names"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            defined_names = self._get_defined_names(tree)
+            imported_names = self._get_imported_names(tree)
+            
+            all_available = defined_names.union(imported_names)
+            
+            # Find the best match using simple string similarity
+            best_match = None
+            best_score = 0
+            
+            for available_name in all_available:
+                score = self._calculate_string_similarity(call.name, available_name)
+                if score > best_score and score >= self.config.typo_similarity_threshold:
+                    best_score = score
+                    best_match = available_name
+            
+            if best_match:
+                return {
+                    "suggested_name": best_match,
+                    "confidence": best_score,
+                    "original_name": call.name
+                }
+                
+        except Exception as e:
+            self.log(f"Error suggesting typo correction: {e}", "verbose")
+        
+        return None
+
+    def _calculate_string_similarity(self, str1: str, str2: str) -> float:
+        """Calculate simple string similarity ratio"""
+        import difflib
+        return difflib.SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+
+    def _apply_typo_correction(self, file_path: Path, call: FunctionCall, correction: Dict) -> bool:
+        """Apply a typo correction"""
+        if self.dry_run:
+            self.log(f"[DRY RUN] Would fix typo {call.name} -> {correction['suggested_name']}", "verbose")
+            return True
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            if call.line < 1 or call.line > len(lines):
+                return False
+            
+            line = lines[call.line - 1]
+            # Simple replacement - could be made more sophisticated
+            new_line = line.replace(call.name, correction["suggested_name"])
+            
+            if new_line != line:
+                lines[call.line - 1] = new_line
+                
+                # Validate syntax
+                try:
+                    ast.parse(''.join(lines))
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.writelines(lines)
+                    return True
+                except SyntaxError:
+                    self.log(f"Syntax error after typo correction in {file_path}", "warning")
+                    return False
+            
+        except Exception as e:
+            self.log(f"Error applying typo correction to {file_path}: {e}", "error")
+        
+        return False
 
     def run_tests(self) -> Dict:
         """Run available tests"""
@@ -3305,16 +3794,21 @@ def {func_call.name}(*args, **kwargs):
         return "||".join(elements)
 
     def find_duplicate_functions(self) -> List[List[Dict]]:
-        """Find duplicate functions using AST fingerprinting"""
-        self.log("Scanning for duplicate functions...", "verbose")
+        """
+        Enhanced duplicate function detection with semantic orphan protection
+        
+        Returns:
+            List of duplicate groups, filtered to exclude valid patterns
+        """
+        self.log("🔍 Scanning for duplicate functions with enhanced analysis...")
 
         function_fingerprints = {}
         python_files = list(self.repo_path.rglob("*.py"))
 
-        for py_file in python_files:
-            if any(part.startswith(".") for part in py_file.parts):
-                continue  # Skip hidden files/directories
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith(".") for part in f.parts)]
 
+        for py_file in python_files:
             try:
                 with open(py_file, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -3324,7 +3818,8 @@ def {func_call.name}(*args, **kwargs):
                 for node in ast.walk(tree):
                     if isinstance(node, ast.FunctionDef):
                         fingerprint = self.function_fingerprint(node)
-
+                        
+                        # Enhanced function analysis
                         func_info = {
                             "name": node.name,
                             "file": str(py_file),
@@ -3332,6 +3827,11 @@ def {func_call.name}(*args, **kwargs):
                             "fingerprint": fingerprint,
                             "docstring": ast.get_docstring(node) or "",
                             "node": node,
+                            "is_class_method": self._is_class_method(node, tree),
+                            "inheritance_context": self._get_inheritance_context(node, tree),
+                            "has_decorators": len(node.decorator_list) > 0,
+                            "complexity_score": self._calculate_function_complexity(node),
+                            "dependencies": self._get_function_dependencies(node),
                         }
 
                         if fingerprint not in function_fingerprints:
@@ -3341,13 +3841,284 @@ def {func_call.name}(*args, **kwargs):
             except Exception as e:
                 self.log(f"Error scanning {py_file} for duplicates: {e}", "verbose")
 
-        # Return groups with more than one function (duplicates)
-        duplicates = []
+        # Filter duplicate groups using enhanced analysis
+        genuine_duplicates = []
+        protected_patterns = []
+        
         for fingerprint, functions in function_fingerprints.items():
             if len(functions) > 1:
-                duplicates.append(functions)
+                analysis_result = self._analyze_duplicate_group(functions)
+                
+                if analysis_result["is_valid_pattern"]:
+                    protected_patterns.append({
+                        "functions": functions,
+                        "pattern_type": analysis_result["pattern_type"],
+                        "reason": analysis_result["reason"]
+                    })
+                    self.log(f"🛡️ Protected {len(functions)} functions as valid {analysis_result['pattern_type']}: {functions[0]['name']}", "verbose")
+                else:
+                    genuine_duplicates.append(functions)
 
-        return duplicates
+        if protected_patterns:
+            self.log(f"🛡️ Protected {len(protected_patterns)} valid duplicate patterns from removal", "info")
+        
+        return genuine_duplicates
+
+    def _is_class_method(self, func_node: ast.FunctionDef, tree: ast.AST) -> bool:
+        """Check if function is a class method"""
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if item == func_node:
+                        return True
+        return False
+
+    def _get_inheritance_context(self, func_node: ast.FunctionDef, tree: ast.AST) -> Dict:
+        """Get inheritance context for the function"""
+        context = {"is_override": False, "base_classes": [], "is_abstract": False}
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if item == func_node:
+                        context["base_classes"] = [base.id for base in node.bases if isinstance(base, ast.Name)]
+                        
+                        # Check for abstract method decorators
+                        for decorator in func_node.decorator_list:
+                            if isinstance(decorator, ast.Name) and decorator.id == "abstractmethod":
+                                context["is_abstract"] = True
+                        
+                        # Simple override detection
+                        if context["base_classes"]:
+                            context["is_override"] = True
+                        
+                        break
+        
+        return context
+
+    def _calculate_function_complexity(self, func_node: ast.FunctionDef) -> int:
+        """Calculate simple complexity score for function"""
+        complexity = 1  # Base complexity
+        
+        for node in ast.walk(func_node):
+            if isinstance(node, (ast.If, ast.While, ast.For)):
+                complexity += 1
+            elif isinstance(node, ast.ExceptHandler):
+                complexity += 1
+            elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp)):
+                complexity += 1
+        
+        return complexity
+
+    def _get_function_dependencies(self, func_node: ast.FunctionDef) -> Set[str]:
+        """Get function dependencies (names it references)"""
+        dependencies = set()
+        
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                dependencies.add(node.id)
+            elif isinstance(node, ast.Attribute):
+                if isinstance(node.value, ast.Name):
+                    dependencies.add(node.value.id)
+        
+        return dependencies
+
+    def _analyze_duplicate_group(self, functions: List[Dict]) -> Dict:
+        """
+        Analyze a group of duplicate functions to determine if they're valid patterns
+        
+        Returns:
+            Dictionary with analysis results including whether it's a valid pattern
+        """
+        # Valid patterns to protect
+        if self._is_inheritance_pattern(functions):
+            return {
+                "is_valid_pattern": True,
+                "pattern_type": "inheritance",
+                "reason": "Method overriding in inheritance hierarchy"
+            }
+        
+        if self._is_polymorphism_pattern(functions):
+            return {
+                "is_valid_pattern": True,
+                "pattern_type": "polymorphism",
+                "reason": "Polymorphic methods in different classes"
+            }
+        
+        if self._is_strategy_pattern(functions):
+            return {
+                "is_valid_pattern": True,
+                "pattern_type": "strategy",
+                "reason": "Strategy pattern implementation"
+            }
+        
+        if self._is_interface_implementation(functions):
+            return {
+                "is_valid_pattern": True,
+                "pattern_type": "interface",
+                "reason": "Interface or protocol implementation"
+            }
+        
+        if self._is_context_specialization(functions):
+            return {
+                "is_valid_pattern": True,
+                "pattern_type": "context_specialization",
+                "reason": "Context-specific implementations"
+            }
+        
+        # Check for semantic orphans (broken duplicates)
+        if self._is_semantic_orphan_group(functions):
+            return {
+                "is_valid_pattern": False,
+                "pattern_type": "semantic_orphan",
+                "reason": "Broken or abandoned duplicate code"
+            }
+        
+        # Default: treat as genuine duplicate needing consolidation
+        return {
+            "is_valid_pattern": False,
+            "pattern_type": "genuine_duplicate",
+            "reason": "True duplicate requiring consolidation"
+        }
+
+    def _is_inheritance_pattern(self, functions: List[Dict]) -> bool:
+        """Check if functions represent inheritance pattern"""
+        class_methods = [f for f in functions if f["is_class_method"]]
+        
+        if len(class_methods) >= 2:
+            # Check if they have inheritance relationships
+            for func in class_methods:
+                if func["inheritance_context"]["is_override"]:
+                    return True
+            
+            # Check if functions are in different classes with base classes
+            base_classes = set()
+            for func in class_methods:
+                base_classes.update(func["inheritance_context"]["base_classes"])
+            
+            if base_classes:
+                return True
+        
+        return False
+
+    def _is_polymorphism_pattern(self, functions: List[Dict]) -> bool:
+        """Check if functions represent polymorphism pattern"""
+        class_methods = [f for f in functions if f["is_class_method"]]
+        
+        if len(class_methods) >= 2:
+            # Same method name in different classes (duck typing)
+            class_files = set(f["file"] for f in class_methods)
+            if len(class_files) > 1:
+                return True
+        
+        return False
+
+    def _is_strategy_pattern(self, functions: List[Dict]) -> bool:
+        """Check if functions represent strategy pattern"""
+        # Functions with same signature but different implementations
+        if len(functions) >= 2:
+            # Check if they're in different files/modules
+            files = set(f["file"] for f in functions)
+            if len(files) > 1:
+                # Check if they have similar complexity (different algorithms)
+                complexities = [f["complexity_score"] for f in functions]
+                if max(complexities) > 2:  # Non-trivial implementations
+                    return True
+        
+        return False
+
+    def _is_interface_implementation(self, functions: List[Dict]) -> bool:
+        """Check if functions implement interfaces or protocols"""
+        for func in functions:
+            # Check for abstract method decorators in inheritance context
+            if func["inheritance_context"]["is_abstract"]:
+                return True
+            
+            # Check for protocol-like patterns
+            if "protocol" in func["file"].lower() or "interface" in func["file"].lower():
+                return True
+        
+        return False
+
+    def _is_context_specialization(self, functions: List[Dict]) -> bool:
+        """Check if functions are context-specific specializations"""
+        files = [f["file"] for f in functions]
+        
+        # Check for environment-specific patterns
+        env_patterns = ["test", "dev", "prod", "staging", "local", "remote"]
+        for pattern in env_patterns:
+            if sum(1 for f in files if pattern in f.lower()) >= 2:
+                return True
+        
+        # Check for platform-specific patterns
+        platform_patterns = ["windows", "linux", "mac", "unix", "posix"]
+        for pattern in platform_patterns:
+            if any(pattern in f.lower() for f in files):
+                return True
+        
+        return False
+
+    def _is_semantic_orphan_group(self, functions: List[Dict]) -> bool:
+        """Check if functions represent semantic orphans (broken duplicates)"""
+        orphan_indicators = 0
+        
+        for func in functions:
+            # Check for broken extraction patterns
+            if self._has_orphaned_self_parameter(func):
+                orphan_indicators += 1
+            
+            # Check for missing dependencies
+            if self._has_missing_dependencies(func):
+                orphan_indicators += 1
+            
+            # Check for incomplete implementations
+            if self._is_incomplete_implementation(func):
+                orphan_indicators += 1
+        
+        # If most functions in the group show orphan indicators, it's likely orphaned
+        return orphan_indicators >= len(functions) * 0.5
+
+    def _has_orphaned_self_parameter(self, func: Dict) -> bool:
+        """Check if function has 'self' parameter but isn't in a class"""
+        if not func["is_class_method"]:
+            node = func["node"]
+            if node.args.args and node.args.args[0].arg == "self":
+                return True
+        return False
+
+    def _has_missing_dependencies(self, func: Dict) -> bool:
+        """Check if function references undefined dependencies"""
+        # This would require deeper analysis of the function's context
+        # For now, do a simple check
+        dependencies = func["dependencies"]
+        
+        # Common signs of missing dependencies
+        problematic_deps = {"self", "cls"} & dependencies
+        if problematic_deps and not func["is_class_method"]:
+            return True
+        
+        return False
+
+    def _is_incomplete_implementation(self, func: Dict) -> bool:
+        """Check if function appears to be incomplete"""
+        node = func["node"]
+        
+        # Check for TODO comments or placeholder implementations
+        if func["docstring"]:
+            docstring_lower = func["docstring"].lower()
+            if any(keyword in docstring_lower for keyword in ["todo", "fixme", "placeholder", "stub"]):
+                return True
+        
+        # Check for very simple implementations that might be placeholders
+        if len(node.body) == 1:
+            stmt = node.body[0]
+            if isinstance(stmt, ast.Pass):
+                return True
+            elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
+                # Just a string literal
+                return True
+        
+        return False
 
     def select_best_implementation(self, dup_group: List[Dict]) -> Dict:
         """Choose best implementation from duplicate group"""
@@ -5002,6 +5773,24 @@ def {func_call.name}(*args, **kwargs):
 @click.option(
     "--session-id", help="Custom session ID for tracking (default: auto-generated)"
 )
+@click.option(
+    "--undefined-functions-only", is_flag=True, help="Only fix undefined function calls using enhanced analysis"
+)
+@click.option(
+    "--duplicates-only", is_flag=True, help="Only analyze and fix duplicate functions with semantic orphan protection"
+)
+@click.option(
+    "--import-optimization", is_flag=True, help="Only run smart import analysis and optimization"
+)
+@click.option(
+    "--disable-smart-imports", is_flag=True, help="Disable smart import resolution"
+)
+@click.option(
+    "--disable-surgical-fixes", is_flag=True, help="Disable surgical fix mode"
+)
+@click.option(
+    "--confidence-threshold", type=float, default=0.8, help="Minimum confidence threshold for automatic fixes (0.0-1.0)"
+)
 @click.version_option(version="2.0.0", prog_name="MCP Autofix")
 def main(
     repo_path,
@@ -5015,12 +5804,19 @@ def main(
     monitor,
     no_backup,
     session_id,
+    undefined_functions_only,
+    duplicates_only,
+    import_optimization,
+    disable_smart_imports,
+    disable_surgical_fixes,
+    confidence_threshold,
 ):
     """
-    MCP Autofix Tool - Consolidated automated fixing system
+    MCP Autofix Tool - Enhanced automated fixing system with advanced capabilities
 
     This tool provides comprehensive automated code fixing capabilities using
-    industry-standard tools including Black, isort, Bandit, Flake8, and MyPy.
+    industry-standard tools including Black, isort, Bandit, Flake8, and MyPy,
+    enhanced with smart import analysis, semantic orphan detection, and surgical fixes.
 
     Examples:
 
@@ -5042,18 +5838,33 @@ def main(
         # Analysis only (no fixes applied)
         python autofix.py --scan-only
 
+        # Enhanced undefined function resolution
+        python autofix.py --undefined-functions-only
+
+        # Smart duplicate analysis with orphan protection
+        python autofix.py --duplicates-only
+
+        # Smart import optimization
+        python autofix.py --import-optimization
+
         # Run with real-time file monitoring
         python autofix.py --monitor
 
         # Use custom configuration
         python autofix.py --config-file config.json
+
+        # Adjust confidence threshold for automatic fixes
+        python autofix.py --confidence-threshold 0.9
+
+        # Disable advanced features for compatibility
+        python autofix.py --disable-smart-imports --disable-surgical-fixes
     """
 
     # Validate mutually exclusive options
-    exclusive_options = [format_only, security_only, critical_only, scan_only]
+    exclusive_options = [format_only, security_only, critical_only, scan_only, undefined_functions_only, duplicates_only, import_optimization]
     if sum(exclusive_options) > 1:
         click.echo(
-            "Error: --format-only, --security-only, --critical-only, and --scan-only are mutually exclusive",
+            "Error: --format-only, --security-only, --critical-only, --scan-only, --undefined-functions-only, --duplicates-only, and --import-optimization are mutually exclusive",
             err=True,
         )
         sys.exit(1)
@@ -5075,8 +5886,48 @@ def main(
         if no_backup:
             autofix.config.backup_enabled = False
 
+        # Configure enhancement settings
+        if disable_smart_imports:
+            autofix.config.enable_smart_import_resolution = False
+
+        if disable_surgical_fixes:
+            autofix.config.surgical_fix_mode = False
+
+        if confidence_threshold != 0.8:
+            autofix.config.import_confidence_threshold = confidence_threshold
+            autofix.config.typo_similarity_threshold = confidence_threshold
+
         # Execute based on selected mode
-        if format_only:
+        if undefined_functions_only:
+            autofix.log("🔍 Running enhanced undefined functions analysis only...")
+            results = autofix.fix_undefined_functions()
+            
+            autofix.log(f"Processed {results.get('undefined_calls_found', 0)} undefined calls")
+            autofix.log(f"Auto-fixed: {results.get('auto_fixed', 0)}")
+            autofix.log(f"Manual review required: {results.get('manual_review_required', 0)}")
+            
+            sys.exit(0 if results.get('auto_fixed', 0) > 0 or results.get('undefined_calls_found', 0) == 0 else 1)
+
+        elif duplicates_only:
+            autofix.log("🔄 Running enhanced duplicate analysis with semantic orphan protection...")
+            results = autofix.fix_duplicate_functions()
+            
+            autofix.log(f"Processed {results.get('duplicate_groups', 0)} duplicate groups")
+            autofix.log(f"Applied fixes: {results.get('fixes_applied', 0)}")
+            
+            sys.exit(0 if results.get('fixes_applied', 0) >= 0 else 1)
+
+        elif import_optimization:
+            autofix.log("📦 Running smart import analysis and optimization...")
+            results = autofix.fix_import_issues()
+            
+            autofix.log(f"Files processed: {results.get('files_processed', 0)}")
+            autofix.log(f"Missing imports added: {results.get('missing_added', 0)}")
+            autofix.log(f"Redundant imports removed: {results.get('redundant_removed', 0)}")
+            
+            sys.exit(0)
+
+        elif format_only:
             autofix.log("🎨 Running code formatting only...")
             results = autofix.fix_code_formatting()
 
