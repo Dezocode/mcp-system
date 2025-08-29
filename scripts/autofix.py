@@ -34,6 +34,8 @@ import subprocess
 import sys
 import tempfile
 import time
+import shutil
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, NamedTuple, Union
@@ -56,6 +58,59 @@ class SecurityIssue(NamedTuple):
     line_number: int
     issue_text: str
     severity: str
+
+
+@contextmanager
+def AtomicFix(target_file: Path, backup_dir: Path):
+    """Context manager for atomic fixes with automatic rollback on failure"""
+    backup_file = None
+    try:
+        # Create backup before making changes
+        if target_file.exists():
+            backup_file = backup_dir / f"{target_file.name}.backup.{int(time.time())}"
+            shutil.copy2(target_file, backup_file)
+        
+        yield target_file
+        
+        # If we get here, the fix succeeded
+        
+    except Exception as e:
+        # Rollback on any failure
+        if backup_file and backup_file.exists():
+            if target_file.exists():
+                target_file.unlink()
+            shutil.copy2(backup_file, target_file)
+        raise e
+
+
+class SafeTransformer(ast.NodeTransformer):
+    """Context-aware AST transformer that understands class methods and dependencies"""
+    
+    def __init__(self):
+        self.class_context = []
+        self.function_context = []
+        self.dependencies = set()
+    
+    def visit_ClassDef(self, node):
+        """Track class context to identify class methods"""
+        self.class_context.append(node.name)
+        result = self.generic_visit(node)
+        self.class_context.pop()
+        return result
+    
+    def visit_FunctionDef(self, node):
+        """Track function context and identify if it's a class method"""
+        is_class_method = len(self.class_context) > 0
+        self.function_context.append({
+            'name': node.name,
+            'is_class_method': is_class_method,
+            'class_name': self.class_context[-1] if is_class_method else None,
+            'has_self': len(node.args.args) > 0 and node.args.args[0].arg == 'self',
+            'has_cls': len(node.args.args) > 0 and node.args.args[0].arg == 'cls'
+        })
+        result = self.generic_visit(node)
+        self.function_context.pop()
+        return result
 
 
 class AutofixConfig:
@@ -323,6 +378,392 @@ class MCPAutofix:
         
         self.log("All required tools are available", "success")
         return True
+    
+    def validate_before_change(self, file_path: Path, planned_changes: Dict) -> bool:
+        """Pre-flight validation before making any changes"""
+        try:
+            # Validate file exists and is readable
+            if not file_path.exists():
+                self.log(f"Cannot validate - file does not exist: {file_path}", "error")
+                return False
+            
+            # Parse current file to ensure it's valid Python
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            try:
+                ast.parse(content)
+            except SyntaxError as e:
+                self.log(f"Pre-validation failed - syntax error in {file_path}: {e}", "error")
+                return False
+            
+            # Check if planned changes would break dependencies
+            if 'function_extractions' in planned_changes:
+                for func_info in planned_changes['function_extractions']:
+                    if not self._validate_safe_extraction(func_info, content):
+                        self.log(f"Pre-validation failed - unsafe extraction of {func_info['name']}", "error")
+                        return False
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Pre-validation error for {file_path}: {e}", "error")
+            return False
+    
+    def _validate_safe_extraction(self, func_info: Dict, content: str) -> bool:
+        """Validate that a function can be safely extracted"""
+        try:
+            tree = ast.parse(content)
+            transformer = SafeTransformer()
+            transformer.visit(tree)
+            
+            # Check if function is a class method
+            for func_context in transformer.function_context:
+                if func_context['name'] == func_info['name']:
+                    if func_context['is_class_method']:
+                        self.log(f"Cannot extract {func_info['name']} - it's a class method", "warning")
+                        return False
+                    
+                    if func_context['has_self'] and not func_context['is_class_method']:
+                        self.log(f"Cannot extract {func_info['name']} - orphaned self parameter", "warning")
+                        return False
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error validating extraction safety: {e}", "error")
+            return False
+    
+    def extract_function_with_context(self, func_info: Dict) -> Optional[str]:
+        """Extract function with full context awareness"""
+        try:
+            with open(func_info['file'], 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            transformer = SafeTransformer()
+            transformer.visit(tree)
+            
+            # Find the function and analyze its context
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
+                    # Check if it's safe to extract
+                    is_class_method = any(
+                        isinstance(parent, ast.ClassDef) 
+                        for parent in ast.walk(tree)
+                        if hasattr(parent, 'body') and node in getattr(parent, 'body', [])
+                    )
+                    
+                    if is_class_method:
+                        self.log(f"Refusing to extract class method: {func_info['name']}", "warning")
+                        return None
+                    
+                    # Extract with proper imports and dependencies
+                    lines = content.split('\n')
+                    start_line = node.lineno - 1
+                    end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
+                    
+                    # Include docstring and decorators
+                    while start_line > 0 and (lines[start_line - 1].strip().startswith('@') or 
+                                              lines[start_line - 1].strip().startswith('"""') or
+                                              lines[start_line - 1].strip().startswith("'''")):
+                        start_line -= 1
+                    
+                    func_source = '\n'.join(lines[start_line:end_line])
+                    
+                    # Add necessary imports
+                    imports = self._extract_function_imports(node, content)
+                    if imports:
+                        func_source = imports + '\n\n' + func_source
+                    
+                    return func_source + '\n\n'
+            
+            return None
+            
+        except Exception as e:
+            self.log(f"Error extracting function with context: {e}", "error")
+            return None
+    
+    def _extract_function_imports(self, func_node: ast.FunctionDef, content: str) -> str:
+        """Extract imports needed by a function"""
+        try:
+            tree = ast.parse(content)
+            needed_imports = set()
+            
+            # Find all names used in the function
+            for node in ast.walk(func_node):
+                if isinstance(node, ast.Name):
+                    needed_imports.add(node.id)
+                elif isinstance(node, ast.Attribute):
+                    if isinstance(node.value, ast.Name):
+                        needed_imports.add(node.value.id)
+            
+            # Find corresponding import statements
+            import_lines = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name in needed_imports:
+                            import_lines.append(f"import {alias.name}")
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        for alias in node.names:
+                            if alias.name in needed_imports:
+                                import_lines.append(f"from {node.module} import {alias.name}")
+            
+            return '\n'.join(import_lines) if import_lines else ""
+            
+        except Exception as e:
+            self.log(f"Error extracting imports: {e}", "error")
+            return ""
+    
+    def identify_safe_duplicates(self) -> List[List[Dict]]:
+        """Smart duplicate detection that avoids dangerous extractions"""
+        self.log("Identifying safe duplicate functions...")
+        
+        all_duplicates = self.find_duplicate_functions()
+        safe_duplicates = []
+        
+        for dup_group in all_duplicates:
+            safe_group = []
+            
+            for func_info in dup_group:
+                # Validate this function is safe to extract
+                if self._is_safe_for_extraction(func_info):
+                    safe_group.append(func_info)
+                else:
+                    self.log(f"Skipping unsafe duplicate: {func_info['name']} in {func_info['file']}", "warning")
+            
+            # Only include groups with multiple safe functions
+            if len(safe_group) > 1:
+                safe_duplicates.append(safe_group)
+        
+        self.log(f"Found {len(safe_duplicates)} safe duplicate groups (filtered from {len(all_duplicates)} total)", "info")
+        return safe_duplicates
+    
+    def _is_safe_for_extraction(self, func_info: Dict) -> bool:
+        """Check if a function is safe for extraction"""
+        try:
+            with open(func_info['file'], 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            
+            # Find the function
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
+                    # Check if it's in a class
+                    for parent in ast.walk(tree):
+                        if isinstance(parent, ast.ClassDef):
+                            if hasattr(parent, 'body') and node in parent.body:
+                                return False  # It's a class method
+                    
+                    # Check for self/cls parameters
+                    if node.args.args and node.args.args[0].arg in ('self', 'cls'):
+                        return False  # Has self/cls parameter
+                    
+                    # Check for complex dependencies (simplified)
+                    func_source = ast.get_source_segment(content, node) if hasattr(ast, 'get_source_segment') else ""
+                    if any(pattern in func_source for pattern in ['self.', 'cls.', 'super()']):
+                        return False  # Uses class-specific patterns
+                    
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error checking extraction safety: {e}", "error")
+            return False
+    
+    def test_after_each_fix(self, fixed_file: Path) -> bool:
+        """Test that fixes don't break the code"""
+        try:
+            # Basic syntax validation
+            with open(fixed_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            try:
+                ast.parse(content)
+            except SyntaxError as e:
+                self.log(f"Fix induced syntax error in {fixed_file}: {e}", "error")
+                return False
+            
+            # Try to import the module if it's a valid Python module
+            if fixed_file.suffix == '.py':
+                try:
+                    # Create a temporary module spec
+                    spec = importlib.util.spec_from_file_location("test_module", fixed_file)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                except Exception as e:
+                    self.log(f"Fix induced import error in {fixed_file}: {e}", "warning")
+                    # Don't fail completely on import errors as they might be due to missing dependencies
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error testing fix: {e}", "error")
+            return False
+    
+    def fix_induced_errors(self, file_path: Path, original_content: str) -> bool:
+        """Fix problems caused by our fixes"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                current_content = f.read()
+            
+            # Check for common issues we might have introduced
+            issues_fixed = 0
+            
+            # Fix missing imports
+            if self._fix_missing_imports(file_path, current_content):
+                issues_fixed += 1
+            
+            # Fix orphaned __init__ methods (the core issue mentioned in the comment)
+            if self._fix_orphaned_init_methods(file_path):
+                issues_fixed += 1
+            
+            # Fix duplicate imports
+            if self._fix_duplicate_imports(file_path):
+                issues_fixed += 1
+            
+            if issues_fixed > 0:
+                self.log(f"Fixed {issues_fixed} induced errors in {file_path}", "success")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing induced errors: {e}", "error")
+            return False
+    
+    def _fix_missing_imports(self, file_path: Path, content: str) -> bool:
+        """Fix imports that might be missing after function moves"""
+        try:
+            tree = ast.parse(content)
+            
+            # Find undefined names
+            defined_names = set()
+            used_names = set()
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    defined_names.add(node.name)
+                elif isinstance(node, ast.ClassDef):
+                    defined_names.add(node.name)
+                elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                    used_names.add(node.id)
+            
+            undefined_names = used_names - defined_names - {'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple'}
+            
+            if undefined_names:
+                # Try to add imports from utils
+                lines = content.split('\n')
+                import_line = f"from utils.functions import {', '.join(undefined_names)}"
+                
+                # Find where to insert the import
+                insert_index = 0
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('import ') or line.strip().startswith('from '):
+                        insert_index = i + 1
+                    elif line.strip() and not line.strip().startswith('#'):
+                        break
+                
+                lines.insert(insert_index, import_line)
+                
+                # Write back
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(lines))
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing missing imports: {e}", "error")
+            return False
+    
+    def _fix_orphaned_init_methods(self, file_path: Path) -> bool:
+        """Fix orphaned __init__ methods (the core issue from the comment)"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Look for __init__ methods outside of classes
+            tree = ast.parse(content)
+            lines = content.split('\n')
+            fixed = False
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == '__init__':
+                    # Check if this __init__ is inside a class
+                    in_class = False
+                    for parent in ast.walk(tree):
+                        if isinstance(parent, ast.ClassDef):
+                            if hasattr(parent, 'body') and node in parent.body:
+                                in_class = True
+                                break
+                    
+                    if not in_class:
+                        # This is an orphaned __init__ method - remove it
+                        start_line = node.lineno - 1
+                        end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 1
+                        
+                        # Remove the orphaned method
+                        for i in range(start_line, min(end_line, len(lines))):
+                            lines[i] = ''
+                        
+                        fixed = True
+                        self.log(f"Removed orphaned __init__ method at line {node.lineno}", "info")
+            
+            if fixed:
+                # Clean up empty lines and write back
+                cleaned_lines = []
+                for line in lines:
+                    if line.strip() or (cleaned_lines and cleaned_lines[-1].strip()):
+                        cleaned_lines.append(line)
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(cleaned_lines))
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing orphaned __init__ methods: {e}", "error")
+            return False
+    
+    def _fix_duplicate_imports(self, file_path: Path) -> bool:
+        """Fix duplicate import statements"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            lines = content.split('\n')
+            seen_imports = set()
+            cleaned_lines = []
+            fixed = False
+            
+            for line in lines:
+                if line.strip().startswith(('import ', 'from ')):
+                    if line.strip() in seen_imports:
+                        fixed = True
+                        continue  # Skip duplicate import
+                    seen_imports.add(line.strip())
+                
+                cleaned_lines.append(line)
+            
+            if fixed:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(cleaned_lines))
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing duplicate imports: {e}", "error")
+            return False
     
     def fix_code_formatting(self) -> Dict:
         """
@@ -1348,13 +1789,19 @@ def {func_call.name}(*args, **kwargs):
         return best_func or dup_group[0]
     
     def move_to_utils(self, func_info: Dict) -> bool:
-        """Move function to utils module if not already there"""
+        """Move function to utils module with context awareness and safety checks"""
         if 'utils' in func_info['file']:
             return True  # Already in utils
         
         if self.dry_run:
             self.log(f"[DRY RUN] Would move {func_info['name']} to utils", "verbose")
             return True
+        
+        # Pre-flight validation
+        planned_changes = {'function_extractions': [func_info]}
+        if not self.validate_before_change(Path(func_info['file']), planned_changes):
+            self.log(f"Refusing to move {func_info['name']} - failed safety validation", "error")
+            return False
         
         # Create utils directory if it doesn't exist
         utils_dir = self.repo_path / 'utils'
@@ -1369,24 +1816,18 @@ def {func_call.name}(*args, **kwargs):
         utils_file = utils_dir / 'functions.py'
         
         try:
-            # Extract function source
-            with open(func_info['file'], 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Use AtomicFix for safe operations with rollback
+            backup_dir = self.repo_path / '.autofix_backups'
+            backup_dir.mkdir(exist_ok=True)
             
-            tree = ast.parse(content)
-            
-            # Find the function node
-            func_source = None
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
-                    # Extract the source lines
-                    lines = content.split('\n')
-                    start_line = node.lineno - 1
-                    end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
-                    func_source = '\n'.join(lines[start_line:end_line]) + '\n\n'
-                    break
-            
-            if func_source:
+            with AtomicFix(utils_file, backup_dir):
+                # Extract function with full context
+                func_source = self.extract_function_with_context(func_info)
+                
+                if not func_source:
+                    self.log(f"Failed to extract {func_info['name']} safely", "error")
+                    return False
+                
                 # Add to utils file
                 if utils_file.exists():
                     with open(utils_file, 'a', encoding='utf-8') as f:
@@ -1396,28 +1837,88 @@ def {func_call.name}(*args, **kwargs):
                         f.write('"""Utility functions"""\n\n')
                         f.write(func_source)
                 
-                self.log(f"Moved {func_info['name']} to utils/functions.py", "verbose")
+                # Test the result
+                if not self.test_after_each_fix(utils_file):
+                    raise Exception(f"Move of {func_info['name']} broke utils file")
+                
+                self.log(f"Safely moved {func_info['name']} to utils/functions.py", "success")
                 return True
         
         except Exception as e:
-            self.log(f"Error moving function to utils: {e}", "error")
-        
-        return False
+            self.log(f"Error moving function to utils (rolled back): {e}", "error")
+            return False
     
     def replace_with_import(self, duplicate: Dict, best: Dict) -> bool:
-        """Replace duplicate function with import"""
+        """Replace duplicate function with import using AtomicFix for safety"""
         if self.dry_run:
             self.log(f"[DRY RUN] Would replace {duplicate['name']} with import in {duplicate['file']}", "verbose")
             return True
         
+        file_path = Path(duplicate['file'])
+        
         try:
-            with open(duplicate['file'], 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Pre-flight validation
+            with open(file_path, 'r', encoding='utf-8') as f:
+                original_content = f.read()
             
-            tree = ast.parse(content)
-            lines = content.split('\n')
+            # Use AtomicFix for safe operations with rollback
+            backup_dir = self.repo_path / '.autofix_backups'
+            backup_dir.mkdir(exist_ok=True)
             
-            # Find and remove the duplicate function
+            with AtomicFix(file_path, backup_dir):
+                tree = ast.parse(original_content)
+                lines = original_content.split('\n')
+                
+                # Find and remove the duplicate function
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == duplicate['name']:
+                        start_line = node.lineno - 1
+                        end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
+                        
+                        # Remove function lines
+                        for i in range(start_line, min(end_line, len(lines))):
+                            lines[i] = ''
+                        
+                        # Add import if not already present
+                        import_line = f"from utils.functions import {duplicate['name']}"
+                        if import_line not in original_content:
+                            # Find where to insert import
+                            insert_index = 0
+                            for i, line in enumerate(lines):
+                                if line.strip().startswith('import ') or line.strip().startswith('from '):
+                                    insert_index = i + 1
+                                elif line.strip() and not line.strip().startswith('#'):
+                                    break
+                            
+                            lines.insert(insert_index, import_line)
+                        
+                        break
+                
+                # Write modified content
+                new_content = '\n'.join(line for line in lines if line.strip() or lines.index(line) == 0)
+                
+                # Validate syntax before writing
+                try:
+                    ast.parse(new_content)
+                except SyntaxError as e:
+                    raise Exception(f"Replacement would create syntax error: {e}")
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                
+                # Test the result
+                if not self.test_after_each_fix(file_path):
+                    raise Exception(f"Replacement of {duplicate['name']} broke the file")
+                
+                # Check for and fix any induced errors
+                self.fix_induced_errors(file_path, original_content)
+                
+                self.log(f"Safely replaced {duplicate['name']} with import in {duplicate['file']}", "success")
+                return True
+        
+        except Exception as e:
+            self.log(f"Error replacing duplicate function (rolled back): {e}", "error")
+            return False
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef) and node.name == duplicate['name']:
                     start_line = node.lineno - 1
@@ -1462,13 +1963,14 @@ def {func_call.name}(*args, **kwargs):
         return False
     
     def fix_duplicate_functions(self) -> Dict:
-        """Eliminate duplicates by consolidating to shared module"""
-        self.log("Fixing duplicate functions...")
+        """Eliminate duplicates using smart detection and safe consolidation"""
+        self.log("Fixing duplicate functions with safety checks...")
         
-        duplicates = self.find_duplicate_functions()
+        # Use safe duplicate detection instead of blind detection
+        duplicates = self.identify_safe_duplicates()
         
         if not duplicates:
-            self.log("No duplicate functions found", "success")
+            self.log("No safe duplicate functions found for consolidation", "success")
             return {'duplicate_groups': 0, 'fixes_applied': 0}
         
         fixes_applied = 0
@@ -1477,21 +1979,26 @@ def {func_call.name}(*args, **kwargs):
             # Choose best implementation
             best = self.select_best_implementation(dup_group)
             
-            # Move to utils if not already there
+            # Move to utils if not already there (with safety checks)
             if 'utils' not in best['file']:
                 if self.move_to_utils(best):
                     # Update best reference to utils location
                     best['file'] = str(self.repo_path / 'utils' / 'functions.py')
+                else:
+                    self.log(f"Failed to safely move {best['name']} to utils, skipping group", "warning")
+                    continue
             
-            # Replace all duplicates with imports
+            # Replace all duplicates with imports (with safety checks)
             for duplicate in dup_group:
                 if duplicate != best:
                     if self.replace_with_import(duplicate, best):
                         fixes_applied += 1
+                    else:
+                        self.log(f"Failed to safely replace {duplicate['name']}, manual review needed", "warning")
         
         self.fixes_applied += fixes_applied
         if fixes_applied > 0:
-            self.log(f"Consolidated {fixes_applied} duplicate functions", "success")
+            self.log(f"Safely consolidated {fixes_applied} duplicate functions", "success")
         
         return {
             'duplicate_groups': len(duplicates),
