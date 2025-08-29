@@ -2,8 +2,8 @@ from utils.functions import main
 #!/usr/bin/env python3
 from utils.functions import f
 from utils.functions import i
-from core.mcp-mem0-simple import line
-from .mcp-docker-orchestration-integration import cmd
+from core.mcp_mem0_simple import line
+from .mcp_docker_orchestration_integration import cmd
 from utils.functions import e
 """
 Enhanced MCP Orchestrator Demo & Testing Suite

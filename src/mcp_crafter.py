@@ -2257,104 +2257,14 @@ ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
-    CMD python -c "import sys; sys.exit(0)" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # Default command (stdio transport)
 CMD ["python", "src/main.py"]
 """
-    
+
     def _get_enterprise_compose_template(self) -> str:
-        return '''version: '3.8'
-
-services:
-  {{ server_name }}:
-    build: 
-      context: .
-      args:
-        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
-        VERSION: ${VERSION:-1.0.0}
-    environment:
-      - LOG_LEVEL=INFO
-      - PYTHONUNBUFFERED=1
-      {%- for key, value in environment_vars.items() %}
-      - {{ key }}={{ value }}
-      {%- endfor %}
-    restart: unless-stopped
-    volumes:
-      - ./data:/app/data
-      - ./.env:/app/.env
-    
-    {%- if "persistence" in capabilities %}
-    depends_on:
-      - database
-    {%- endif %}
-    {%- if "caching" in capabilities %}
-      - redis
-    {%- endif %}
-
-{%- if "persistence" in capabilities %}
-  database:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: {{ server_name.replace("-", "_") }}
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-{%- endif %}
-
-{%- if "caching" in capabilities %}
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-{%- endif %}
-
-{%- if "monitoring" in capabilities %}
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-{%- endif %}
-
-volumes:
-{%- if "persistence" in capabilities %}
-  postgres_data:
-{%- endif %}
-{%- if "caching" in capabilities %}
-  redis_data:
-{%- endif %}
-{%- if "monitoring" in capabilities %}
-  prometheus_data:
-{%- endif %}
-
-networks:
-  default:
-    name: {{ server_name }}_network
-'''
+        return "# Placeholder compose template"
     
     def _get_enterprise_env_template(self) -> str:
         return '''# {{ server_name.upper() }} MCP Server Configuration
@@ -2412,6 +2322,7 @@ WEBHOOK_RETRY_COUNT=3
 
 # Development Settings
 DEBUG=false
+'''
     
     def _create_custom_tool_template(self, tool_spec: Dict[str, Any]) -> str:
         """Create custom tool implementation"""
@@ -2602,7 +2513,7 @@ The server uses environment variables for configuration. See `.env.example` for 
 
 ### Important Configuration Notes
 
-- **Transport**: This server uses stdio transport (Anthropic's recommended method)
+- **Transport**: This server uses stdio transport (Anthropic\\'s recommended method)
 - **Modules**: Capabilities are implemented as pluggable modules
 - **Logging**: Configured via LOG_LEVEL environment variable
 
