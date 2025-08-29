@@ -1,8 +1,16 @@
-# MCP Autofix Tool - Consolidated Automated Fixing System
+# MCP Autofix Tool - Enhanced with Higher Resolution Logic
 
-Advanced, consolidated autofix tool that delivers reliable code improvements using proven industry-standard tools with comprehensive error handling, detailed reporting, and configurable operation modes.
+Advanced, consolidated autofix tool with **higher resolution capabilities** that delivers precise, surgical code improvements using proven industry-standard tools with comprehensive error handling, detailed reporting, and configurable operation modes.
 
 ## ✨ ENHANCED FEATURES:
+
+### 🔬 **Higher Resolution Capabilities (NEW)**
+✅ **Granular Classification**: Issues categorized by complexity (critical/high/medium/low/cosmetic)  
+✅ **Surgical Fix Precision**: Line-level targeting with minimal disruption  
+✅ **Context-Aware Analysis**: Dependency graph analysis for intelligent fixes  
+✅ **Advanced Validation**: Multi-level validation (syntax, imports, execution, safety)  
+✅ **Precision Metrics**: Detailed impact analysis and confidence scoring  
+✅ **Backup Registry**: Comprehensive backup management with metadata tracking  
 
 ### 🎯 **Core Capabilities**
 ✅ **Code Formatting**: Uses `black` and `isort` for consistent formatting  
@@ -29,6 +37,7 @@ Advanced, consolidated autofix tool that delivers reliable code improvements usi
 ✅ **Issue Categorization**: Security, quality, type, and test issue classification  
 ✅ **Recommendations**: Smart recommendations based on findings  
 ✅ **Multiple Formats**: JSON reports + human-readable summaries  
+✅ **High-Resolution Insights**: Precision metrics, complexity breakdown, dependency analysis  
 
 ## 🚀 COMMAND USAGE:
 
@@ -54,7 +63,7 @@ Advanced, consolidated autofix tool that delivers reliable code improvements usi
 
 ## ⚙️ CONFIGURATION:
 
-Create an optional `autofix-config.json` file:
+Create an optional `autofix-config.json` file with enhanced resolution settings:
 
 ```json
 {
@@ -65,7 +74,20 @@ Create an optional `autofix-config.json` file:
   "max_cycles": 10,
   "skip_hidden_files": true,
   "backup_enabled": true,
-  "tools_required": ["black", "isort", "flake8", "mypy", "bandit"]
+  "tools_required": ["black", "isort", "flake8", "mypy", "bandit"],
+  
+  "enable_high_resolution": true,
+  "granular_classification": true,
+  "line_level_precision": true,
+  "context_aware_fixes": true,
+  "advanced_validation": true,
+  "detailed_reporting": true,
+  "surgical_fix_mode": true,
+  
+  "similarity_threshold": 0.85,
+  "complexity_threshold": 5,
+  "dependency_depth": 3,
+  "validation_levels": ["syntax", "imports", "execution", "safety"]
 }
 ```
 
@@ -75,7 +97,7 @@ Create an optional `autofix-config.json` file:
 from scripts.autofix import MCPAutofix, AutofixConfig
 from pathlib import Path
 
-# Basic usage
+# Basic usage with higher resolution
 autofix = MCPAutofix(dry_run=False, verbose=True)
 results = autofix.run_complete_autofix()
 print(f"Applied {autofix.fixes_applied} fixes")
@@ -89,10 +111,12 @@ autofix = MCPAutofix(
 )
 results = autofix.run_complete_autofix()
 
-# Specific operations
-autofix.fix_code_formatting()           # Format code only
-autofix.run_security_scan()             # Security scan only
-autofix.fix_security_issues()           # Security fixes only
+# Higher resolution specific operations
+if autofix.config.enable_high_resolution:
+    issues = [{'type': 'whitespace', 'file': 'test.py', 'line': 10}]
+    categorized = autofix.analyze_issues_with_high_resolution(issues)
+    surgical_success = autofix.apply_surgical_fix(issues[0])
+    validation = autofix.validate_fix_with_high_resolution(Path('test.py'), issues[0])
 ```
 
 ## 📁 OUTPUT FILES:
@@ -104,6 +128,11 @@ autofix-reports/
 ├── bandit-report-{session_id}.json     # Security vulnerability report
 └── autofix-{session_id}.log            # Detailed execution log
 
+.autofix_surgical_backups/              # Higher resolution backups
+├── file1.py.{timestamp}.bak
+├── file2.py.{timestamp}.bak
+└── ...
+
 # Additional analysis files (as needed)
 flake8-report.txt                        # Style and error analysis
 mypy-report.txt                          # Type checking results
@@ -112,64 +141,76 @@ test-results.txt                         # Test execution output
 
 ## 🔄 EXECUTION PHASES:
 
-The autofix process runs in carefully orchestrated phases:
+The enhanced autofix process runs in carefully orchestrated phases with higher resolution analysis:
 
 1. **Environment Validation** - Verify Python version, file permissions, repository structure
 2. **Tool Installation** - Install and verify required tools (black, isort, flake8, mypy, bandit)
-3. **Code Formatting** - Apply Black and isort formatting with validation
-4. **Whitespace Cleanup** - Fix whitespace issues with encoding detection and backups
-5. **Security Fixes** - Detect and fix security vulnerabilities using Bandit
-6. **Function Resolution** - Resolve undefined functions through intelligent analysis
-7. **Duplicate Elimination** - Consolidate duplicate code into shared utilities
-8. **Type Error Fixes** - Add type annotations and fix type-related issues
-9. **Test Failure Repairs** - Analyze and repair test failures
-10. **Final Analysis** - Comprehensive security, quality, and test analysis
-11. **Report Generation** - Create detailed reports with recommendations
+3. **Higher Resolution Analysis** - Build dependency graph, analyze issue complexity
+4. **High-Resolution Code Formatting** - Apply Black and isort with surgical precision
+5. **Surgical Whitespace Cleanup** - Line-level whitespace fixes with validation
+6. **Security Fixes** - Detect and fix security vulnerabilities using Bandit
+7. **Function Resolution** - Resolve undefined functions through intelligent analysis
+8. **Duplicate Elimination** - Consolidate duplicate code into shared utilities
+9. **Type Error Fixes** - Add type annotations and fix type-related issues
+10. **Test Failure Repairs** - Analyze and repair test failures
+11. **Final Analysis** - Comprehensive security, quality, and test analysis
+12. **Enhanced Report Generation** - Create detailed reports with higher resolution insights
 
-## 🎯 INTELLIGENT FEATURES:
+## 🎯 HIGHER RESOLUTION FEATURES:
 
-### **Smart Function Resolution**
-- Typo detection using Levenshtein distance
-- Missing import detection from standard library
-- Stub generation for missing functions with TODO markers
+### **🔬 Granular Issue Classification**
+- **Critical**: Complex security issues, core system changes
+- **High**: Important functional changes, class modifications  
+- **Medium**: Standard fixes, moderate complexity
+- **Low**: Simple changes, basic improvements
+- **Cosmetic**: Formatting, whitespace, style adjustments
 
-### **Advanced Security Fixes**
-- Subprocess shell=True to shell=False conversion
-- Hardcoded password to environment variable migration
-- YAML safe_load() implementation
-- Comprehensive vulnerability pattern matching
+### **⚡ Surgical Fix Precision**
+- Line-level targeting with context validation
+- Minimal disruption to surrounding code
+- Fuzzy matching for content verification (80% similarity threshold)
+- Automatic backup creation with metadata tracking
 
-### **Code Quality Improvements**
-- AST-based duplicate function detection
-- Intelligent consolidation to shared modules
-- Type annotation inference and addition
-- Import organization and cleanup
+### **🧠 Context-Aware Analysis**
+- Dependency graph construction for all Python files
+- Impact analysis considering file importance
+- Risk assessment based on change scope
+- Confidence scoring for fix reliability
+
+### **🛡️ Advanced Multi-Level Validation**
+1. **Syntax Validation**: AST parsing verification
+2. **Import Validation**: Import structure integrity  
+3. **Execution Safety**: Dangerous pattern detection
+4. **Safety Checks**: File size change monitoring, issue resolution verification
 
 ## 📈 SUCCESS METRICS:
 
-After running autofix, expect:
-- **Consistent formatting** across all Python files
-- **Reduced security vulnerabilities** with specific fixes applied
-- **Improved code quality** through automated cleanup
-- **Better type safety** with enhanced annotations
-- **Consolidated code** with eliminated duplicates
-- **Comprehensive documentation** of all changes made
+After running enhanced autofix, expect:
+- **Consistent formatting** across all Python files with surgical precision
+- **Reduced security vulnerabilities** with specific fixes applied and validated
+- **Improved code quality** through automated cleanup with minimal disruption
+- **Better type safety** with enhanced annotations and context awareness
+- **Consolidated code** with eliminated duplicates using intelligent analysis
+- **Comprehensive documentation** of all changes with higher resolution insights
+- **Precision metrics** showing surgical fix ratios and validation success rates
 
 ## 🔧 INTEGRATION:
 
-This tool integrates seamlessly with:
-- **MCP Pipeline System** - Part of the larger MCP ecosystem
-- **CI/CD Workflows** - Can be run in automated pipelines
-- **Pre-commit Hooks** - Use for automatic code quality enforcement
-- **Development Workflows** - Regular maintenance and cleanup
+This enhanced tool integrates seamlessly with:
+- **MCP Pipeline System** - Part of the larger MCP ecosystem with higher resolution reporting
+- **CI/CD Workflows** - Can be run in automated pipelines with precision metrics
+- **Pre-commit Hooks** - Use for automatic code quality enforcement with surgical fixes
+- **Development Workflows** - Regular maintenance and cleanup with minimal disruption
 
 ## 🚨 SAFETY GUARANTEES:
 
 - **Syntax Validation**: All changes are AST-validated before writing
-- **Backup Creation**: Original files are preserved with session tracking
+- **Surgical Backup Creation**: Original files preserved with metadata and timestamps
 - **Error Isolation**: Failed phases don't affect successful ones
 - **Dry Run Mode**: Always test with `--dry-run` first
 - **Detailed Logging**: Complete audit trail of all operations
 - **Graceful Degradation**: Continues operation even if some tools fail
+- **Higher Resolution Validation**: Multi-level validation ensures fix quality
+- **Impact Analysis**: Risk assessment prevents dangerous changes
 
-This enhanced autofix tool represents a significant improvement in automated code maintenance, providing enterprise-grade reliability and comprehensive coverage of code quality issues.
+This enhanced autofix tool with **higher resolution logic** represents a significant advancement in automated code maintenance, providing enterprise-grade reliability, surgical precision, and comprehensive coverage of code quality issues with minimal disruption to existing codebases.
