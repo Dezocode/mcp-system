@@ -1,0 +1,252 @@
+#!/bin/bash
+# Enhanced Autofix Launcher v3.0 - Higher Resolution Logic & Watchdog Integration
+# Upgrades the existing autofix system with advanced capabilities
+
+set -euo pipefail
+
+# Enhanced header
+readonly CYAN='\033[0;36m'
+readonly GREEN='\033[0;32m' 
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly RED='\033[0;31m'
+readonly PURPLE='\033[0;35m'
+readonly NC='\033[0m'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo -e "${PURPLE}🚀 Enhanced MCP Autofix v3.0 - Higher Resolution & Watchdog Integration${NC}"
+echo -e "${CYAN}✨ Advanced Features: Proactive Prevention • Self-Healing • Learning System${NC}"
+echo -e "${GREEN}🎯 High-Resolution Analysis • Real-Time Monitoring • Intelligent Fixes${NC}"
+echo -e "${BLUE}🔮 Pattern Learning • Regression Prevention • Unified Control${NC}"
+echo ""
+
+# Show enhanced help
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+    echo "Enhanced MCP Autofix Tool v3.0 - Comprehensive automated code fixing with prevention"
+    echo ""
+    echo "Usage: $0 [MODE] [OPTIONS]"
+    echo ""
+    echo "🎯 Enhanced Modes:"
+    echo "  --full-suite         Complete enhanced autofix with monitoring (default)"
+    echo "  --critical-only      Fix only critical issues that prevent execution"
+    echo "  --monitor-only       Start preventive monitoring without initial fixes"
+    echo "  --learn-improve      Learn from fixes and improve prevention strategies"
+    echo "  --legacy             Use original autofix system"
+    echo ""
+    echo "⚙️ Configuration Options:"
+    echo "  --config FILE        Custom configuration file"
+    echo "  --no-monitoring      Disable real-time file monitoring"
+    echo "  --max-issues N       Maximum issues to fix in one session"
+    echo "  --timeout N          Monitoring timeout in seconds"
+    echo ""
+    echo "🔍 Analysis Options:"
+    echo "  --dry-run           Preview changes without applying"
+    echo "  --verbose, -v       Show detailed output and debug info"
+    echo "  --scan-only         Only analyze without fixes"
+    echo "  --output FILE       Save detailed report to file"
+    echo ""
+    echo "🧪 Testing & Status:"
+    echo "  --test [COMPONENT]  Test system components"
+    echo "  --status            Show system status"
+    echo "  --version           Show version information"
+    echo ""
+    echo "📊 Examples:"
+    echo "  $0                           # Run complete enhanced autofix"
+    echo "  $0 --critical-only --verbose # Fix critical issues with detailed output"
+    echo "  $0 --monitor-only --timeout 3600  # Monitor for 1 hour"
+    echo "  $0 --learn-improve --analyze-patterns  # Analyze and learn"
+    echo "  $0 --legacy --dry-run        # Use original system in preview mode"
+    echo ""
+    echo "🚀 Enhanced Features:"
+    echo "  • Higher resolution issue detection and classification"
+    echo "  • Proactive prevention through integrated watchdog monitoring"
+    echo "  • Self-healing capabilities with automatic regression detection"
+    echo "  • Learning system that analyzes patterns to prevent similar issues"
+    echo "  • Unified control system coordinating all autofix components"
+    echo ""
+    exit 0
+fi
+
+# Check for version request
+if [[ "${1:-}" == "--version" ]]; then
+    echo "Enhanced MCP Autofix v3.0.0"
+    echo "Higher resolution logic with integrated watchdog prevention system"
+    echo ""
+    echo "Components:"
+    echo "  • Enhanced Autofix Engine: v3.0"
+    echo "  • Integrated Watchdog System: v2.0"
+    echo "  • Self-Healing Learning System: v1.0"
+    echo "  • High-Resolution Analyzer: v2.0"
+    echo "  • Unified Control Interface: v3.0"
+    echo ""
+    echo "Legacy compatibility with original autofix.py maintained"
+    exit 0
+fi
+
+# Environment validation
+echo -e "${BLUE}🔍 Validating enhanced environment...${NC}"
+
+# Check Python version
+if ! command -v python3 &> /dev/null; then
+    echo -e "${RED}❌ Python 3 not found. Please install Python 3.8+ to run enhanced autofix.${NC}"
+    exit 1
+fi
+
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo -e "${GREEN}✅ Python ${PYTHON_VERSION} detected${NC}"
+
+# Check for required dependencies
+echo -e "${BLUE}🔧 Checking enhanced dependencies...${NC}"
+
+MISSING_DEPS=()
+
+# Check for watchdog
+if ! python3 -c "import watchdog" &> /dev/null; then
+    MISSING_DEPS+=("watchdog")
+fi
+
+# Check for click
+if ! python3 -c "import click" &> /dev/null; then
+    MISSING_DEPS+=("click")
+fi
+
+if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+    echo -e "${YELLOW}⚠️ Missing enhanced dependencies: ${MISSING_DEPS[*]}${NC}"
+    echo -e "${BLUE}Installing enhanced dependencies...${NC}"
+    
+    pip3 install watchdog click --quiet
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Enhanced dependencies installed${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Could not install dependencies automatically${NC}"
+        echo -e "${BLUE}Please run: pip3 install watchdog click${NC}"
+    fi
+fi
+
+# Check enhanced components
+echo -e "${BLUE}🔍 Checking enhanced components...${NC}"
+
+ENHANCED_ENGINE="${SCRIPT_DIR}/scripts/enhanced_autofix_engine.py"
+ENHANCED_CONTROL="${SCRIPT_DIR}/scripts/enhanced_autofix_control.py"
+PREVENTION_CONFIG="${SCRIPT_DIR}/configs/prevention_rules.json"
+
+if [[ ! -f "$ENHANCED_ENGINE" ]]; then
+    echo -e "${RED}❌ Enhanced autofix engine not found at ${ENHANCED_ENGINE}${NC}"
+    echo -e "${BLUE}Falling back to legacy autofix system...${NC}"
+    exec "${SCRIPT_DIR}/scripts/autofix.py" "$@"
+fi
+
+if [[ ! -f "$ENHANCED_CONTROL" ]]; then
+    echo -e "${RED}❌ Enhanced control system not found at ${ENHANCED_CONTROL}${NC}"
+    echo -e "${BLUE}Falling back to legacy autofix system...${NC}"
+    exec "${SCRIPT_DIR}/scripts/autofix.py" "$@"
+fi
+
+echo -e "${GREEN}✅ Enhanced components available${NC}"
+
+# Create required directories
+REPORTS_DIR="autofix-reports"
+AUTOFIX_DIR=".autofix"
+mkdir -p "$REPORTS_DIR" "$AUTOFIX_DIR"
+
+echo -e "${GREEN}✅ Enhanced environment ready${NC}"
+echo ""
+
+# Parse enhanced arguments
+MODE="full-suite"
+ENHANCED_ARGS=()
+LEGACY_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --full-suite)
+            MODE="full-suite"
+            shift
+            ;;
+        --critical-only)
+            MODE="critical-only"
+            shift
+            ;;
+        --monitor-only)
+            MODE="monitor-only"
+            shift
+            ;;
+        --learn-improve)
+            MODE="learn-and-improve"
+            shift
+            ;;
+        --legacy)
+            LEGACY_MODE=true
+            shift
+            ;;
+        --status)
+            MODE="status"
+            shift
+            ;;
+        --test)
+            MODE="test"
+            if [[ $# -gt 1 && ! "$2" =~ ^-- ]]; then
+                ENHANCED_ARGS+=("--component" "$2")
+                shift
+            fi
+            shift
+            ;;
+        --config)
+            ENHANCED_ARGS+=("--config" "$2")
+            shift 2
+            ;;
+        --no-monitoring)
+            ENHANCED_ARGS+=("--no-monitoring")
+            shift
+            ;;
+        --max-issues)
+            ENHANCED_ARGS+=("--max-issues" "$2")
+            shift 2
+            ;;
+        --timeout)
+            ENHANCED_ARGS+=("--timeout" "$2")
+            shift 2
+            ;;
+        --output)
+            ENHANCED_ARGS+=("--output" "$2")
+            shift 2
+            ;;
+        --analyze-patterns)
+            ENHANCED_ARGS+=("--analyze-patterns")
+            shift
+            ;;
+        --update-prevention)
+            ENHANCED_ARGS+=("--update-prevention")
+            shift
+            ;;
+        --dry-run|--verbose|-v|--scan-only)
+            ENHANCED_ARGS+=("$1")
+            shift
+            ;;
+        *)
+            # Pass unknown arguments to enhanced system
+            ENHANCED_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Route to appropriate system
+if [[ "$LEGACY_MODE" == "true" ]]; then
+    echo -e "${CYAN}🔄 Running legacy autofix system...${NC}"
+    exec python3 "${SCRIPT_DIR}/scripts/autofix.py" "${ENHANCED_ARGS[@]}"
+else
+    echo -e "${PURPLE}🚀 Starting Enhanced Autofix System v3.0...${NC}"
+    echo -e "${BLUE}Mode: ${MODE}${NC}"
+    
+    if [[ "${#ENHANCED_ARGS[@]}" -gt 0 ]]; then
+        echo -e "${BLUE}Options: ${ENHANCED_ARGS[*]}${NC}"
+    fi
+    
+    echo ""
+    
+    # Execute enhanced control system
+    exec python3 "$ENHANCED_CONTROL" --repo-path . "$MODE" "${ENHANCED_ARGS[@]}"
+fi
