@@ -38,7 +38,7 @@ import shutil
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, NamedTuple, Union, Any
+from typing import Dict, List, Optional, Tuple, NamedTuple, Union, Any, Set
 
 import click
 
@@ -84,7 +84,7 @@ def AtomicFix(target_file: Path, backup_dir: Path):
 
 
 class HighResolutionAnalyzer:
-    """Enhanced analyzer for high-resolution code analysis and fix precision"""
+    """Enhanced analyzer for high-resolution code analysis and fix precision with smart import analysis"""
     
     def __init__(self, repo_path: Path, config):
         self.repo_path = repo_path
@@ -98,6 +98,14 @@ class HighResolutionAnalyzer:
         }
         self.dependency_graph = {}
         self.complexity_scores = {}
+        
+        # Smart import analysis components
+        self.import_mapping = {}  # Maps modules to their available symbols
+        self.standard_library_modules = set()
+        self.installed_packages = set()
+        self.local_modules = {}  # Maps local files to their exported symbols
+        self.import_usage_patterns = {}  # Tracks how imports are used across files
+        self.smart_import_cache = {}  # Cache for expensive import resolution operations
         
     def analyze_issue_complexity(self, issue: Dict) -> str:
         """Analyze issue complexity for better prioritization"""
@@ -228,6 +236,481 @@ class HighResolutionAnalyzer:
                 impact['confidence'] = 0.6  # High impact but need careful review
         
         return impact
+    
+    def initialize_smart_import_analysis(self) -> None:
+        """Initialize smart import analysis with comprehensive module mapping"""
+        try:
+            # Build standard library module set
+            self._build_standard_library_mapping()
+            
+            # Discover installed packages
+            self._discover_installed_packages()
+            
+            # Analyze local module structure
+            self._analyze_local_modules()
+            
+            # Build import usage patterns
+            self._analyze_import_usage_patterns()
+            
+        except Exception as e:
+            logging.warning(f"Smart import analysis initialization failed: {e}")
+    
+    def _build_standard_library_mapping(self) -> None:
+        """Build comprehensive mapping of standard library modules and their symbols"""
+        import sys
+        import pkgutil
+        import importlib
+        
+        # Core standard library modules with their common symbols
+        self.standard_library_modules = {
+            'os', 'sys', 'json', 'datetime', 'pathlib', 'typing', 'collections',
+            'itertools', 'functools', 'operator', 're', 'math', 'random',
+            'time', 'subprocess', 'shutil', 'tempfile', 'glob', 'csv',
+            'urllib', 'http', 'email', 'base64', 'hashlib', 'hmac',
+            'sqlite3', 'pickle', 'gzip', 'zipfile', 'tarfile', 'configparser',
+            'logging', 'threading', 'multiprocessing', 'asyncio', 'concurrent',
+            'xml', 'html', 'unittest', 'doctest', 'pdb', 'profile', 'timeit'
+        }
+        
+        # Build detailed symbol mapping for key modules
+        self.import_mapping = {
+            'os': ['path', 'environ', 'getcwd', 'listdir', 'makedirs', 'remove', 'rename'],
+            'sys': ['argv', 'path', 'version', 'platform', 'exit', 'stdout', 'stderr'],
+            'json': ['loads', 'dumps', 'load', 'dump', 'JSONDecodeError'],
+            'datetime': ['datetime', 'date', 'time', 'timedelta', 'timezone'],
+            'pathlib': ['Path', 'PurePath', 'WindowsPath', 'PosixPath'],
+            'typing': ['List', 'Dict', 'Set', 'Tuple', 'Optional', 'Union', 'Any', 'Callable'],
+            'collections': ['defaultdict', 'Counter', 'OrderedDict', 'namedtuple', 'deque'],
+            'itertools': ['chain', 'combinations', 'permutations', 'product', 'cycle'],
+            'functools': ['partial', 'reduce', 'wraps', 'lru_cache', 'cached_property'],
+            're': ['compile', 'match', 'search', 'findall', 'sub', 'split', 'escape'],
+            'subprocess': ['run', 'Popen', 'PIPE', 'STDOUT', 'check_output', 'call'],
+            'shutil': ['copy', 'copy2', 'copytree', 'move', 'rmtree', 'which'],
+            'tempfile': ['NamedTemporaryFile', 'TemporaryDirectory', 'mktemp', 'gettempdir'],
+            'logging': ['getLogger', 'debug', 'info', 'warning', 'error', 'critical', 'basicConfig'],
+            'threading': ['Thread', 'Lock', 'RLock', 'Event', 'Condition', 'Semaphore'],
+            'asyncio': ['run', 'create_task', 'gather', 'sleep', 'wait_for', 'Queue']
+        }
+    
+    def _discover_installed_packages(self) -> None:
+        """Discover installed packages and their common symbols"""
+        try:
+            import pkg_resources
+            
+            for dist in pkg_resources.working_set:
+                package_name = dist.project_name.lower()
+                self.installed_packages.add(package_name)
+                
+                # Add common symbols for known packages
+                if package_name == 'numpy':
+                    self.import_mapping['numpy'] = ['array', 'zeros', 'ones', 'arange', 'linspace', 'random']
+                elif package_name == 'pandas':
+                    self.import_mapping['pandas'] = ['DataFrame', 'Series', 'read_csv', 'read_json', 'concat']
+                elif package_name == 'requests':
+                    self.import_mapping['requests'] = ['get', 'post', 'put', 'delete', 'Session', 'Response']
+                elif package_name == 'flask':
+                    self.import_mapping['flask'] = ['Flask', 'request', 'jsonify', 'render_template', 'redirect']
+                elif package_name == 'fastapi':
+                    self.import_mapping['fastapi'] = ['FastAPI', 'Depends', 'HTTPException', 'status', 'Request']
+                elif package_name == 'pydantic':
+                    self.import_mapping['pydantic'] = ['BaseModel', 'Field', 'validator', 'ValidationError']
+                elif package_name == 'click':
+                    self.import_mapping['click'] = ['command', 'option', 'argument', 'group', 'echo', 'Context']
+                
+        except ImportError:
+            # Fallback: scan site-packages if pkg_resources not available
+            import site
+            for site_path in site.getsitepackages():
+                site_packages = Path(site_path)
+                if site_packages.exists():
+                    for item in site_packages.iterdir():
+                        if item.is_dir() and not item.name.startswith('.'):
+                            self.installed_packages.add(item.name.lower())
+    
+    def _analyze_local_modules(self) -> None:
+        """Analyze local Python modules and their exported symbols"""
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        for py_file in python_files:
+            try:
+                relative_path = py_file.relative_to(self.repo_path)
+                module_name = str(relative_path).replace('/', '.').replace('\\', '.')[:-3]  # Remove .py
+                
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                tree = ast.parse(content)
+                symbols = self._extract_module_symbols(tree)
+                
+                self.local_modules[module_name] = {
+                    'file_path': str(py_file),
+                    'symbols': symbols,
+                    'is_package': py_file.name == '__init__.py'
+                }
+                
+            except Exception as e:
+                logging.debug(f"Failed to analyze local module {py_file}: {e}")
+    
+    def _extract_module_symbols(self, tree: ast.AST) -> Dict[str, str]:
+        """Extract symbols (functions, classes, variables) from an AST"""
+        symbols = {}
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                symbols[node.name] = 'function'
+            elif isinstance(node, ast.ClassDef):
+                symbols[node.name] = 'class'
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        symbols[target.id] = 'variable'
+        
+        return symbols
+    
+    def _analyze_import_usage_patterns(self) -> None:
+        """Analyze how imports are used across the codebase to build usage patterns"""
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                tree = ast.parse(content)
+                file_imports = self._extract_file_imports(tree)
+                file_usage = self._extract_symbol_usage(tree)
+                
+                # Map imports to their usage
+                for import_info in file_imports:
+                    module = import_info['module']
+                    symbols = import_info['symbols']
+                    
+                    if module not in self.import_usage_patterns:
+                        self.import_usage_patterns[module] = {'files': set(), 'symbols': {}}
+                    
+                    self.import_usage_patterns[module]['files'].add(str(py_file))
+                    
+                    for symbol in symbols:
+                        if symbol not in self.import_usage_patterns[module]['symbols']:
+                            self.import_usage_patterns[module]['symbols'][symbol] = 0
+                        
+                        # Count usage in this file
+                        usage_count = file_usage.get(symbol, 0)
+                        self.import_usage_patterns[module]['symbols'][symbol] += usage_count
+                
+            except Exception as e:
+                logging.debug(f"Failed to analyze import patterns in {py_file}: {e}")
+    
+    def _extract_file_imports(self, tree: ast.AST) -> List[Dict]:
+        """Extract import statements and their symbols from an AST"""
+        imports = []
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append({
+                        'module': alias.name,
+                        'symbols': [alias.asname or alias.name.split('.')[-1]],
+                        'type': 'import'
+                    })
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    symbols = [alias.asname or alias.name for alias in node.names]
+                    imports.append({
+                        'module': node.module,
+                        'symbols': symbols,
+                        'type': 'from_import'
+                    })
+        
+        return imports
+    
+    def _extract_symbol_usage(self, tree: ast.AST) -> Dict[str, int]:
+        """Count how many times each symbol is used in the code"""
+        usage_counts = {}
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                symbol = node.id
+                usage_counts[symbol] = usage_counts.get(symbol, 0) + 1
+            elif isinstance(node, ast.Attribute):
+                if isinstance(node.value, ast.Name):
+                    symbol = node.value.id
+                    usage_counts[symbol] = usage_counts.get(symbol, 0) + 1
+        
+        return usage_counts
+    
+    def suggest_smart_import(self, symbol_name: str, context_file: Path) -> Optional[Dict[str, Any]]:
+        """Suggest the best import for a given symbol with high confidence scoring"""
+        suggestions = []
+        
+        # Check cache first for performance
+        cache_key = f"{symbol_name}:{context_file}"
+        if cache_key in self.smart_import_cache:
+            return self.smart_import_cache[cache_key]
+        
+        # Search in standard library
+        std_suggestions = self._search_standard_library(symbol_name)
+        suggestions.extend(std_suggestions)
+        
+        # Search in installed packages
+        pkg_suggestions = self._search_installed_packages(symbol_name)
+        suggestions.extend(pkg_suggestions)
+        
+        # Search in local modules
+        local_suggestions = self._search_local_modules(symbol_name, context_file)
+        suggestions.extend(local_suggestions)
+        
+        # Search based on usage patterns
+        pattern_suggestions = self._search_usage_patterns(symbol_name)
+        suggestions.extend(pattern_suggestions)
+        
+        # Rank suggestions by confidence and context relevance
+        if suggestions:
+            best_suggestion = self._rank_import_suggestions(suggestions, context_file)
+            self.smart_import_cache[cache_key] = best_suggestion
+            return best_suggestion
+        
+        return None
+    
+    def _search_standard_library(self, symbol_name: str) -> List[Dict[str, Any]]:
+        """Search for symbol in standard library modules"""
+        suggestions = []
+        
+        for module, symbols in self.import_mapping.items():
+            if module in self.standard_library_modules and symbol_name in symbols:
+                suggestions.append({
+                    'module': module,
+                    'symbol': symbol_name,
+                    'import_statement': f"from {module} import {symbol_name}",
+                    'confidence': 0.9,  # High confidence for standard library
+                    'source': 'standard_library'
+                })
+        
+        return suggestions
+    
+    def _search_installed_packages(self, symbol_name: str) -> List[Dict[str, Any]]:
+        """Search for symbol in installed packages"""
+        suggestions = []
+        
+        for module, symbols in self.import_mapping.items():
+            if module in self.installed_packages and symbol_name in symbols:
+                suggestions.append({
+                    'module': module,
+                    'symbol': symbol_name,
+                    'import_statement': f"from {module} import {symbol_name}",
+                    'confidence': 0.8,  # High confidence for known packages
+                    'source': 'installed_package'
+                })
+        
+        return suggestions
+    
+    def _search_local_modules(self, symbol_name: str, context_file: Path) -> List[Dict[str, Any]]:
+        """Search for symbol in local modules with path-based confidence scoring"""
+        suggestions = []
+        
+        for module_name, module_info in self.local_modules.items():
+            if symbol_name in module_info['symbols']:
+                # Calculate confidence based on file proximity
+                module_path = Path(module_info['file_path'])
+                confidence = self._calculate_proximity_confidence(context_file, module_path)
+                
+                # Adjust import statement based on relative location
+                import_statement = self._generate_local_import_statement(
+                    context_file, module_path, module_name, symbol_name
+                )
+                
+                suggestions.append({
+                    'module': module_name,
+                    'symbol': symbol_name,
+                    'import_statement': import_statement,
+                    'confidence': confidence,
+                    'source': 'local_module',
+                    'file_path': module_info['file_path']
+                })
+        
+        return suggestions
+    
+    def _search_usage_patterns(self, symbol_name: str) -> List[Dict[str, Any]]:
+        """Search based on existing usage patterns in the codebase"""
+        suggestions = []
+        
+        for module, pattern_info in self.import_usage_patterns.items():
+            if symbol_name in pattern_info['symbols']:
+                usage_count = pattern_info['symbols'][symbol_name]
+                file_count = len(pattern_info['files'])
+                
+                # Calculate confidence based on usage frequency
+                confidence = min(0.7, 0.3 + (usage_count * file_count) / 100)
+                
+                suggestions.append({
+                    'module': module,
+                    'symbol': symbol_name,
+                    'import_statement': f"from {module} import {symbol_name}",
+                    'confidence': confidence,
+                    'source': 'usage_pattern',
+                    'usage_count': usage_count,
+                    'file_count': file_count
+                })
+        
+        return suggestions
+    
+    def _calculate_proximity_confidence(self, context_file: Path, target_file: Path) -> float:
+        """Calculate confidence based on file proximity in the project structure"""
+        try:
+            context_parts = context_file.relative_to(self.repo_path).parts
+            target_parts = target_file.relative_to(self.repo_path).parts
+            
+            # Same directory = high confidence
+            if context_parts[:-1] == target_parts[:-1]:
+                return 0.9
+            
+            # Parent/child relationship = medium-high confidence
+            if len(context_parts) > 1 and context_parts[:-2] == target_parts[:-1]:
+                return 0.7
+            
+            # Same top-level package = medium confidence
+            if context_parts[0] == target_parts[0]:
+                return 0.6
+            
+            # Different packages = lower confidence
+            return 0.4
+            
+        except ValueError:
+            # Files not in repo structure
+            return 0.3
+    
+    def _generate_local_import_statement(self, context_file: Path, target_file: Path, 
+                                       module_name: str, symbol_name: str) -> str:
+        """Generate appropriate import statement for local modules"""
+        try:
+            context_parts = context_file.relative_to(self.repo_path).parts[:-1]  # Remove filename
+            target_parts = target_file.relative_to(self.repo_path).parts[:-1]   # Remove filename
+            
+            # If in same directory, use simple relative import
+            if context_parts == target_parts:
+                target_module = target_file.stem
+                return f"from .{target_module} import {symbol_name}"
+            
+            # Use full module path for other cases
+            return f"from {module_name} import {symbol_name}"
+            
+        except ValueError:
+            # Fallback to absolute import
+            return f"from {module_name} import {symbol_name}"
+    
+    def _rank_import_suggestions(self, suggestions: List[Dict[str, Any]], 
+                               context_file: Path) -> Dict[str, Any]:
+        """Rank import suggestions and return the best one"""
+        if not suggestions:
+            return None
+        
+        # Sort by confidence score (descending)
+        suggestions.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        # Apply additional ranking factors
+        for suggestion in suggestions:
+            # Boost score for standard library
+            if suggestion['source'] == 'standard_library':
+                suggestion['confidence'] += 0.05
+            
+            # Boost score for local modules (prefer local over external)
+            elif suggestion['source'] == 'local_module':
+                suggestion['confidence'] += 0.02
+            
+            # Boost score for frequently used patterns
+            elif suggestion['source'] == 'usage_pattern':
+                usage_boost = min(0.1, suggestion.get('usage_count', 0) / 50)
+                suggestion['confidence'] += usage_boost
+        
+        # Re-sort after applying boosts
+        suggestions.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        return suggestions[0]
+    
+    def optimize_imports_in_file(self, file_path: Path) -> Dict[str, Any]:
+        """Optimize imports in a file using smart analysis"""
+        optimization_result = {
+            'redundant_removed': 0,
+            'missing_added': 0,
+            'reorganized': False,
+            'suggestions': []
+        }
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            
+            # Analyze current imports
+            current_imports = self._extract_file_imports(tree)
+            used_symbols = self._extract_symbol_usage(tree)
+            
+            # Find redundant imports
+            redundant_imports = self._find_redundant_imports(current_imports, used_symbols)
+            optimization_result['redundant_removed'] = len(redundant_imports)
+            
+            # Find missing imports
+            missing_symbols = self._find_missing_imports(tree, current_imports)
+            suggested_imports = []
+            
+            for symbol in missing_symbols:
+                suggestion = self.suggest_smart_import(symbol, file_path)
+                if suggestion:
+                    suggested_imports.append(suggestion)
+            
+            optimization_result['missing_added'] = len(suggested_imports)
+            optimization_result['suggestions'] = suggested_imports
+            
+            return optimization_result
+            
+        except Exception as e:
+            logging.error(f"Failed to optimize imports in {file_path}: {e}")
+            return optimization_result
+    
+    def _find_redundant_imports(self, imports: List[Dict], used_symbols: Dict[str, int]) -> List[Dict]:
+        """Find imports that are not used in the code"""
+        redundant = []
+        
+        for import_info in imports:
+            for symbol in import_info['symbols']:
+                if symbol not in used_symbols or used_symbols[symbol] == 0:
+                    redundant.append({
+                        'module': import_info['module'],
+                        'symbol': symbol,
+                        'type': import_info['type']
+                    })
+        
+        return redundant
+    
+    def _find_missing_imports(self, tree: ast.AST, current_imports: List[Dict]) -> Set[str]:
+        """Find symbols that are used but not imported"""
+        # Get all imported symbols
+        imported_symbols = set()
+        for import_info in current_imports:
+            imported_symbols.update(import_info['symbols'])
+        
+        # Get all used symbols
+        used_symbols = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                used_symbols.add(node.id)
+        
+        # Find undefined symbols (used but not imported and not builtin)
+        builtin_names = set(dir(__builtins__))
+        undefined_symbols = used_symbols - imported_symbols - builtin_names
+        
+        # Filter out local definitions (functions, classes, variables defined in the file)
+        local_definitions = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                local_definitions.add(node.name)
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        local_definitions.add(target.id)
+        
+        return undefined_symbols - local_definitions
 
 
 class SurgicalFixEngine:
@@ -469,6 +952,11 @@ class MCPAutofix:
             self.high_res_analyzer = HighResolutionAnalyzer(self.repo_path, self.config)
             self.surgical_engine = SurgicalFixEngine(self.repo_path, self.config)
             self.log("🔬 High resolution mode enabled", "info")
+            
+            # Initialize smart import analysis
+            self.log("🧠 Initializing smart import analysis...", "verbose")
+            self.high_res_analyzer.initialize_smart_import_analysis()
+            self.log("✅ Smart import analysis ready", "verbose")
         
         self.logger.info(f"Enhanced MCPAutofix initialized - Session ID: {self.session_id}")
         self.logger.info(f"Repository: {self.repo_path}")
@@ -1045,9 +1533,45 @@ class MCPAutofix:
             return None
     
     def _extract_function_imports(self, func_node: ast.FunctionDef, content: str) -> str:
-        """Extract imports needed by a function"""
+        """Extract imports needed by a function using smart analysis"""
         try:
             tree = ast.parse(content)
+            needed_imports = set()
+            
+            # Use smart import analysis if available
+            if hasattr(self, 'high_res_analyzer') and self.config.enable_high_resolution:
+                # Find all names used in the function
+                for node in ast.walk(func_node):
+                    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                        needed_imports.add(node.id)
+                    elif isinstance(node, ast.Attribute):
+                        if isinstance(node.value, ast.Name):
+                            needed_imports.add(node.value.id)
+                
+                # Get smart import suggestions for each needed symbol
+                import_statements = set()
+                
+                for symbol in needed_imports:
+                    suggestion = self.high_res_analyzer.suggest_smart_import(
+                        symbol, Path(content) if isinstance(content, str) else content
+                    )
+                    
+                    if suggestion:
+                        import_statements.add(suggestion['import_statement'])
+                    else:
+                        # Fallback: check if it's in current file's imports
+                        current_imports = self.high_res_analyzer._extract_file_imports(tree)
+                        for import_info in current_imports:
+                            if symbol in import_info['symbols']:
+                                if import_info['type'] == 'import':
+                                    import_statements.add(f"import {import_info['module']}")
+                                else:
+                                    import_statements.add(f"from {import_info['module']} import {symbol}")
+                                break
+                
+                return '\n'.join(sorted(import_statements)) if import_statements else ""
+            
+            # Fallback to original logic
             needed_imports = set()
             
             # Find all names used in the function
@@ -1198,11 +1722,42 @@ class MCPAutofix:
             return False
     
     def _fix_missing_imports(self, file_path: Path, content: str) -> bool:
-        """Fix imports that might be missing after function moves"""
+        """Fix imports that might be missing after function moves using smart analysis"""
         try:
             tree = ast.parse(content)
             
-            # Find undefined names
+            # Use smart import analysis if available
+            if hasattr(self, 'high_res_analyzer') and self.config.enable_high_resolution:
+                optimization_result = self.high_res_analyzer.optimize_imports_in_file(file_path)
+                
+                if optimization_result['missing_added'] > 0:
+                    lines = content.split('\n')
+                    
+                    # Find where to insert imports
+                    import_insert_index = self._find_import_insertion_point(lines)
+                    
+                    # Add suggested imports
+                    new_imports = []
+                    for suggestion in optimization_result['suggestions']:
+                        import_statement = suggestion['import_statement']
+                        if import_statement not in lines:  # Avoid duplicates
+                            new_imports.append(import_statement)
+                    
+                    if new_imports:
+                        # Insert new imports at appropriate location
+                        for i, import_stmt in enumerate(new_imports):
+                            lines.insert(import_insert_index + i, import_stmt)
+                        
+                        # Write back
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write('\n'.join(lines))
+                        
+                        self.log(f"Added {len(new_imports)} smart imports to {file_path}", "verbose")
+                        return True
+                
+                return optimization_result['missing_added'] > 0
+            
+            # Fallback to original logic if smart analysis not available
             defined_names = set()
             used_names = set()
             
@@ -1222,13 +1777,7 @@ class MCPAutofix:
                 import_line = f"from utils.functions import {', '.join(undefined_names)}"
                 
                 # Find where to insert the import
-                insert_index = 0
-                for i, line in enumerate(lines):
-                    if line.strip().startswith('import ') or line.strip().startswith('from '):
-                        insert_index = i + 1
-                    elif line.strip() and not line.strip().startswith('#'):
-                        break
-                
+                insert_index = self._find_import_insertion_point(lines)
                 lines.insert(insert_index, import_line)
                 
                 # Write back
@@ -1242,6 +1791,49 @@ class MCPAutofix:
         except Exception as e:
             self.log(f"Error fixing missing imports: {e}", "error")
             return False
+    
+    def _find_import_insertion_point(self, lines: List[str]) -> int:
+        """Find the best location to insert new import statements"""
+        insert_index = 0
+        
+        # Skip initial comments and docstrings
+        in_docstring = False
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            
+            # Skip empty lines and comments at the top
+            if not stripped or stripped.startswith('#'):
+                continue
+            
+            # Handle docstrings
+            if stripped.startswith('"""') or stripped.startswith("'''"):
+                if not in_docstring:
+                    in_docstring = True
+                    continue
+                else:
+                    in_docstring = False
+                    continue
+            
+            if in_docstring:
+                continue
+            
+            # Found first non-comment, non-docstring line
+            if stripped.startswith('import ') or stripped.startswith('from '):
+                # Find the end of existing imports
+                for j in range(i, len(lines)):
+                    next_line = lines[j].strip()
+                    if next_line and not next_line.startswith(('import ', 'from ', '#')):
+                        insert_index = j
+                        break
+                else:
+                    insert_index = len(lines)
+                break
+            else:
+                # No existing imports, insert at current position
+                insert_index = i
+                break
+        
+        return insert_index
     
     def _fix_orphaned_init_methods(self, file_path: Path) -> bool:
         """Fix orphaned __init__ methods (the core issue from the comment)"""
@@ -3000,7 +3592,71 @@ def {func_call.name}(*args, **kwargs):
         self.log("Fixture failure detected - manual review required", "warning")
         return False
     
-    def fix_test_failures(self) -> Dict:
+    def fix_import_issues(self) -> Dict:
+        """Fix import-related issues using smart import analysis"""
+        self.log("Fixing import issues with smart analysis...")
+        
+        results = {
+            'files_processed': 0,
+            'files_modified': 0,
+            'redundant_removed': 0,
+            'missing_added': 0,
+            'imports_reorganized': 0,
+            'errors': []
+        }
+        
+        if not hasattr(self, 'high_res_analyzer') or not self.config.enable_high_resolution:
+            self.log("Smart import analysis not available, skipping", "warning")
+            return results
+        
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        # Filter out hidden files if configured
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        self.log(f"Processing {len(python_files)} Python files for import optimization", "verbose")
+        
+        for py_file in python_files:
+            results['files_processed'] += 1
+            
+            try:
+                if self.dry_run:
+                    self.log(f"[DRY RUN] Would optimize imports in {py_file}", "verbose")
+                    continue
+                
+                # Get optimization suggestions
+                optimization_result = self.high_res_analyzer.optimize_imports_in_file(py_file)
+                
+                if optimization_result['redundant_removed'] > 0 or optimization_result['missing_added'] > 0:
+                    results['files_modified'] += 1
+                    results['redundant_removed'] += optimization_result['redundant_removed']
+                    results['missing_added'] += optimization_result['missing_added']
+                    
+                    if optimization_result['reorganized']:
+                        results['imports_reorganized'] += 1
+                    
+                    self.log(f"Optimized imports in {py_file}: "
+                           f"+{optimization_result['missing_added']} "
+                           f"-{optimization_result['redundant_removed']}", "verbose")
+                
+            except Exception as e:
+                error_msg = f"Error optimizing imports in {py_file}: {e}"
+                self.log(error_msg, "error")
+                results['errors'].append(error_msg)
+        
+        # Summary
+        total_changes = results['redundant_removed'] + results['missing_added']
+        if total_changes > 0:
+            self.fixes_applied += 1  # Count as one logical fix
+            self.log(f"Import optimization completed: "
+                   f"{results['files_modified']} files modified, "
+                   f"{results['missing_added']} imports added, "
+                   f"{results['redundant_removed']} redundant imports removed", "success")
+        else:
+            self.log("No import issues found to fix", "success")
+        
+        return results
         """Intelligently fix failing tests"""
         self.log("Fixing test failures...")
         
@@ -3345,8 +4001,23 @@ def {func_call.name}(*args, **kwargs):
                 # Build dependency graph for context-aware fixes
                 self.high_res_analyzer.dependency_graph = self.high_res_analyzer.build_dependency_graph()
                 self.log(f"  ✅ Dependency graph built: {len(self.high_res_analyzer.dependency_graph)} files mapped", "verbose")
+                
+                # Initialize smart import analysis for comprehensive import handling
+                self.log("  🧠 Initializing smart import analysis...", "verbose")
+                self.high_res_analyzer.initialize_smart_import_analysis()
+                
+                # Log smart import analysis statistics
+                std_lib_count = len(self.high_res_analyzer.standard_library_modules)
+                installed_count = len(self.high_res_analyzer.installed_packages)
+                local_count = len(self.high_res_analyzer.local_modules)
+                pattern_count = len(self.high_res_analyzer.import_usage_patterns)
+                
+                self.log(f"  ✅ Smart import analysis ready: {std_lib_count} stdlib, "
+                       f"{installed_count} packages, {local_count} local modules, "
+                       f"{pattern_count} usage patterns", "verbose")
+                
             except Exception as e:
-                self.log(f"  ⚠️ Dependency analysis failed: {e}", "warning")
+                self.log(f"  ⚠️ Higher resolution analysis initialization failed: {e}", "warning")
         
         # Environment validation
         if not self._validate_environment():
@@ -3360,6 +4031,7 @@ def {func_call.name}(*args, **kwargs):
         phases = [
             ('formatting', self.fix_code_formatting_high_res, 'High-resolution code formatting with Black and isort'),
             ('whitespace', self.fix_whitespace_issues_high_res, 'Surgical whitespace and formatting cleanup'),
+            ('import_optimization', self.fix_import_issues, 'Smart import analysis and optimization'),
             ('security_fixes', self.fix_security_issues, 'Security vulnerability fixes'),
             ('undefined_fixes', self.fix_undefined_functions, 'Undefined function resolution'),
             ('duplicate_fixes', self.fix_duplicate_functions, 'Duplicate function consolidation'),
