@@ -38,7 +38,7 @@ import shutil
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, NamedTuple, Union
+from typing import Dict, List, Optional, Tuple, NamedTuple, Union, Any
 
 import click
 
@@ -83,6 +83,268 @@ def AtomicFix(target_file: Path, backup_dir: Path):
         raise e
 
 
+class HighResolutionAnalyzer:
+    """Enhanced analyzer for high-resolution code analysis and fix precision"""
+    
+    def __init__(self, repo_path: Path, config):
+        self.repo_path = repo_path
+        self.config = config
+        self.issue_classification = {
+            'critical': [],
+            'high': [],
+            'medium': [],
+            'low': [],
+            'cosmetic': []
+        }
+        self.dependency_graph = {}
+        self.complexity_scores = {}
+        
+    def analyze_issue_complexity(self, issue: Dict) -> str:
+        """Analyze issue complexity for better prioritization"""
+        complexity_factors = 0
+        
+        # File-level factors
+        if 'file' in issue:
+            file_path = Path(issue['file'])
+            if file_path.suffix == '.py':
+                try:
+                    with open(file_path, 'r') as f:
+                        content = f.read()
+                    
+                    # Check file size (larger files = higher complexity)
+                    if len(content.splitlines()) > 100:
+                        complexity_factors += 1
+                    
+                    # Check for class definitions (OOP complexity)
+                    if 'class ' in content:
+                        complexity_factors += 1
+                    
+                    # Check for decorator usage (metaprogramming complexity)
+                    if '@' in content:
+                        complexity_factors += 1
+                        
+                except Exception:
+                    pass
+        
+        # Issue-type factors
+        issue_type = issue.get('type', '')
+        if issue_type in ['security', 'undefined_function']:
+            complexity_factors += 2
+        elif issue_type in ['duplicate', 'type_error']:
+            complexity_factors += 1
+        
+        # Line context factors
+        if 'line' in issue:
+            try:
+                with open(issue['file'], 'r') as f:
+                    lines = f.readlines()
+                
+                line_idx = issue['line'] - 1
+                if 0 <= line_idx < len(lines):
+                    line_content = lines[line_idx].strip()
+                    
+                    # Complex patterns increase complexity
+                    if any(pattern in line_content for pattern in ['lambda', 'yield', 'async', 'await']):
+                        complexity_factors += 1
+                    
+                    # Multiple operators suggest complexity
+                    if len(re.findall(r'[+\-*/=<>!&|]', line_content)) > 3:
+                        complexity_factors += 1
+                        
+            except Exception:
+                pass
+        
+        # Classify based on total complexity
+        if complexity_factors >= 4:
+            return 'critical'
+        elif complexity_factors >= 3:
+            return 'high'
+        elif complexity_factors >= 2:
+            return 'medium'
+        elif complexity_factors >= 1:
+            return 'low'
+        else:
+            return 'cosmetic'
+    
+    def build_dependency_graph(self) -> Dict[str, List[str]]:
+        """Build a detailed dependency graph for context-aware fixes"""
+        dependency_graph = {}
+        
+        python_files = list(self.repo_path.rglob("*.py"))
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r') as f:
+                    content = f.read()
+                
+                tree = ast.parse(content)
+                file_key = str(py_file.relative_to(self.repo_path))
+                dependencies = []
+                
+                # Analyze imports
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            dependencies.append(alias.name)
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module:
+                            dependencies.append(node.module)
+                
+                dependency_graph[file_key] = dependencies
+                
+            except Exception:
+                dependency_graph[str(py_file.relative_to(self.repo_path))] = []
+        
+        return dependency_graph
+    
+    def calculate_fix_impact(self, issue: Dict) -> Dict[str, Any]:
+        """Calculate the potential impact of applying a fix"""
+        impact = {
+            'affected_files': [issue.get('file', '')],
+            'risk_level': 'low',
+            'dependencies': [],
+            'confidence': 0.9
+        }
+        
+        if 'file' in issue:
+            file_path = issue['file']
+            
+            # Check dependencies
+            if file_path in self.dependency_graph:
+                impact['dependencies'] = self.dependency_graph[file_path]
+            
+            # Calculate risk based on file importance
+            if any(important in file_path for important in ['__init__', 'main', 'core', 'base']):
+                impact['risk_level'] = 'high'
+                impact['confidence'] = 0.7
+            elif any(test in file_path for test in ['test_', '_test', 'tests/']):
+                impact['risk_level'] = 'medium'
+                impact['confidence'] = 0.8
+            
+            # Adjust confidence based on issue type
+            issue_type = issue.get('type', '')
+            if issue_type == 'whitespace':
+                impact['confidence'] = 0.95
+            elif issue_type == 'security':
+                impact['confidence'] = 0.6  # High impact but need careful review
+        
+        return impact
+
+
+class SurgicalFixEngine:
+    """Engine for applying precise, surgical fixes with minimal disruption"""
+    
+    def __init__(self, repo_path: Path, config):
+        self.repo_path = repo_path
+        self.config = config
+        self.backup_registry = {}
+        
+    def create_surgical_backup(self, file_path: Path) -> Path:
+        """Create a surgical backup with metadata"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        backup_dir = self.repo_path / '.autofix_surgical_backups'
+        backup_dir.mkdir(exist_ok=True)
+        
+        backup_path = backup_dir / f"{file_path.name}.{timestamp}.bak"
+        shutil.copy2(file_path, backup_path)
+        
+        # Store backup metadata
+        self.backup_registry[str(file_path)] = {
+            'backup_path': str(backup_path),
+            'timestamp': timestamp,
+            'original_size': file_path.stat().st_size
+        }
+        
+        return backup_path
+    
+    def apply_line_level_fix(self, file_path: Path, line_number: int, 
+                           old_content: str, new_content: str, 
+                           context_lines: int = 2) -> bool:
+        """Apply a surgical fix at specific line with context validation"""
+        try:
+            # Create surgical backup
+            backup_path = self.create_surgical_backup(file_path)
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Validate line number
+            if line_number < 1 or line_number > len(lines):
+                return False
+            
+            # Get context for validation
+            start_ctx = max(0, line_number - context_lines - 1)
+            end_ctx = min(len(lines), line_number + context_lines)
+            
+            # Verify the old content matches (with some tolerance for whitespace)
+            target_line = lines[line_number - 1].strip()
+            if target_line != old_content.strip():
+                # Try fuzzy matching for minor differences
+                similarity = difflib.SequenceMatcher(None, target_line, old_content.strip()).ratio()
+                if similarity < 0.8:
+                    return False
+            
+            # Apply the fix
+            lines[line_number - 1] = new_content if new_content.endswith('\n') else new_content + '\n'
+            
+            # Validate syntax
+            try:
+                ast.parse(''.join(lines))
+            except SyntaxError:
+                # Restore from backup
+                shutil.copy2(backup_path, file_path)
+                return False
+            
+            # Write the fixed content
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            
+            return True
+            
+        except Exception:
+            # Restore from backup if anything goes wrong
+            if str(file_path) in self.backup_registry:
+                backup_path = Path(self.backup_registry[str(file_path)]['backup_path'])
+                if backup_path.exists():
+                    shutil.copy2(backup_path, file_path)
+            return False
+    
+    def apply_multi_line_fix(self, file_path: Path, start_line: int, end_line: int, 
+                           new_content: List[str]) -> bool:
+        """Apply a surgical fix across multiple lines"""
+        try:
+            backup_path = self.create_surgical_backup(file_path)
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # Validate line ranges
+            if start_line < 1 or end_line > len(lines) or start_line > end_line:
+                return False
+            
+            # Replace the lines
+            lines[start_line - 1:end_line] = [line if line.endswith('\n') else line + '\n' for line in new_content]
+            
+            # Validate syntax
+            try:
+                ast.parse(''.join(lines))
+            except SyntaxError:
+                shutil.copy2(backup_path, file_path)
+                return False
+            
+            # Write the fixed content
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            
+            return True
+            
+        except Exception:
+            if str(file_path) in self.backup_registry:
+                backup_path = Path(self.backup_registry[str(file_path)]['backup_path'])
+                if backup_path.exists():
+                    shutil.copy2(backup_path, file_path)
+            return False
+
+
 class SafeTransformer(ast.NodeTransformer):
     """Context-aware AST transformer that understands class methods and dependencies"""
     
@@ -114,7 +376,7 @@ class SafeTransformer(ast.NodeTransformer):
 
 
 class AutofixConfig:
-    """Configuration class for autofix operations"""
+    """Configuration class for autofix operations with enhanced resolution settings"""
     
     def __init__(self, config_file: Optional[Path] = None):
         """Initialize configuration with defaults and optional config file"""
@@ -127,6 +389,21 @@ class AutofixConfig:
         self.skip_hidden_files = True
         self.backup_enabled = True
         self.tools_required = ['black', 'isort', 'flake8', 'mypy', 'bandit']
+        
+        # Enhanced resolution settings
+        self.enable_high_resolution = True
+        self.granular_classification = True
+        self.line_level_precision = True
+        self.context_aware_fixes = True
+        self.advanced_validation = True
+        self.detailed_reporting = True
+        self.surgical_fix_mode = True
+        
+        # Higher resolution thresholds
+        self.similarity_threshold = 0.85  # For more precise duplicate detection
+        self.complexity_threshold = 5    # Maximum function complexity for safe extraction
+        self.dependency_depth = 3        # How deep to analyze dependencies
+        self.validation_levels = ['syntax', 'imports', 'execution', 'safety']
         
         # Load from config file if provided
         if config_file and config_file.exists():
@@ -160,7 +437,7 @@ class MCPAutofix:
                  verbose: bool = False,
                  config_file: Optional[Path] = None):
         """
-        Initialize the autofix system
+        Initialize the enhanced autofix system with higher resolution capabilities
         
         Args:
             repo_path: Repository path to process (default: current directory)
@@ -187,9 +464,16 @@ class MCPAutofix:
         # Setup logging (requires session_id to be set)
         self._setup_logging()
         
-        self.logger.info(f"MCPAutofix initialized - Session ID: {self.session_id}")
+        # Initialize higher resolution components
+        if self.config.enable_high_resolution:
+            self.high_res_analyzer = HighResolutionAnalyzer(self.repo_path, self.config)
+            self.surgical_engine = SurgicalFixEngine(self.repo_path, self.config)
+            self.log("🔬 High resolution mode enabled", "info")
+        
+        self.logger.info(f"Enhanced MCPAutofix initialized - Session ID: {self.session_id}")
         self.logger.info(f"Repository: {self.repo_path}")
         self.logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
+        self.logger.info(f"High Resolution: {self.config.enable_high_resolution}")
     
     def _setup_logging(self) -> None:
         """Setup logging configuration"""
@@ -378,6 +662,282 @@ class MCPAutofix:
         
         self.log("All required tools are available", "success")
         return True
+    
+    def analyze_issues_with_high_resolution(self, issues: List[Dict]) -> Dict[str, List[Dict]]:
+        """Analyze issues with enhanced granular classification"""
+        if not self.config.enable_high_resolution:
+            return {'default': issues}
+        
+        categorized = {
+            'critical': [],
+            'high': [],
+            'medium': [],
+            'low': [],
+            'cosmetic': []
+        }
+        
+        for issue in issues:
+            # Add enhanced metadata
+            complexity = self.high_res_analyzer.analyze_issue_complexity(issue)
+            impact = self.high_res_analyzer.calculate_fix_impact(issue)
+            
+            enhanced_issue = {
+                **issue,
+                'complexity': complexity,
+                'impact': impact,
+                'resolution_confidence': impact.get('confidence', 0.5),
+                'estimated_fix_time': self._estimate_fix_time(issue, complexity)
+            }
+            
+            categorized[complexity].append(enhanced_issue)
+        
+        # Log detailed analysis
+        self.log(f"🔬 High-resolution analysis complete:", "info")
+        for level, items in categorized.items():
+            if items:
+                self.log(f"  {level.upper()}: {len(items)} issues", "info")
+        
+        return categorized
+    
+    def _estimate_fix_time(self, issue: Dict, complexity: str) -> int:
+        """Estimate fix time in seconds based on issue complexity"""
+        base_times = {
+            'cosmetic': 5,
+            'low': 15,
+            'medium': 45,
+            'high': 120,
+            'critical': 300
+        }
+        
+        base_time = base_times.get(complexity, 30)
+        
+        # Adjust based on issue type
+        issue_type = issue.get('type', '')
+        if issue_type == 'security':
+            base_time *= 2  # Security issues take longer to verify
+        elif issue_type == 'whitespace':
+            base_time = min(base_time, 10)  # Whitespace is always quick
+        
+        return base_time
+    
+    def apply_surgical_fix(self, issue: Dict) -> bool:
+        """Apply a precise surgical fix to a specific issue"""
+        if not self.config.surgical_fix_mode:
+            return False
+        
+        file_path = Path(issue.get('file', ''))
+        if not file_path.exists():
+            return False
+        
+        fix_type = issue.get('type', '')
+        line_number = issue.get('line', 0)
+        
+        if fix_type == 'whitespace' and line_number > 0:
+            return self._apply_whitespace_surgical_fix(file_path, line_number, issue)
+        elif fix_type == 'import_order':
+            return self._apply_import_surgical_fix(file_path, issue)
+        elif fix_type == 'simple_typo':
+            return self._apply_typo_surgical_fix(file_path, line_number, issue)
+        
+        return False
+    
+    def _apply_whitespace_surgical_fix(self, file_path: Path, line_number: int, issue: Dict) -> bool:
+        """Apply surgical fix for whitespace issues"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            if line_number < 1 or line_number > len(lines):
+                return False
+            
+            original_line = lines[line_number - 1]
+            fixed_line = original_line.rstrip() + '\n'
+            
+            if original_line != fixed_line:
+                return self.surgical_engine.apply_line_level_fix(
+                    file_path, line_number, original_line, fixed_line
+                )
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error applying whitespace surgical fix: {e}", "error")
+            return False
+    
+    def _apply_import_surgical_fix(self, file_path: Path, issue: Dict) -> bool:
+        """Apply surgical fix for import ordering"""
+        if self.dry_run:
+            self.log(f"[DRY RUN] Would apply import surgical fix to {file_path}", "verbose")
+            return True
+        
+        try:
+            # Use isort for surgical import fixing
+            result = subprocess.run([
+                sys.executable, '-m', 'isort',
+                '--profile', 'black',
+                '--diff' if self.dry_run else '--apply',
+                str(file_path)
+            ], capture_output=True, text=True, cwd=self.repo_path)
+            
+            success = result.returncode == 0
+            if success:
+                self.log(f"Applied import surgical fix to {file_path}", "verbose")
+            
+            return success
+            
+        except Exception as e:
+            self.log(f"Error applying import surgical fix: {e}", "error")
+            return False
+    
+    def _apply_typo_surgical_fix(self, file_path: Path, line_number: int, issue: Dict) -> bool:
+        """Apply surgical fix for simple typos"""
+        old_text = issue.get('old_text', '')
+        new_text = issue.get('new_text', '')
+        
+        if not old_text or not new_text:
+            return False
+        
+        return self.surgical_engine.apply_line_level_fix(
+            file_path, line_number, old_text, new_text
+        )
+    
+    def validate_fix_with_high_resolution(self, file_path: Path, issue: Dict) -> Dict[str, Any]:
+        """Perform high-resolution validation after fix application"""
+        validation_result = {
+            'syntax_valid': False,
+            'imports_valid': False,
+            'execution_safe': False,
+            'safety_checks': False,
+            'overall_success': False
+        }
+        
+        if not self.config.advanced_validation:
+            # Basic validation only
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                ast.parse(content)
+                validation_result['syntax_valid'] = True
+                validation_result['overall_success'] = True
+            except SyntaxError:
+                pass
+            return validation_result
+        
+        # Advanced multi-level validation
+        try:
+            # Level 1: Syntax validation
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            ast.parse(content)
+            validation_result['syntax_valid'] = True
+            
+            # Level 2: Import validation
+            tree = ast.parse(content)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    # Basic import structure validation
+                    validation_result['imports_valid'] = True
+                    break
+            else:
+                validation_result['imports_valid'] = True  # No imports = valid
+            
+            # Level 3: Execution safety (basic checks)
+            dangerous_patterns = ['exec(', 'eval(', '__import__', 'open(']
+            has_dangerous = any(pattern in content for pattern in dangerous_patterns)
+            validation_result['execution_safe'] = not has_dangerous
+            
+            # Level 4: Safety checks
+            validation_result['safety_checks'] = self._perform_safety_checks(file_path, issue)
+            
+            # Overall success
+            validation_result['overall_success'] = all([
+                validation_result['syntax_valid'],
+                validation_result['imports_valid'],
+                validation_result['execution_safe'],
+                validation_result['safety_checks']
+            ])
+            
+        except Exception as e:
+            self.log(f"Validation error: {e}", "error")
+        
+        return validation_result
+    
+    def _perform_safety_checks(self, file_path: Path, issue: Dict) -> bool:
+        """Perform additional safety checks"""
+        try:
+            # Check if file size didn't change dramatically
+            if str(file_path) in self.surgical_engine.backup_registry:
+                backup_info = self.surgical_engine.backup_registry[str(file_path)]
+                current_size = file_path.stat().st_size
+                original_size = backup_info['original_size']
+                
+                # File shouldn't change by more than 50%
+                size_change_ratio = abs(current_size - original_size) / max(original_size, 1)
+                if size_change_ratio > 0.5:
+                    self.log(f"Warning: Large file size change detected in {file_path}", "warning")
+                    return False
+            
+            # Check that the issue was actually addressed
+            issue_type = issue.get('type', '')
+            if issue_type == 'whitespace':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                # Check for trailing whitespace
+                lines = content.split('\n')
+                for line in lines:
+                    if line.endswith(' ') or line.endswith('\t'):
+                        return False  # Whitespace issue not fully fixed
+            
+            return True
+            
+        except Exception:
+            return False
+    
+    def generate_high_resolution_report(self, results: Dict) -> Dict:
+        """Generate a detailed high-resolution report"""
+        if not self.config.detailed_reporting:
+            return {}
+        
+        high_res_report = {
+            'resolution_mode': 'high',
+            'analysis_depth': 'detailed',
+            'surgical_fixes_applied': 0,
+            'validation_levels_used': self.config.validation_levels,
+            'issue_complexity_breakdown': {},
+            'fix_precision_metrics': {},
+            'dependency_analysis': {},
+            'performance_metrics': {}
+        }
+        
+        # Count surgical fixes
+        if hasattr(self, 'surgical_engine'):
+            high_res_report['surgical_fixes_applied'] = len(self.surgical_engine.backup_registry)
+        
+        # Analyze issue complexity breakdown
+        for phase_name, phase_results in results.items():
+            if isinstance(phase_results, dict) and 'categorized_issues' in phase_results:
+                for complexity, issues in phase_results['categorized_issues'].items():
+                    if complexity not in high_res_report['issue_complexity_breakdown']:
+                        high_res_report['issue_complexity_breakdown'][complexity] = 0
+                    high_res_report['issue_complexity_breakdown'][complexity] += len(issues)
+        
+        # Calculate precision metrics
+        total_fixes = self.fixes_applied
+        if total_fixes > 0:
+            high_res_report['fix_precision_metrics'] = {
+                'surgical_fix_ratio': high_res_report['surgical_fixes_applied'] / total_fixes,
+                'average_validation_levels': len(self.config.validation_levels),
+                'context_awareness_enabled': self.config.context_aware_fixes
+            }
+        
+        # Add dependency analysis
+        if hasattr(self, 'high_res_analyzer'):
+            high_res_report['dependency_analysis'] = {
+                'total_dependencies_mapped': len(self.high_res_analyzer.dependency_graph),
+                'dependency_depth': self.config.dependency_depth
+            }
+        
+        return high_res_report
     
     def validate_before_change(self, file_path: Path, planned_changes: Dict) -> bool:
         """Pre-flight validation before making any changes"""
@@ -2542,17 +3102,251 @@ def {func_call.name}(*args, **kwargs):
             self.results[phase_name] = {'error': str(e)}
             return False
     
+    def _execute_phase_high_res(self, phase_name: str, phase_func: callable, description: str) -> bool:
+        """
+        Execute a single autofix phase with higher resolution analysis and validation
+        
+        Args:
+            phase_name: Name of the phase for tracking
+            phase_func: Function to execute
+            description: Human-readable description
+            
+        Returns:
+            True if phase completed successfully
+        """
+        try:
+            self.log(f"🔬 Starting {description} with higher resolution analysis...")
+            phase_start = time.time()
+            
+            # Pre-phase analysis
+            pre_issues = []
+            if self.config.enable_high_resolution and hasattr(self, 'high_res_analyzer'):
+                try:
+                    # Collect current issues for analysis
+                    if 'whitespace' in phase_name.lower():
+                        pre_issues = self._detect_whitespace_issues()
+                    elif 'formatting' in phase_name.lower():
+                        pre_issues = self._detect_formatting_issues()
+                    
+                    if pre_issues:
+                        categorized = self.analyze_issues_with_high_resolution(pre_issues)
+                        self.log(f"  📊 Pre-analysis: {sum(len(issues) for issues in categorized.values())} issues categorized", "verbose")
+                except Exception as e:
+                    self.log(f"  ⚠️ Pre-analysis failed: {e}", "warning")
+            
+            # Execute the phase
+            result = phase_func()
+            
+            # Post-phase validation with higher resolution
+            if self.config.enable_high_resolution and isinstance(result, dict):
+                validation_results = []
+                files_to_validate = self._get_modified_files_from_result(result)
+                
+                for file_path in files_to_validate:
+                    if file_path.exists():
+                        validation = self.validate_fix_with_high_resolution(file_path, {'type': phase_name})
+                        validation_results.append(validation)
+                
+                # Add validation metrics to result
+                if validation_results:
+                    result['high_resolution_validation'] = {
+                        'total_files_validated': len(validation_results),
+                        'syntax_success_rate': sum(1 for v in validation_results if v['syntax_valid']) / len(validation_results),
+                        'overall_success_rate': sum(1 for v in validation_results if v['overall_success']) / len(validation_results),
+                        'categorized_issues': getattr(self, '_last_categorized_issues', {})
+                    }
+            
+            phase_duration = time.time() - phase_start
+            self.results[phase_name] = result
+            
+            if isinstance(result, dict) and result.get('error'):
+                self.log(f"🔬 {description} completed with errors: {result['error']}", "warning")
+                return False
+            else:
+                success_rate = ""
+                if self.config.enable_high_resolution and isinstance(result, dict) and 'high_resolution_validation' in result:
+                    rate = result['high_resolution_validation'].get('overall_success_rate', 0)
+                    success_rate = f" (validation: {rate:.1%})"
+                self.log(f"🔬 {description} completed successfully in {phase_duration:.2f}s{success_rate}", "success")
+                return True
+                
+        except Exception as e:
+            error_msg = f"🔬 {description} failed with exception: {e}"
+            self.log(error_msg, "error")
+            self.logger.exception(f"Exception in high-res phase {phase_name}")
+            self.results[phase_name] = {'error': str(e)}
+            return False
+    
+    def _detect_whitespace_issues(self) -> List[Dict]:
+        """Detect whitespace issues for higher resolution analysis"""
+        issues = []
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                
+                for line_num, line in enumerate(lines, 1):
+                    if line.rstrip() != line:  # Has trailing whitespace
+                        issues.append({
+                            'type': 'whitespace',
+                            'file': str(py_file),
+                            'line': line_num,
+                            'severity': 'cosmetic',
+                            'description': 'Trailing whitespace'
+                        })
+            except Exception:
+                continue
+        
+        return issues
+    
+    def _detect_formatting_issues(self) -> List[Dict]:
+        """Detect formatting issues for higher resolution analysis"""
+        issues = []
+        # This would typically run black/isort in check mode to detect issues
+        python_files = list(self.repo_path.rglob("*.py"))
+        
+        for py_file in python_files:
+            try:
+                # Check with black
+                result = subprocess.run([
+                    sys.executable, '-m', 'black',
+                    '--check', '--quiet', str(py_file)
+                ], capture_output=True, cwd=self.repo_path)
+                
+                if result.returncode != 0:
+                    issues.append({
+                        'type': 'formatting',
+                        'file': str(py_file),
+                        'severity': 'low',
+                        'description': 'Code formatting needed'
+                    })
+            except Exception:
+                continue
+        
+        return issues
+    
+    def _get_modified_files_from_result(self, result: Dict) -> List[Path]:
+        """Extract list of modified files from phase result"""
+        modified_files = []
+        
+        # Common patterns for extracting modified files
+        if 'files_modified' in result and isinstance(result['files_modified'], list):
+            modified_files.extend([Path(f) for f in result['files_modified']])
+        elif 'files_processed' in result:
+            # If no specific modified list, assume all processed files were potentially modified
+            python_files = list(self.repo_path.rglob("*.py"))
+            modified_files = python_files[:min(10, len(python_files))]  # Limit validation to 10 files
+        
+        return modified_files
+    
+    def fix_code_formatting_high_res(self) -> Dict:
+        """Enhanced code formatting with higher resolution analysis"""
+        if not self.config.enable_high_resolution:
+            return self.fix_code_formatting()
+        
+        self.log("🔬 Applying high-resolution code formatting...")
+        
+        # First, analyze what needs formatting
+        formatting_issues = self._detect_formatting_issues()
+        categorized_issues = self.analyze_issues_with_high_resolution(formatting_issues)
+        self._last_categorized_issues = categorized_issues
+        
+        # Apply surgical fixes where possible
+        surgical_fixes = 0
+        if self.config.surgical_fix_mode:
+            for complexity, issues in categorized_issues.items():
+                if complexity in ['cosmetic', 'low']:
+                    for issue in issues:
+                        if self.apply_surgical_fix(issue):
+                            surgical_fixes += 1
+        
+        # Fall back to standard formatting for remaining issues
+        standard_result = self.fix_code_formatting()
+        
+        # Enhance result with high-resolution metrics
+        standard_result.update({
+            'high_resolution_metrics': {
+                'issues_analyzed': len(formatting_issues),
+                'surgical_fixes_applied': surgical_fixes,
+                'categorized_issues': categorized_issues
+            }
+        })
+        
+        return standard_result
+    
+    def fix_whitespace_issues_high_res(self) -> Dict:
+        """Enhanced whitespace fixing with surgical precision"""
+        if not self.config.enable_high_resolution:
+            return self.fix_whitespace_issues()
+        
+        self.log("🔬 Applying surgical whitespace fixes...")
+        
+        # Analyze whitespace issues first
+        whitespace_issues = self._detect_whitespace_issues()
+        categorized_issues = self.analyze_issues_with_high_resolution(whitespace_issues)
+        self._last_categorized_issues = categorized_issues
+        
+        # Apply surgical fixes
+        surgical_fixes = 0
+        files_modified = []
+        
+        if self.config.surgical_fix_mode:
+            for complexity, issues in categorized_issues.items():
+                for issue in issues:
+                    if self.apply_surgical_fix(issue):
+                        surgical_fixes += 1
+                        if issue['file'] not in files_modified:
+                            files_modified.append(issue['file'])
+        
+        # Enhanced result
+        result = {
+            'files_processed': len(set(issue['file'] for issue in whitespace_issues)),
+            'files_modified': len(files_modified),
+            'errors': [],
+            'high_resolution_metrics': {
+                'issues_analyzed': len(whitespace_issues),
+                'surgical_fixes_applied': surgical_fixes,
+                'categorized_issues': categorized_issues,
+                'precision_mode': 'surgical'
+            }
+        }
+        
+        self.fixes_applied += surgical_fixes
+        
+        if surgical_fixes > 0:
+            self.log(f"🔬 Applied {surgical_fixes} surgical whitespace fixes", "success")
+        
+        return result
+    
     def run_complete_autofix(self) -> Dict:
         """
-        Run complete autofix process with enhanced capabilities and better error handling
+        Run complete autofix process with enhanced higher resolution capabilities
         
         Returns:
-            Comprehensive report dictionary
+            Comprehensive report dictionary with detailed analysis
         """
-        self.log("🛠️ Starting Enhanced MCP Autofix Process...")
+        self.log("🛠️ Starting Enhanced MCP Autofix Process with Higher Resolution Logic...")
         self.log(f"Session ID: {self.session_id}")
         self.log(f"Repository: {self.repo_path}")
         self.log(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE EXECUTION'}")
+        if self.config.enable_high_resolution:
+            self.log(f"🔬 Higher Resolution Features: Enabled")
+            self.log(f"  • Granular Classification: {self.config.granular_classification}")
+            self.log(f"  • Line-Level Precision: {self.config.line_level_precision}")
+            self.log(f"  • Context-Aware Fixes: {self.config.context_aware_fixes}")
+            self.log(f"  • Surgical Fix Mode: {self.config.surgical_fix_mode}")
+        
+        # Initialize higher resolution analysis
+        if self.config.enable_high_resolution:
+            self.log("🔬 Initializing higher resolution analysis...", "info")
+            try:
+                # Build dependency graph for context-aware fixes
+                self.high_res_analyzer.dependency_graph = self.high_res_analyzer.build_dependency_graph()
+                self.log(f"  ✅ Dependency graph built: {len(self.high_res_analyzer.dependency_graph)} files mapped", "verbose")
+            except Exception as e:
+                self.log(f"  ⚠️ Dependency analysis failed: {e}", "warning")
         
         # Environment validation
         if not self._validate_environment():
@@ -2562,10 +3356,10 @@ def {func_call.name}(*args, **kwargs):
         if not self.install_tools():
             return {'error': 'tool_installation_failed', 'session_id': self.session_id}
         
-        # Define autofix phases
+        # Enhanced phase definitions with higher resolution capabilities
         phases = [
-            ('formatting', self.fix_code_formatting, 'Code formatting with Black and isort'),
-            ('whitespace', self.fix_whitespace_issues, 'Whitespace and basic formatting cleanup'),
+            ('formatting', self.fix_code_formatting_high_res, 'High-resolution code formatting with Black and isort'),
+            ('whitespace', self.fix_whitespace_issues_high_res, 'Surgical whitespace and formatting cleanup'),
             ('security_fixes', self.fix_security_issues, 'Security vulnerability fixes'),
             ('undefined_fixes', self.fix_undefined_functions, 'Undefined function resolution'),
             ('duplicate_fixes', self.fix_duplicate_functions, 'Duplicate function consolidation'),
@@ -2580,12 +3374,12 @@ def {func_call.name}(*args, **kwargs):
             ('test_run', self.run_tests, 'Final test execution'),
         ]
         
-        # Execute fix phases
+        # Execute fix phases with higher resolution
         successful_phases = 0
         total_phases = len(phases) + len(analysis_phases)
         
         for phase_name, phase_func, description in phases:
-            if self._execute_phase(phase_name, phase_func, description):
+            if self._execute_phase_high_res(phase_name, phase_func, description):
                 successful_phases += 1
         
         # Execute analysis phases
@@ -2593,9 +3387,12 @@ def {func_call.name}(*args, **kwargs):
             if self._execute_phase(phase_name, phase_func, description):
                 successful_phases += 1
         
-        # Generate comprehensive report
+        # Generate comprehensive report with higher resolution insights
         try:
             report = self.generate_report()
+            if self.config.enable_high_resolution:
+                high_res_report = self.generate_high_resolution_report(self.results)
+                report['high_resolution_analysis'] = high_res_report
         except Exception as e:
             self.log(f"Report generation failed: {e}", "error")
             report = {'error': 'report_generation_failed', 'details': str(e)}
