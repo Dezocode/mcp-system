@@ -1,10 +1,18 @@
-# MCP Autofix Tool - Enhanced with Higher Resolution Logic
+# MCP Autofix Tool - Enhanced with Higher Resolution Logic & Smart Import Analysis
 
-Advanced, consolidated autofix tool with **higher resolution capabilities** that delivers precise, surgical code improvements using proven industry-standard tools with comprehensive error handling, detailed reporting, and configurable operation modes.
+Advanced, consolidated autofix tool with **higher resolution capabilities** and **intelligent import analysis** that delivers precise, surgical code improvements using proven industry-standard tools with comprehensive error handling, detailed reporting, and configurable operation modes.
 
 ## ✨ ENHANCED FEATURES:
 
-### 🔬 **Higher Resolution Capabilities (NEW)**
+### 🧠 **Smart Import Analysis (NEW)**
+✅ **Intelligent Import Suggestions**: Context-aware import recommendations with confidence scoring  
+✅ **Multi-Source Resolution**: Analyzes standard library, installed packages, and local modules  
+✅ **Usage Pattern Learning**: Learns from existing codebase import patterns  
+✅ **Redundant Import Detection**: Identifies and removes unused imports automatically  
+✅ **Missing Import Resolution**: Suggests optimal imports for undefined symbols  
+✅ **Context-Aware Confidence**: Proximity-based scoring for local module imports  
+
+### 🔬 **Higher Resolution Capabilities**
 ✅ **Granular Classification**: Issues categorized by complexity (critical/high/medium/low/cosmetic)  
 ✅ **Surgical Fix Precision**: Line-level targeting with minimal disruption  
 ✅ **Context-Aware Analysis**: Dependency graph analysis for intelligent fixes  
@@ -16,6 +24,7 @@ Advanced, consolidated autofix tool with **higher resolution capabilities** that
 ✅ **Code Formatting**: Uses `black` and `isort` for consistent formatting  
 ✅ **Security Analysis**: Uses `bandit` for vulnerability detection and automated fixes  
 ✅ **Quality Analysis**: Uses `flake8` and `mypy` for style and type checking  
+✅ **Smart Import Optimization**: Intelligent import analysis, cleanup, and suggestions  
 ✅ **Whitespace Cleanup**: Automated whitespace and formatting fixes with backup creation  
 ✅ **Function Resolution**: Intelligent undefined function detection and resolution  
 ✅ **Duplicate Elimination**: Smart duplicate code detection and consolidation  
@@ -146,17 +155,27 @@ The enhanced autofix process runs in carefully orchestrated phases with higher r
 1. **Environment Validation** - Verify Python version, file permissions, repository structure
 2. **Tool Installation** - Install and verify required tools (black, isort, flake8, mypy, bandit)
 3. **Higher Resolution Analysis** - Build dependency graph, analyze issue complexity
-4. **High-Resolution Code Formatting** - Apply Black and isort with surgical precision
-5. **Surgical Whitespace Cleanup** - Line-level whitespace fixes with validation
-6. **Security Fixes** - Detect and fix security vulnerabilities using Bandit
-7. **Function Resolution** - Resolve undefined functions through intelligent analysis
-8. **Duplicate Elimination** - Consolidate duplicate code into shared utilities
-9. **Type Error Fixes** - Add type annotations and fix type-related issues
-10. **Test Failure Repairs** - Analyze and repair test failures
-11. **Final Analysis** - Comprehensive security, quality, and test analysis
-12. **Enhanced Report Generation** - Create detailed reports with higher resolution insights
+4. **Smart Import Analysis** - Build import mappings, analyze usage patterns, prepare suggestions
+5. **High-Resolution Code Formatting** - Apply Black and isort with surgical precision
+6. **Surgical Whitespace Cleanup** - Line-level whitespace fixes with validation
+7. **Smart Import Optimization** - Intelligent import analysis, cleanup, and suggestions
+8. **Security Fixes** - Detect and fix security vulnerabilities using Bandit
+9. **Function Resolution** - Resolve undefined functions through intelligent analysis
+10. **Duplicate Elimination** - Consolidate duplicate code into shared utilities
+11. **Type Error Fixes** - Add type annotations and fix type-related issues
+12. **Test Failure Repairs** - Analyze and repair test failures
+13. **Final Analysis** - Comprehensive security, quality, and test analysis
+14. **Enhanced Report Generation** - Create detailed reports with higher resolution insights
 
 ## 🎯 HIGHER RESOLUTION FEATURES:
+
+### **🧠 Smart Import Analysis**
+- **Intelligent Suggestions**: Context-aware import recommendations using confidence scoring
+- **Multi-Source Resolution**: Standard library, installed packages, and local module analysis
+- **Usage Pattern Learning**: Analyzes existing import patterns across the codebase
+- **Redundant Detection**: Identifies and removes unused import statements
+- **Missing Resolution**: Suggests optimal imports for undefined symbols
+- **Proximity Scoring**: Higher confidence for nearby local modules
 
 ### **🔬 Granular Issue Classification**
 - **Critical**: Complex security issues, core system changes
@@ -187,6 +206,7 @@ The enhanced autofix process runs in carefully orchestrated phases with higher r
 
 After running enhanced autofix, expect:
 - **Consistent formatting** across all Python files with surgical precision
+- **Optimized imports** with intelligent cleanup and smart suggestions  
 - **Reduced security vulnerabilities** with specific fixes applied and validated
 - **Improved code quality** through automated cleanup with minimal disruption
 - **Better type safety** with enhanced annotations and context awareness
@@ -213,4 +233,4 @@ This enhanced tool integrates seamlessly with:
 - **Higher Resolution Validation**: Multi-level validation ensures fix quality
 - **Impact Analysis**: Risk assessment prevents dangerous changes
 
-This enhanced autofix tool with **higher resolution logic** represents a significant advancement in automated code maintenance, providing enterprise-grade reliability, surgical precision, and comprehensive coverage of code quality issues with minimal disruption to existing codebases.
+This enhanced autofix tool with **higher resolution logic** and **smart import analysis** represents a significant advancement in automated code maintenance, providing enterprise-grade reliability, surgical precision, intelligent import management, and comprehensive coverage of code quality issues with minimal disruption to existing codebases.
