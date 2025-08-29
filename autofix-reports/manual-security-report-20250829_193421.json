@@ -1,0 +1,432 @@
+{
+  "scan_type": "manual",
+  "timestamp": "2025-08-29T19:34:23.036969",
+  "total_issues": 35,
+  "issues_by_severity": {
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 35
+  },
+  "issues": [
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-docker-orchestration-integration.py",
+      "line_number": 548,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        548
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-claude-pipeline-enhanced.py",
+      "line_number": 386,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        386
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-claude-pipeline-enhanced.py",
+      "line_number": 442,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        442
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/rapid_fix.py",
+      "line_number": 60,
+      "issue_text": "proc = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        60
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 1586,
+      "issue_text": "dangerous_patterns = [\"exec(\", \"eval(\", \"__import__\", \"open(\"]",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of eval() detected",
+      "line_range": [
+        1586
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 1586,
+      "issue_text": "dangerous_patterns = [\"exec(\", \"eval(\", \"__import__\", \"open(\"]",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        1586
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2713,
+      "issue_text": "\"message\": \"subprocess call with shell=True detected\"",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2713
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2719,
+      "issue_text": "\"message\": \"Use of eval() detected\"",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of eval() detected",
+      "line_range": [
+        2719
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2725,
+      "issue_text": "\"message\": \"Use of exec() detected\"",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        2725
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2812,
+      "issue_text": "if security_issue.test_id == \"B602\":  # subprocess shell=True",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2812
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2836,
+      "issue_text": "\"\"\"Convert shell=True to shell=False with proper args\"\"\"",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2836
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2854,
+      "issue_text": "# Replace shell=True with shell=False",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2854
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2855,
+      "issue_text": "if \"shell=True\" in line:",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2855
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/scripts/autofix.py",
+      "line_number": 2856,
+      "issue_text": "new_line = line.replace(\"shell=True\", \"shell=False\")",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        2856
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-router.py",
+      "line_number": 165,
+      "issue_text": "result = subprocess.run(cmd, shell=True, capture_output=True, text=True)",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        165
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-router.py",
+      "line_number": 173,
+      "issue_text": "result = subprocess.run(cmd, shell=True, capture_output=True, text=True)",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        173
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 76,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        76
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 85,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        85
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 108,
+      "issue_text": "subprocess.run(cmd, shell=True, check=True)",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        108
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 120,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        120
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 155,
+      "issue_text": "subprocess.run(command, shell=True, cwd=path)",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        155
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-manager.py",
+      "line_number": 160,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        160
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-test-framework.py",
+      "line_number": 354,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        354
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-test-framework.py",
+      "line_number": 366,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        366
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-upgrader.py",
+      "line_number": 536,
+      "issue_text": "shell=True,",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        536
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/core/mcp-upgrader.py",
+      "line_number": 631,
+      "issue_text": "subprocess.run(command, shell=True, cwd=server.path)",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        631
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/pipeline-mcp/src/main.py",
+      "line_number": 312,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        312
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 227,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        227
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 250,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        250
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 267,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        267
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 292,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        292
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 310,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        310
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 351,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        351
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/mcp-tools/orchestrator/orchestrator/main.py",
+      "line_number": 580,
+      "issue_text": "process = await asyncio.create_subprocess_exec(",
+      "test_id": "code_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "Use of exec() detected",
+      "line_range": [
+        580
+      ]
+    },
+    {
+      "filename": "/home/runner/work/mcp-system/mcp-system/src/config/cross_platform.py",
+      "line_number": 285,
+      "issue_text": "# Use shell=True on Windows for better compatibility",
+      "test_id": "shell_injection",
+      "issue_severity": "HIGH",
+      "issue_confidence": "MEDIUM",
+      "more_info": "subprocess call with shell=True detected",
+      "line_range": [
+        285
+      ]
+    }
+  ]
+}
