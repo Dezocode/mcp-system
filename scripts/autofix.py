@@ -1,20 +1,44 @@
 #!/usr/bin/env python3
 """
 MCP Autofix Tool - Consolidated automated fixing system
-Integrates proven tools: black, isort, flake8, mypy, bandit
+
+This tool provides comprehensive automated code fixing capabilities using
+industry-standard tools. It integrates black, isort, flake8, mypy, and bandit
+to deliver reliable code improvements with safety validations.
+
+Features:
+    - Code formatting with black and isort
+    - Security vulnerability detection and fixes
+    - Quality analysis and improvements
+    - Undefined function resolution
+    - Duplicate code elimination
+    - Type error corrections
+    - Test failure repairs
+
+Best Practices Implemented:
+    - AST validation for all code changes
+    - Comprehensive error handling and logging
+    - Configurable operation modes
+    - Detailed progress reporting
+    - Safe rollback capabilities
 """
 
 import ast
 import difflib
 import importlib.util
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import time
+import shutil
+from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, NamedTuple
+from typing import Dict, List, Optional, Tuple, NamedTuple, Union
 
 import click
 
@@ -36,39 +60,218 @@ class SecurityIssue(NamedTuple):
     severity: str
 
 
+@contextmanager
+def AtomicFix(target_file: Path, backup_dir: Path):
+    """Context manager for atomic fixes with automatic rollback on failure"""
+    backup_file = None
+    try:
+        # Create backup before making changes
+        if target_file.exists():
+            backup_file = backup_dir / f"{target_file.name}.backup.{int(time.time())}"
+            shutil.copy2(target_file, backup_file)
+        
+        yield target_file
+        
+        # If we get here, the fix succeeded
+        
+    except Exception as e:
+        # Rollback on any failure
+        if backup_file and backup_file.exists():
+            if target_file.exists():
+                target_file.unlink()
+            shutil.copy2(backup_file, target_file)
+        raise e
+
+
+class SafeTransformer(ast.NodeTransformer):
+    """Context-aware AST transformer that understands class methods and dependencies"""
+    
+    def __init__(self):
+        self.class_context = []
+        self.function_context = []
+        self.dependencies = set()
+    
+    def visit_ClassDef(self, node):
+        """Track class context to identify class methods"""
+        self.class_context.append(node.name)
+        result = self.generic_visit(node)
+        self.class_context.pop()
+        return result
+    
+    def visit_FunctionDef(self, node):
+        """Track function context and identify if it's a class method"""
+        is_class_method = len(self.class_context) > 0
+        self.function_context.append({
+            'name': node.name,
+            'is_class_method': is_class_method,
+            'class_name': self.class_context[-1] if is_class_method else None,
+            'has_self': len(node.args.args) > 0 and node.args.args[0].arg == 'self',
+            'has_cls': len(node.args.args) > 0 and node.args.args[0].arg == 'cls'
+        })
+        result = self.generic_visit(node)
+        self.function_context.pop()
+        return result
+
+
+class AutofixConfig:
+    """Configuration class for autofix operations"""
+    
+    def __init__(self, config_file: Optional[Path] = None):
+        """Initialize configuration with defaults and optional config file"""
+        # Default configuration
+        self.black_line_length = 88
+        self.target_python_version = "py38"
+        self.max_line_length = 88
+        self.command_timeout = 300
+        self.max_cycles = 10
+        self.skip_hidden_files = True
+        self.backup_enabled = True
+        self.tools_required = ['black', 'isort', 'flake8', 'mypy', 'bandit']
+        
+        # Load from config file if provided
+        if config_file and config_file.exists():
+            self._load_config(config_file)
+    
+    def _load_config(self, config_file: Path) -> None:
+        """Load configuration from JSON file"""
+        try:
+            with open(config_file, 'r') as f:
+                config_data = json.load(f)
+            
+            # Update attributes from config
+            for key, value in config_data.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+        except Exception as e:
+            logging.warning(f"Failed to load config from {config_file}: {e}")
+
+
 class MCPAutofix:
     """
     Consolidated autofix system that delivers real results using proven tools
+    
+    This class provides comprehensive automated code fixing capabilities with
+    safety validations, detailed logging, and configurable operation modes.
     """
     
-    def __init__(self, repo_path: Path = None, dry_run: bool = False, verbose: bool = False):
+    def __init__(self, 
+                 repo_path: Optional[Path] = None, 
+                 dry_run: bool = False, 
+                 verbose: bool = False,
+                 config_file: Optional[Path] = None):
+        """
+        Initialize the autofix system
+        
+        Args:
+            repo_path: Repository path to process (default: current directory)
+            dry_run: If True, show what would be fixed without applying changes
+            verbose: If True, show detailed output
+            config_file: Optional configuration file path
+        """
         self.repo_path = repo_path or Path.cwd()
         self.dry_run = dry_run
         self.verbose = verbose
         self.fixes_applied = 0
         self.issues_found = 0
         self.results = {}
+        self.start_time = time.time()
         
-    def log(self, message: str, level: str = "info"):
-        """Log message with optional verbosity control"""
-        if level == "verbose" and not self.verbose:
-            return
+        # Initialize session info early
+        self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.report_dir = self.repo_path / "autofix-reports"
+        self.report_dir.mkdir(exist_ok=True)
         
-        prefixes = {
-            "info": "ℹ️",
-            "success": "✅", 
-            "warning": "⚠️",
-            "error": "❌",
-            "verbose": "🔍"
+        # Load configuration
+        self.config = AutofixConfig(config_file)
+        
+        # Setup logging (requires session_id to be set)
+        self._setup_logging()
+        
+        self.logger.info(f"MCPAutofix initialized - Session ID: {self.session_id}")
+        self.logger.info(f"Repository: {self.repo_path}")
+        self.logger.info(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE'}")
+    
+    def _setup_logging(self) -> None:
+        """Setup logging configuration"""
+        log_level = logging.DEBUG if self.verbose else logging.INFO
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        
+        # Create logger
+        self.logger = logging.getLogger('mcp.autofix')
+        self.logger.setLevel(log_level)
+        
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+        self.logger.addHandler(console_handler)
+        
+        # File handler for detailed logs
+        log_file = self.repo_path / f"autofix-{self.session_id}.log"
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG)
+        file_formatter = logging.Formatter(log_format)
+        file_handler.setFormatter(file_formatter)
+        self.logger.addHandler(file_handler)
+        
+    def log(self, message: str, level: str = "info") -> None:
+        """
+        Log message with appropriate level and format
+        
+        Args:
+            message: Message to log
+            level: Log level (info, success, warning, error, verbose, debug)
+        """
+        # Map custom levels to standard logging levels
+        level_mapping = {
+            'info': logging.INFO,
+            'success': logging.INFO,
+            'warning': logging.WARNING,
+            'error': logging.ERROR,
+            'verbose': logging.DEBUG,
+            'debug': logging.DEBUG
         }
-        prefix = prefixes.get(level, "•")
-        print(f"{prefix} {message}")
+        
+        log_level = level_mapping.get(level, logging.INFO)
+        
+        # Use logger for file logging
+        self.logger.log(log_level, message)
+        
+        # Console output with colors and emojis (if not in verbose mode for logger)
+        if not self.verbose or level != "verbose":
+            prefixes = {
+                "info": "ℹ️",
+                "success": "✅", 
+                "warning": "⚠️",
+                "error": "❌",
+                "verbose": "🔍",
+                "debug": "🐛"
+            }
+            prefix = prefixes.get(level, "•")
+            
+            # Only print to console if appropriate level
+            if level != "verbose" or self.verbose:
+                print(f"{prefix} {message}")
     
     def run_command(self, cmd: List[str], description: str = "") -> Tuple[bool, str, str]:
-        """Run command and return success, stdout, stderr"""
+        """
+        Run command with enhanced error handling and logging
+        
+        Args:
+            cmd: Command and arguments to run
+            description: Human-readable description of the command
+            
+        Returns:
+            Tuple of (success, stdout, stderr)
+        """
         if self.dry_run:
             self.log(f"[DRY RUN] Would run: {' '.join(cmd)}", "verbose")
             return True, "", ""
+        
+        self.logger.debug(f"Running command: {' '.join(cmd)}")
+        if description:
+            self.log(f"Running: {description}", "verbose")
         
         try:
             result = subprocess.run(
@@ -76,104 +279,636 @@ class MCPAutofix:
                 capture_output=True, 
                 text=True, 
                 cwd=self.repo_path,
-                timeout=300  # 5 minute timeout
+                timeout=self.config.command_timeout
             )
             
             success = result.returncode == 0
-            if not success and self.verbose:
-                self.log(f"Command failed: {' '.join(cmd)}", "error")
-                self.log(f"Error: {result.stderr}", "verbose")
+            
+            if success:
+                self.logger.debug(f"Command succeeded: {' '.join(cmd)}")
+                if result.stdout.strip():
+                    self.logger.debug(f"STDOUT: {result.stdout}")
+            else:
+                self.logger.error(f"Command failed: {' '.join(cmd)}")
+                self.logger.error(f"Return code: {result.returncode}")
+                if result.stderr:
+                    self.logger.error(f"STDERR: {result.stderr}")
+                    
+                if self.verbose:
+                    self.log(f"Command failed with code {result.returncode}: {' '.join(cmd)}", "error")
+                    if result.stderr:
+                        self.log(f"Error details: {result.stderr.strip()}", "verbose")
             
             return success, result.stdout, result.stderr
             
         except subprocess.TimeoutExpired:
-            self.log(f"Command timed out: {' '.join(cmd)}", "error")
+            error_msg = f"Command timed out after {self.config.command_timeout}s: {' '.join(cmd)}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
             return False, "", "Command timed out"
+            
+        except FileNotFoundError:
+            error_msg = f"Command not found: {cmd[0]}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
+            return False, "", "Command not found"
+            
         except Exception as e:
-            self.log(f"Command error: {e}", "error")
+            error_msg = f"Unexpected error running command: {e}"
+            self.logger.error(error_msg)
+            self.log(error_msg, "error")
             return False, "", str(e)
     
     def install_tools(self) -> bool:
-        """Install required tools if not available"""
-        tools = ['black', 'isort', 'flake8', 'mypy', 'bandit']
-        missing_tools = []
+        """
+        Install required tools if not available
         
-        for tool in tools:
-            success, _, _ = self.run_command(['python3', '-m', tool, '--version'])
-            if not success:
+        Returns:
+            True if all tools are available, False otherwise
+        """
+        self.log("Checking required tools availability...")
+        missing_tools = []
+        available_tools = []
+        
+        for tool in self.config.tools_required:
+            success, _, _ = self.run_command([sys.executable, '-m', tool, '--version'])
+            if success:
+                available_tools.append(tool)
+                self.log(f"✓ {tool} is available", "verbose")
+            else:
                 missing_tools.append(tool)
+                self.log(f"✗ {tool} is missing", "verbose")
+        
+        if available_tools:
+            self.log(f"Available tools: {', '.join(available_tools)}", "success")
         
         if missing_tools:
-            self.log(f"Installing tools: {', '.join(missing_tools)}")
-            success, stdout, stderr = self.run_command([
-                sys.executable, '-m', 'pip', 'install'
-            ] + missing_tools)
+            self.log(f"Missing tools: {', '.join(missing_tools)}", "warning")
             
-            if not success:
+            if self.dry_run:
+                self.log("[DRY RUN] Would install missing tools", "info")
+                return True
+            
+            self.log(f"Installing missing tools: {', '.join(missing_tools)}")
+            
+            # Try to install missing tools
+            install_cmd = [sys.executable, '-m', 'pip', 'install'] + missing_tools
+            success, stdout, stderr = self.run_command(
+                install_cmd, 
+                f"Installing {', '.join(missing_tools)}"
+            )
+            
+            if success:
+                self.log(f"Successfully installed: {', '.join(missing_tools)}", "success")
+                
+                # Verify installation
+                still_missing = []
+                for tool in missing_tools:
+                    verify_success, _, _ = self.run_command([sys.executable, '-m', tool, '--version'])
+                    if not verify_success:
+                        still_missing.append(tool)
+                
+                if still_missing:
+                    self.log(f"Failed to verify installation of: {', '.join(still_missing)}", "error")
+                    return False
+                    
+            else:
                 self.log(f"Failed to install tools: {stderr}", "error")
                 return False
         
+        self.log("All required tools are available", "success")
         return True
     
+    def validate_before_change(self, file_path: Path, planned_changes: Dict) -> bool:
+        """Pre-flight validation before making any changes"""
+        try:
+            # Validate file exists and is readable
+            if not file_path.exists():
+                self.log(f"Cannot validate - file does not exist: {file_path}", "error")
+                return False
+            
+            # Parse current file to ensure it's valid Python
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            try:
+                ast.parse(content)
+            except SyntaxError as e:
+                self.log(f"Pre-validation failed - syntax error in {file_path}: {e}", "error")
+                return False
+            
+            # Check if planned changes would break dependencies
+            if 'function_extractions' in planned_changes:
+                for func_info in planned_changes['function_extractions']:
+                    if not self._validate_safe_extraction(func_info, content):
+                        self.log(f"Pre-validation failed - unsafe extraction of {func_info['name']}", "error")
+                        return False
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Pre-validation error for {file_path}: {e}", "error")
+            return False
+    
+    def _validate_safe_extraction(self, func_info: Dict, content: str) -> bool:
+        """Validate that a function can be safely extracted"""
+        try:
+            tree = ast.parse(content)
+            transformer = SafeTransformer()
+            transformer.visit(tree)
+            
+            # Check if function is a class method
+            for func_context in transformer.function_context:
+                if func_context['name'] == func_info['name']:
+                    if func_context['is_class_method']:
+                        self.log(f"Cannot extract {func_info['name']} - it's a class method", "warning")
+                        return False
+                    
+                    if func_context['has_self'] and not func_context['is_class_method']:
+                        self.log(f"Cannot extract {func_info['name']} - orphaned self parameter", "warning")
+                        return False
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error validating extraction safety: {e}", "error")
+            return False
+    
+    def extract_function_with_context(self, func_info: Dict) -> Optional[str]:
+        """Extract function with full context awareness"""
+        try:
+            with open(func_info['file'], 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            transformer = SafeTransformer()
+            transformer.visit(tree)
+            
+            # Find the function and analyze its context
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
+                    # Check if it's safe to extract
+                    is_class_method = any(
+                        isinstance(parent, ast.ClassDef) 
+                        for parent in ast.walk(tree)
+                        if hasattr(parent, 'body') and node in getattr(parent, 'body', [])
+                    )
+                    
+                    if is_class_method:
+                        self.log(f"Refusing to extract class method: {func_info['name']}", "warning")
+                        return None
+                    
+                    # Extract with proper imports and dependencies
+                    lines = content.split('\n')
+                    start_line = node.lineno - 1
+                    end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
+                    
+                    # Include docstring and decorators
+                    while start_line > 0 and (lines[start_line - 1].strip().startswith('@') or 
+                                              lines[start_line - 1].strip().startswith('"""') or
+                                              lines[start_line - 1].strip().startswith("'''")):
+                        start_line -= 1
+                    
+                    func_source = '\n'.join(lines[start_line:end_line])
+                    
+                    # Add necessary imports
+                    imports = self._extract_function_imports(node, content)
+                    if imports:
+                        func_source = imports + '\n\n' + func_source
+                    
+                    return func_source + '\n\n'
+            
+            return None
+            
+        except Exception as e:
+            self.log(f"Error extracting function with context: {e}", "error")
+            return None
+    
+    def _extract_function_imports(self, func_node: ast.FunctionDef, content: str) -> str:
+        """Extract imports needed by a function"""
+        try:
+            tree = ast.parse(content)
+            needed_imports = set()
+            
+            # Find all names used in the function
+            for node in ast.walk(func_node):
+                if isinstance(node, ast.Name):
+                    needed_imports.add(node.id)
+                elif isinstance(node, ast.Attribute):
+                    if isinstance(node.value, ast.Name):
+                        needed_imports.add(node.value.id)
+            
+            # Find corresponding import statements
+            import_lines = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name in needed_imports:
+                            import_lines.append(f"import {alias.name}")
+                elif isinstance(node, ast.ImportFrom):
+                    if node.module:
+                        for alias in node.names:
+                            if alias.name in needed_imports:
+                                import_lines.append(f"from {node.module} import {alias.name}")
+            
+            return '\n'.join(import_lines) if import_lines else ""
+            
+        except Exception as e:
+            self.log(f"Error extracting imports: {e}", "error")
+            return ""
+    
+    def identify_safe_duplicates(self) -> List[List[Dict]]:
+        """Smart duplicate detection that avoids dangerous extractions"""
+        self.log("Identifying safe duplicate functions...")
+        
+        all_duplicates = self.find_duplicate_functions()
+        safe_duplicates = []
+        
+        for dup_group in all_duplicates:
+            safe_group = []
+            
+            for func_info in dup_group:
+                # Validate this function is safe to extract
+                if self._is_safe_for_extraction(func_info):
+                    safe_group.append(func_info)
+                else:
+                    self.log(f"Skipping unsafe duplicate: {func_info['name']} in {func_info['file']}", "warning")
+            
+            # Only include groups with multiple safe functions
+            if len(safe_group) > 1:
+                safe_duplicates.append(safe_group)
+        
+        self.log(f"Found {len(safe_duplicates)} safe duplicate groups (filtered from {len(all_duplicates)} total)", "info")
+        return safe_duplicates
+    
+    def _is_safe_for_extraction(self, func_info: Dict) -> bool:
+        """Check if a function is safe for extraction"""
+        try:
+            with open(func_info['file'], 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            
+            # Find the function
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
+                    # Check if it's in a class
+                    for parent in ast.walk(tree):
+                        if isinstance(parent, ast.ClassDef):
+                            if hasattr(parent, 'body') and node in parent.body:
+                                return False  # It's a class method
+                    
+                    # Check for self/cls parameters
+                    if node.args.args and node.args.args[0].arg in ('self', 'cls'):
+                        return False  # Has self/cls parameter
+                    
+                    # Check for complex dependencies (simplified)
+                    func_source = ast.get_source_segment(content, node) if hasattr(ast, 'get_source_segment') else ""
+                    if any(pattern in func_source for pattern in ['self.', 'cls.', 'super()']):
+                        return False  # Uses class-specific patterns
+                    
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error checking extraction safety: {e}", "error")
+            return False
+    
+    def test_after_each_fix(self, fixed_file: Path) -> bool:
+        """Test that fixes don't break the code"""
+        try:
+            # Basic syntax validation
+            with open(fixed_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            try:
+                ast.parse(content)
+            except SyntaxError as e:
+                self.log(f"Fix induced syntax error in {fixed_file}: {e}", "error")
+                return False
+            
+            # Try to import the module if it's a valid Python module
+            if fixed_file.suffix == '.py':
+                try:
+                    # Create a temporary module spec
+                    spec = importlib.util.spec_from_file_location("test_module", fixed_file)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                except Exception as e:
+                    self.log(f"Fix induced import error in {fixed_file}: {e}", "warning")
+                    # Don't fail completely on import errors as they might be due to missing dependencies
+            
+            return True
+            
+        except Exception as e:
+            self.log(f"Error testing fix: {e}", "error")
+            return False
+    
+    def fix_induced_errors(self, file_path: Path, original_content: str) -> bool:
+        """Fix problems caused by our fixes"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                current_content = f.read()
+            
+            # Check for common issues we might have introduced
+            issues_fixed = 0
+            
+            # Fix missing imports
+            if self._fix_missing_imports(file_path, current_content):
+                issues_fixed += 1
+            
+            # Fix orphaned __init__ methods (the core issue mentioned in the comment)
+            if self._fix_orphaned_init_methods(file_path):
+                issues_fixed += 1
+            
+            # Fix duplicate imports
+            if self._fix_duplicate_imports(file_path):
+                issues_fixed += 1
+            
+            if issues_fixed > 0:
+                self.log(f"Fixed {issues_fixed} induced errors in {file_path}", "success")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing induced errors: {e}", "error")
+            return False
+    
+    def _fix_missing_imports(self, file_path: Path, content: str) -> bool:
+        """Fix imports that might be missing after function moves"""
+        try:
+            tree = ast.parse(content)
+            
+            # Find undefined names
+            defined_names = set()
+            used_names = set()
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    defined_names.add(node.name)
+                elif isinstance(node, ast.ClassDef):
+                    defined_names.add(node.name)
+                elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                    used_names.add(node.id)
+            
+            undefined_names = used_names - defined_names - {'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple'}
+            
+            if undefined_names:
+                # Try to add imports from utils
+                lines = content.split('\n')
+                import_line = f"from utils.functions import {', '.join(undefined_names)}"
+                
+                # Find where to insert the import
+                insert_index = 0
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('import ') or line.strip().startswith('from '):
+                        insert_index = i + 1
+                    elif line.strip() and not line.strip().startswith('#'):
+                        break
+                
+                lines.insert(insert_index, import_line)
+                
+                # Write back
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(lines))
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing missing imports: {e}", "error")
+            return False
+    
+    def _fix_orphaned_init_methods(self, file_path: Path) -> bool:
+        """Fix orphaned __init__ methods (the core issue from the comment)"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Look for __init__ methods outside of classes
+            tree = ast.parse(content)
+            lines = content.split('\n')
+            fixed = False
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name == '__init__':
+                    # Check if this __init__ is inside a class
+                    in_class = False
+                    for parent in ast.walk(tree):
+                        if isinstance(parent, ast.ClassDef):
+                            if hasattr(parent, 'body') and node in parent.body:
+                                in_class = True
+                                break
+                    
+                    if not in_class:
+                        # This is an orphaned __init__ method - remove it
+                        start_line = node.lineno - 1
+                        end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 1
+                        
+                        # Remove the orphaned method
+                        for i in range(start_line, min(end_line, len(lines))):
+                            lines[i] = ''
+                        
+                        fixed = True
+                        self.log(f"Removed orphaned __init__ method at line {node.lineno}", "info")
+            
+            if fixed:
+                # Clean up empty lines and write back
+                cleaned_lines = []
+                for line in lines:
+                    if line.strip() or (cleaned_lines and cleaned_lines[-1].strip()):
+                        cleaned_lines.append(line)
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(cleaned_lines))
+                
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing orphaned __init__ methods: {e}", "error")
+            return False
+    
+    def _fix_duplicate_imports(self, file_path: Path) -> bool:
+        """Fix duplicate import statements"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            lines = content.split('\n')
+            seen_imports = set()
+            cleaned_lines = []
+            fixed = False
+            
+            for line in lines:
+                if line.strip().startswith(('import ', 'from ')):
+                    if line.strip() in seen_imports:
+                        fixed = True
+                        continue  # Skip duplicate import
+                    seen_imports.add(line.strip())
+                
+                cleaned_lines.append(line)
+            
+            if fixed:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(cleaned_lines))
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.log(f"Error fixing duplicate imports: {e}", "error")
+            return False
+    
     def fix_code_formatting(self) -> Dict:
-        """Fix code formatting using black and isort"""
+        """
+        Fix code formatting using black and isort with enhanced configuration
+        
+        Returns:
+            Dictionary with formatting results
+        """
         self.log("Fixing code formatting...")
         
-        results = {'black': False, 'isort': False}
+        results = {'black': False, 'isort': False, 'files_processed': 0}
         
-        # Run black
-        success, stdout, stderr = self.run_command([
+        # Count Python files to process
+        python_files = list(self.repo_path.rglob("*.py"))
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        results['files_found'] = len(python_files)
+        self.log(f"Found {len(python_files)} Python files to format", "verbose")
+        
+        if not python_files:
+            self.log("No Python files found to format", "warning")
+            return results
+        
+        # Run black formatting
+        self.log("Running Black code formatter...", "verbose")
+        black_cmd = [
             sys.executable, '-m', 'black', 
-            '--line-length', '88',
-            '--target-version', 'py38',
-            str(self.repo_path)
-        ])
+            '--line-length', str(self.config.black_line_length),
+            '--target-version', self.config.target_python_version,
+            '--quiet'  # Reduce output noise
+        ]
+        
+        if self.dry_run:
+            black_cmd.append('--diff')  # Show diff in dry run mode
+        
+        black_cmd.append(str(self.repo_path))
+        
+        success, stdout, stderr = self.run_command(
+            black_cmd,
+            "Black code formatting"
+        )
+        
         results['black'] = success
         
         if success:
             self.fixes_applied += 1
-            self.log("Code formatted with black", "success")
+            results['files_processed'] += len(python_files)
+            self.log("Code formatted with Black", "success")
+            if self.dry_run and stdout:
+                self.log("Black would make these changes:", "verbose")
+                self.log(stdout, "verbose")
         else:
             self.log(f"Black formatting failed: {stderr}", "error")
         
-        # Run isort
-        success, stdout, stderr = self.run_command([
+        # Run isort for import sorting
+        self.log("Running isort import sorter...", "verbose")
+        isort_cmd = [
             sys.executable, '-m', 'isort',
             '--profile', 'black',
-            '--line-length', '88',
-            str(self.repo_path)
-        ])
+            '--line-length', str(self.config.max_line_length),
+            '--quiet'  # Reduce output noise
+        ]
+        
+        if self.dry_run:
+            isort_cmd.append('--diff')  # Show diff in dry run mode
+        
+        isort_cmd.append(str(self.repo_path))
+        
+        success, stdout, stderr = self.run_command(
+            isort_cmd,
+            "Import sorting with isort"
+        )
+        
         results['isort'] = success
         
         if success:
             self.fixes_applied += 1
             self.log("Imports sorted with isort", "success")
+            if self.dry_run and stdout:
+                self.log("isort would make these changes:", "verbose")
+                self.log(stdout, "verbose")
         else:
             self.log(f"Import sorting failed: {stderr}", "error")
+        
+        # Summary
+        if results['black'] and results['isort']:
+            self.log(f"Code formatting completed successfully for {results['files_processed']} files", "success")
+        elif results['black'] or results['isort']:
+            self.log("Code formatting partially completed", "warning")
+        else:
+            self.log("Code formatting failed", "error")
         
         return results
     
     def fix_whitespace_issues(self) -> Dict:
-        """Fix whitespace and basic formatting issues"""
+        """
+        Fix whitespace and basic formatting issues with enhanced safety
+        
+        Returns:
+            Dictionary with whitespace fixing results
+        """
         self.log("Fixing whitespace issues...")
+        
+        results = {
+            'files_processed': 0,
+            'files_modified': 0,
+            'files_skipped': 0,
+            'errors': []
+        }
         
         if self.dry_run:
             self.log("[DRY RUN] Would fix whitespace issues", "verbose")
-            return {'files_processed': 0}
+            return results
         
-        files_fixed = 0
         python_files = list(self.repo_path.rglob("*.py"))
         
+        # Filter out hidden files if configured
+        if self.config.skip_hidden_files:
+            python_files = [f for f in python_files if not any(part.startswith('.') for part in f.parts)]
+        
+        self.log(f"Processing {len(python_files)} Python files for whitespace issues", "verbose")
+        
         for py_file in python_files:
-            if any(part.startswith('.') for part in py_file.parts):
-                continue  # Skip hidden files/directories
+            results['files_processed'] += 1
             
             try:
-                with open(py_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                # Read file with proper encoding detection
+                try:
+                    with open(py_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except UnicodeDecodeError:
+                    # Try with different encoding
+                    try:
+                        with open(py_file, 'r', encoding='latin-1') as f:
+                            content = f.read()
+                    except Exception as e:
+                        self.log(f"Cannot read file {py_file}: {e}", "error")
+                        results['files_skipped'] += 1
+                        results['errors'].append(f"Read error in {py_file}: {e}")
+                        continue
                 
                 original_content = content
                 
+                # Apply whitespace fixes
                 # Remove trailing whitespace
                 content = re.sub(r'[ \t]+$', '', content, flags=re.MULTILINE)
                 
@@ -183,58 +918,142 @@ class MCPAutofix:
                 # Fix multiple consecutive blank lines (max 2)
                 content = re.sub(r'\n{4,}', '\n\n\n', content)
                 
+                # Remove spaces before tabs (mixed indentation)
+                content = re.sub(r'^ +\t', '\t', content, flags=re.MULTILINE)
+                
+                # Only proceed if changes were made
                 if content != original_content:
                     # Validate syntax before writing
                     try:
                         ast.parse(content)
+                    except SyntaxError as e:
+                        self.log(f"Syntax error would result from whitespace fix in {py_file}: {e}", "warning")
+                        results['files_skipped'] += 1
+                        results['errors'].append(f"Syntax error would result in {py_file}: {e}")
+                        continue
+                    
+                    # Create backup if enabled
+                    if self.config.backup_enabled:
+                        backup_file = py_file.with_suffix(f'.py.autofix-backup-{self.session_id}')
+                        try:
+                            with open(backup_file, 'w', encoding='utf-8') as f:
+                                f.write(original_content)
+                        except Exception as e:
+                            self.log(f"Failed to create backup for {py_file}: {e}", "warning")
+                    
+                    # Write the fixed content
+                    try:
                         with open(py_file, 'w', encoding='utf-8') as f:
                             f.write(content)
-                        files_fixed += 1
+                        results['files_modified'] += 1
                         self.log(f"Fixed whitespace in {py_file}", "verbose")
-                    except SyntaxError:
-                        self.log(f"Skipped {py_file} - syntax error after fix", "warning")
+                    except Exception as e:
+                        self.log(f"Failed to write fixed file {py_file}: {e}", "error")
+                        results['errors'].append(f"Write error in {py_file}: {e}")
+                        continue
                         
             except Exception as e:
                 self.log(f"Error processing {py_file}: {e}", "error")
+                results['files_skipped'] += 1
+                results['errors'].append(f"Processing error in {py_file}: {e}")
         
-        if files_fixed > 0:
-            self.fixes_applied += files_fixed
-            self.log(f"Fixed whitespace in {files_fixed} files", "success")
+        # Update global counters
+        self.fixes_applied += results['files_modified']
         
-        return {'files_processed': files_fixed}
+        # Summary logging
+        if results['files_modified'] > 0:
+            self.log(f"Fixed whitespace in {results['files_modified']} files", "success")
+        
+        if results['files_skipped'] > 0:
+            self.log(f"Skipped {results['files_skipped']} files due to errors", "warning")
+        
+        if results['errors']:
+            self.log(f"Encountered {len(results['errors'])} errors during whitespace fixing", "warning")
+        
+        return results
     
     def run_security_scan(self) -> Dict:
-        """Run security analysis with bandit"""
-        self.log("Running security scan...")
+        """
+        Run security analysis with bandit and enhanced reporting
         
-        output_file = self.repo_path / "bandit-report.json"
+        Returns:
+            Dictionary with security scan results
+        """
+        self.log("Running security analysis with Bandit...")
         
-        success, stdout, stderr = self.run_command([
+        # Use timestamped report file in reports directory
+        output_file = self.report_dir / f"bandit-report-{self.session_id}.json"
+        
+        # Build bandit command with enhanced options
+        bandit_cmd = [
             sys.executable, '-m', 'bandit',
             '-r', str(self.repo_path),
             '-f', 'json',
-            '-o', str(output_file)
-        ])
+            '-o', str(output_file),
+            '--skip', 'B101',  # Skip assert_used test (often acceptable in tests)
+        ]
         
-        results = {'scan_completed': success, 'report_file': str(output_file)}
+        # Add exclusions for common non-security files
+        if self.config.skip_hidden_files:
+            bandit_cmd.extend(['--exclude', '.*,*/.*'])
+        
+        success, stdout, stderr = self.run_command(
+            bandit_cmd,
+            "Security vulnerability scan"
+        )
+        
+        results = {
+            'scan_completed': success, 
+            'report_file': str(output_file),
+            'issues_found': 0,
+            'issues_by_severity': {},
+            'scan_timestamp': datetime.now().isoformat()
+        }
         
         if success:
-            self.log(f"Security scan completed: {output_file}", "success")
+            self.log(f"Security scan completed: {output_file.name}", "success")
             
-            # Parse results if available
+            # Parse and analyze results
             try:
-                with open(output_file, 'r') as f:
-                    report = json.load(f)
-                    issues = len(report.get('results', []))
-                    results['issues_found'] = issues
-                    if issues > 0:
-                        self.log(f"Found {issues} security issues", "warning")
+                if output_file.exists():
+                    with open(output_file, 'r') as f:
+                        report = json.load(f)
+                    
+                    issues = report.get('results', [])
+                    results['issues_found'] = len(issues)
+                    
+                    # Categorize by severity
+                    severity_counts = {}
+                    for issue in issues:
+                        severity = issue.get('issue_severity', 'UNKNOWN')
+                        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                    
+                    results['issues_by_severity'] = severity_counts
+                    
+                    # Log summary
+                    if issues:
+                        self.log(f"Found {len(issues)} security issues", "warning")
+                        for severity, count in severity_counts.items():
+                            self.log(f"  {severity}: {count} issues", "verbose")
                     else:
                         self.log("No security issues found", "success")
+                        
+                    # Store detailed results for later use
+                    results['detailed_issues'] = issues
+                    
+                else:
+                    self.log("Security report file not created", "warning")
+                    
+            except json.JSONDecodeError as e:
+                self.log(f"Invalid JSON in security report: {e}", "error")
+                results['error'] = f"JSON parse error: {e}"
             except Exception as e:
-                self.log(f"Could not parse security report: {e}", "error")
+                self.log(f"Error processing security report: {e}", "error")
+                results['error'] = f"Processing error: {e}"
         else:
-            self.log(f"Security scan failed: {stderr}", "error")
+            error_msg = f"Security scan failed: {stderr}"
+            self.log(error_msg, "error")
+            results['error'] = error_msg
         
         return results
     
@@ -970,13 +1789,19 @@ def {func_call.name}(*args, **kwargs):
         return best_func or dup_group[0]
     
     def move_to_utils(self, func_info: Dict) -> bool:
-        """Move function to utils module if not already there"""
+        """Move function to utils module with context awareness and safety checks"""
         if 'utils' in func_info['file']:
             return True  # Already in utils
         
         if self.dry_run:
             self.log(f"[DRY RUN] Would move {func_info['name']} to utils", "verbose")
             return True
+        
+        # Pre-flight validation
+        planned_changes = {'function_extractions': [func_info]}
+        if not self.validate_before_change(Path(func_info['file']), planned_changes):
+            self.log(f"Refusing to move {func_info['name']} - failed safety validation", "error")
+            return False
         
         # Create utils directory if it doesn't exist
         utils_dir = self.repo_path / 'utils'
@@ -991,24 +1816,18 @@ def {func_call.name}(*args, **kwargs):
         utils_file = utils_dir / 'functions.py'
         
         try:
-            # Extract function source
-            with open(func_info['file'], 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Use AtomicFix for safe operations with rollback
+            backup_dir = self.repo_path / '.autofix_backups'
+            backup_dir.mkdir(exist_ok=True)
             
-            tree = ast.parse(content)
-            
-            # Find the function node
-            func_source = None
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef) and node.name == func_info['name']:
-                    # Extract the source lines
-                    lines = content.split('\n')
-                    start_line = node.lineno - 1
-                    end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
-                    func_source = '\n'.join(lines[start_line:end_line]) + '\n\n'
-                    break
-            
-            if func_source:
+            with AtomicFix(utils_file, backup_dir):
+                # Extract function with full context
+                func_source = self.extract_function_with_context(func_info)
+                
+                if not func_source:
+                    self.log(f"Failed to extract {func_info['name']} safely", "error")
+                    return False
+                
                 # Add to utils file
                 if utils_file.exists():
                     with open(utils_file, 'a', encoding='utf-8') as f:
@@ -1018,28 +1837,88 @@ def {func_call.name}(*args, **kwargs):
                         f.write('"""Utility functions"""\n\n')
                         f.write(func_source)
                 
-                self.log(f"Moved {func_info['name']} to utils/functions.py", "verbose")
+                # Test the result
+                if not self.test_after_each_fix(utils_file):
+                    raise Exception(f"Move of {func_info['name']} broke utils file")
+                
+                self.log(f"Safely moved {func_info['name']} to utils/functions.py", "success")
                 return True
         
         except Exception as e:
-            self.log(f"Error moving function to utils: {e}", "error")
-        
-        return False
+            self.log(f"Error moving function to utils (rolled back): {e}", "error")
+            return False
     
     def replace_with_import(self, duplicate: Dict, best: Dict) -> bool:
-        """Replace duplicate function with import"""
+        """Replace duplicate function with import using AtomicFix for safety"""
         if self.dry_run:
             self.log(f"[DRY RUN] Would replace {duplicate['name']} with import in {duplicate['file']}", "verbose")
             return True
         
+        file_path = Path(duplicate['file'])
+        
         try:
-            with open(duplicate['file'], 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Pre-flight validation
+            with open(file_path, 'r', encoding='utf-8') as f:
+                original_content = f.read()
             
-            tree = ast.parse(content)
-            lines = content.split('\n')
+            # Use AtomicFix for safe operations with rollback
+            backup_dir = self.repo_path / '.autofix_backups'
+            backup_dir.mkdir(exist_ok=True)
             
-            # Find and remove the duplicate function
+            with AtomicFix(file_path, backup_dir):
+                tree = ast.parse(original_content)
+                lines = original_content.split('\n')
+                
+                # Find and remove the duplicate function
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == duplicate['name']:
+                        start_line = node.lineno - 1
+                        end_line = node.end_lineno if hasattr(node, 'end_lineno') else start_line + 10
+                        
+                        # Remove function lines
+                        for i in range(start_line, min(end_line, len(lines))):
+                            lines[i] = ''
+                        
+                        # Add import if not already present
+                        import_line = f"from utils.functions import {duplicate['name']}"
+                        if import_line not in original_content:
+                            # Find where to insert import
+                            insert_index = 0
+                            for i, line in enumerate(lines):
+                                if line.strip().startswith('import ') or line.strip().startswith('from '):
+                                    insert_index = i + 1
+                                elif line.strip() and not line.strip().startswith('#'):
+                                    break
+                            
+                            lines.insert(insert_index, import_line)
+                        
+                        break
+                
+                # Write modified content
+                new_content = '\n'.join(line for line in lines if line.strip() or lines.index(line) == 0)
+                
+                # Validate syntax before writing
+                try:
+                    ast.parse(new_content)
+                except SyntaxError as e:
+                    raise Exception(f"Replacement would create syntax error: {e}")
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                
+                # Test the result
+                if not self.test_after_each_fix(file_path):
+                    raise Exception(f"Replacement of {duplicate['name']} broke the file")
+                
+                # Check for and fix any induced errors
+                self.fix_induced_errors(file_path, original_content)
+                
+                self.log(f"Safely replaced {duplicate['name']} with import in {duplicate['file']}", "success")
+                return True
+        
+        except Exception as e:
+            self.log(f"Error replacing duplicate function (rolled back): {e}", "error")
+            return False
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef) and node.name == duplicate['name']:
                     start_line = node.lineno - 1
@@ -1084,13 +1963,14 @@ def {func_call.name}(*args, **kwargs):
         return False
     
     def fix_duplicate_functions(self) -> Dict:
-        """Eliminate duplicates by consolidating to shared module"""
-        self.log("Fixing duplicate functions...")
+        """Eliminate duplicates using smart detection and safe consolidation"""
+        self.log("Fixing duplicate functions with safety checks...")
         
-        duplicates = self.find_duplicate_functions()
+        # Use safe duplicate detection instead of blind detection
+        duplicates = self.identify_safe_duplicates()
         
         if not duplicates:
-            self.log("No duplicate functions found", "success")
+            self.log("No safe duplicate functions found for consolidation", "success")
             return {'duplicate_groups': 0, 'fixes_applied': 0}
         
         fixes_applied = 0
@@ -1099,21 +1979,26 @@ def {func_call.name}(*args, **kwargs):
             # Choose best implementation
             best = self.select_best_implementation(dup_group)
             
-            # Move to utils if not already there
+            # Move to utils if not already there (with safety checks)
             if 'utils' not in best['file']:
                 if self.move_to_utils(best):
                     # Update best reference to utils location
                     best['file'] = str(self.repo_path / 'utils' / 'functions.py')
+                else:
+                    self.log(f"Failed to safely move {best['name']} to utils, skipping group", "warning")
+                    continue
             
-            # Replace all duplicates with imports
+            # Replace all duplicates with imports (with safety checks)
             for duplicate in dup_group:
                 if duplicate != best:
                     if self.replace_with_import(duplicate, best):
                         fixes_applied += 1
+                    else:
+                        self.log(f"Failed to safely replace {duplicate['name']}, manual review needed", "warning")
         
         self.fixes_applied += fixes_applied
         if fixes_applied > 0:
-            self.log(f"Consolidated {fixes_applied} duplicate functions", "success")
+            self.log(f"Safely consolidated {fixes_applied} duplicate functions", "success")
         
         return {
             'duplicate_groups': len(duplicates),
@@ -1122,26 +2007,196 @@ def {func_call.name}(*args, **kwargs):
         }
     
     def generate_report(self) -> Dict:
-        """Generate comprehensive autofix report"""
-        self.log("Generating autofix report...")
+        """
+        Generate comprehensive autofix report with detailed analytics
         
+        Returns:
+            Complete report dictionary
+        """
+        self.log("Generating comprehensive autofix report...")
+        
+        execution_time = time.time() - self.start_time
+        
+        # Build comprehensive report
         report = {
-            'timestamp': str(Path.cwd()),
-            'summary': {
-                'fixes_applied': self.fixes_applied,
-                'issues_found': self.issues_found,
-                'dry_run': self.dry_run
+            'metadata': {
+                'session_id': self.session_id,
+                'timestamp': datetime.now().isoformat(),
+                'execution_time_seconds': round(execution_time, 2),
+                'repository_path': str(self.repo_path),
+                'dry_run_mode': self.dry_run,
+                'verbose_mode': self.verbose,
+                'autofix_version': '2.0.0'
             },
-            'results': self.results
+            'summary': {
+                'total_fixes_applied': self.fixes_applied,
+                'total_issues_found': self.issues_found,
+                'completion_status': 'completed',
+                'phases_executed': len(self.results)
+            },
+            'phase_results': self.results,
+            'recommendations': [],
+            'next_steps': []
         }
         
-        # Save report
-        report_file = self.repo_path / "autofix-report.json"
-        with open(report_file, 'w') as f:
-            json.dump(report, f, indent=2)
+        # Calculate detailed statistics
+        stats = {
+            'files_processed': 0,
+            'files_modified': 0,
+            'security_issues': 0,
+            'quality_issues': 0,
+            'type_errors': 0,
+            'test_failures': 0
+        }
         
-        self.log(f"Report saved: {report_file}", "success")
+        # Aggregate statistics from phase results
+        for phase_name, phase_result in self.results.items():
+            if isinstance(phase_result, dict):
+                # Count files processed
+                if 'files_processed' in phase_result:
+                    stats['files_processed'] += phase_result.get('files_processed', 0)
+                if 'files_modified' in phase_result:
+                    stats['files_modified'] += phase_result.get('files_modified', 0)
+                
+                # Count specific issue types
+                if 'issues_found' in phase_result:
+                    if 'security' in phase_name:
+                        stats['security_issues'] += phase_result.get('issues_found', 0)
+                    elif 'type' in phase_name:
+                        stats['type_errors'] += phase_result.get('issues_found', 0)
+                    elif 'test' in phase_name:
+                        stats['test_failures'] += phase_result.get('issues_found', 0)
+                    else:
+                        stats['quality_issues'] += phase_result.get('issues_found', 0)
+        
+        report['statistics'] = stats
+        
+        # Generate recommendations based on results
+        recommendations = []
+        
+        if stats['security_issues'] > 0:
+            recommendations.append({
+                'category': 'security',
+                'priority': 'high',
+                'message': f"Found {stats['security_issues']} security issues. Review and address remaining vulnerabilities.",
+                'action': 'Review security scan report and implement additional security measures.'
+            })
+        
+        if stats['type_errors'] > 0:
+            recommendations.append({
+                'category': 'typing',
+                'priority': 'medium',
+                'message': f"Found {stats['type_errors']} type-related issues. Consider adding more type annotations.",
+                'action': 'Run mypy with stricter settings and add missing type annotations.'
+            })
+        
+        if self.fixes_applied == 0:
+            recommendations.append({
+                'category': 'maintenance',
+                'priority': 'low',
+                'message': 'No fixes were applied. Code appears to be in good condition.',
+                'action': 'Continue regular maintenance and periodic autofix runs.'
+            })
+        elif self.fixes_applied > 50:
+            recommendations.append({
+                'category': 'maintenance',
+                'priority': 'medium',
+                'message': f'Applied {self.fixes_applied} fixes. Consider implementing pre-commit hooks.',
+                'action': 'Set up automated code formatting and linting in your development workflow.'
+            })
+        
+        report['recommendations'] = recommendations
+        
+        # Generate next steps
+        next_steps = [
+            'Review the detailed phase results for any remaining issues',
+            'Run tests to ensure all fixes are working correctly',
+            'Consider implementing pre-commit hooks for continuous code quality',
+            'Schedule regular autofix runs as part of maintenance workflow'
+        ]
+        
+        if self.dry_run:
+            next_steps.insert(0, 'Run autofix without --dry-run flag to apply the suggested changes')
+        
+        report['next_steps'] = next_steps
+        
+        # Save comprehensive report
+        report_file = self.report_dir / f"autofix-report-{self.session_id}.json"
+        
+        try:
+            with open(report_file, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            
+            # Also save a human-readable summary
+            summary_file = self.report_dir / f"autofix-summary-{self.session_id}.txt"
+            self._generate_text_summary(report, summary_file)
+            
+            self.log(f"Comprehensive report saved: {report_file}", "success")
+            self.log(f"Human-readable summary: {summary_file}", "success")
+            
+        except Exception as e:
+            self.log(f"Failed to save report: {e}", "error")
+            # Return report anyway so caller can still use it
+        
         return report
+    
+    def _generate_text_summary(self, report: Dict, output_file: Path) -> None:
+        """Generate human-readable text summary of the autofix results"""
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write("="*60 + "\n")
+                f.write("MCP Autofix - Execution Summary\n")
+                f.write("="*60 + "\n\n")
+                
+                # Metadata
+                metadata = report.get('metadata', {})
+                f.write(f"Session ID: {metadata.get('session_id', 'N/A')}\n")
+                f.write(f"Timestamp: {metadata.get('timestamp', 'N/A')}\n")
+                f.write(f"Execution Time: {metadata.get('execution_time_seconds', 0)} seconds\n")
+                f.write(f"Repository: {metadata.get('repository_path', 'N/A')}\n")
+                f.write(f"Mode: {'DRY RUN' if metadata.get('dry_run_mode') else 'LIVE EXECUTION'}\n\n")
+                
+                # Summary
+                summary = report.get('summary', {})
+                f.write("SUMMARY\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Total Fixes Applied: {summary.get('total_fixes_applied', 0)}\n")
+                f.write(f"Total Issues Found: {summary.get('total_issues_found', 0)}\n")
+                f.write(f"Phases Executed: {summary.get('phases_executed', 0)}\n")
+                f.write(f"Status: {summary.get('completion_status', 'unknown').upper()}\n\n")
+                
+                # Statistics
+                stats = report.get('statistics', {})
+                f.write("STATISTICS\n")
+                f.write("-" * 20 + "\n")
+                f.write(f"Files Processed: {stats.get('files_processed', 0)}\n")
+                f.write(f"Files Modified: {stats.get('files_modified', 0)}\n")
+                f.write(f"Security Issues: {stats.get('security_issues', 0)}\n")
+                f.write(f"Quality Issues: {stats.get('quality_issues', 0)}\n")
+                f.write(f"Type Errors: {stats.get('type_errors', 0)}\n")
+                f.write(f"Test Failures: {stats.get('test_failures', 0)}\n\n")
+                
+                # Recommendations
+                recommendations = report.get('recommendations', [])
+                if recommendations:
+                    f.write("RECOMMENDATIONS\n")
+                    f.write("-" * 20 + "\n")
+                    for i, rec in enumerate(recommendations, 1):
+                        f.write(f"{i}. [{rec.get('priority', 'medium').upper()}] {rec.get('message', 'N/A')}\n")
+                        f.write(f"   Action: {rec.get('action', 'N/A')}\n\n")
+                
+                # Next steps
+                next_steps = report.get('next_steps', [])
+                if next_steps:
+                    f.write("NEXT STEPS\n")
+                    f.write("-" * 20 + "\n")
+                    for i, step in enumerate(next_steps, 1):
+                        f.write(f"{i}. {step}\n")
+                
+                f.write("\n" + "="*60 + "\n")
+                
+        except Exception as e:
+            self.log(f"Failed to generate text summary: {e}", "error")
     
     def parse_mypy_errors(self, mypy_report: str) -> List[Dict]:
         """Parse mypy errors for type-related issues"""
@@ -1422,59 +2477,132 @@ def {func_call.name}(*args, **kwargs):
             'remaining_failures': 'unknown'
         }
     
+    def _validate_environment(self) -> bool:
+        """Validate that the environment is suitable for autofix operations"""
+        try:
+            # Check Python version
+            if sys.version_info < (3, 6):
+                self.log("Python 3.6 or higher is required", "error")
+                return False
+            
+            # Check repository path exists and is writable
+            if not self.repo_path.exists():
+                self.log(f"Repository path does not exist: {self.repo_path}", "error")
+                return False
+            
+            if not os.access(self.repo_path, os.W_OK):
+                self.log(f"Repository path is not writable: {self.repo_path}", "error")
+                return False
+            
+            # Check if we have Python files to process
+            python_files = list(self.repo_path.rglob("*.py"))
+            if not python_files:
+                self.log("No Python files found in repository", "warning")
+                return True  # Not an error, just nothing to do
+            
+            self.log(f"Environment validation passed - found {len(python_files)} Python files", "verbose")
+            return True
+            
+        except Exception as e:
+            self.log(f"Environment validation failed: {e}", "error")
+            return False
+    
+    def _execute_phase(self, phase_name: str, phase_func: callable, description: str) -> bool:
+        """
+        Execute a single autofix phase with error handling
+        
+        Args:
+            phase_name: Name of the phase for tracking
+            phase_func: Function to execute
+            description: Human-readable description
+            
+        Returns:
+            True if phase completed successfully
+        """
+        try:
+            self.log(f"Starting {description}...")
+            phase_start = time.time()
+            
+            result = phase_func()
+            
+            phase_duration = time.time() - phase_start
+            self.results[phase_name] = result
+            
+            if isinstance(result, dict) and result.get('error'):
+                self.log(f"{description} completed with errors: {result['error']}", "warning")
+                return False
+            else:
+                self.log(f"{description} completed successfully in {phase_duration:.2f}s", "success")
+                return True
+                
+        except Exception as e:
+            error_msg = f"{description} failed with exception: {e}"
+            self.log(error_msg, "error")
+            self.logger.exception(f"Exception in phase {phase_name}")
+            self.results[phase_name] = {'error': str(e)}
+            return False
+    
     def run_complete_autofix(self) -> Dict:
-        """Run complete autofix process with enhanced capabilities"""
+        """
+        Run complete autofix process with enhanced capabilities and better error handling
+        
+        Returns:
+            Comprehensive report dictionary
+        """
         self.log("🛠️ Starting Enhanced MCP Autofix Process...")
+        self.log(f"Session ID: {self.session_id}")
+        self.log(f"Repository: {self.repo_path}")
+        self.log(f"Mode: {'DRY RUN' if self.dry_run else 'LIVE EXECUTION'}")
         
-        # Install tools first
+        # Environment validation
+        if not self._validate_environment():
+            return {'error': 'environment_validation_failed', 'session_id': self.session_id}
+        
+        # Tool installation and verification
         if not self.install_tools():
-            self.log("Failed to install required tools", "error")
-            return {'error': 'tool_installation_failed'}
+            return {'error': 'tool_installation_failed', 'session_id': self.session_id}
         
-        # Phase 1: Code formatting (existing)
-        self.log("Phase 1: Code formatting...")
-        self.results['formatting'] = self.fix_code_formatting()
+        # Define autofix phases
+        phases = [
+            ('formatting', self.fix_code_formatting, 'Code formatting with Black and isort'),
+            ('whitespace', self.fix_whitespace_issues, 'Whitespace and basic formatting cleanup'),
+            ('security_fixes', self.fix_security_issues, 'Security vulnerability fixes'),
+            ('undefined_fixes', self.fix_undefined_functions, 'Undefined function resolution'),
+            ('duplicate_fixes', self.fix_duplicate_functions, 'Duplicate function consolidation'),
+            ('type_fixes', self.fix_type_errors, 'Type error corrections'),
+            ('test_fixes', self.fix_test_failures, 'Test failure repairs'),
+        ]
         
-        # Phase 2: Whitespace cleanup (existing)
-        self.log("Phase 2: Whitespace cleanup...")
-        self.results['whitespace'] = self.fix_whitespace_issues()
+        # Analysis phases (run after fixes)
+        analysis_phases = [
+            ('security_scan', self.run_security_scan, 'Final security analysis'),
+            ('quality_analysis', self.run_quality_analysis, 'Final quality analysis'),
+            ('test_run', self.run_tests, 'Final test execution'),
+        ]
         
-        # Phase 3: Security fixes (enhanced)
-        self.log("Phase 3: Security fixes...")
-        self.results['security_fixes'] = self.fix_security_issues()
+        # Execute fix phases
+        successful_phases = 0
+        total_phases = len(phases) + len(analysis_phases)
         
-        # Phase 4: Undefined function resolution (new)
-        self.log("Phase 4: Undefined function resolution...")
-        self.results['undefined_fixes'] = self.fix_undefined_functions()
+        for phase_name, phase_func, description in phases:
+            if self._execute_phase(phase_name, phase_func, description):
+                successful_phases += 1
         
-        # Phase 5: Duplicate function consolidation (new)
-        self.log("Phase 5: Duplicate function consolidation...")
-        self.results['duplicate_fixes'] = self.fix_duplicate_functions()
-        
-        # Phase 6: Type error fixes (new)
-        self.log("Phase 6: Type error fixes...")
-        self.results['type_fixes'] = self.fix_type_errors()
-        
-        # Phase 7: Test failure repairs (new)
-        self.log("Phase 7: Test failure repairs...")
-        self.results['test_fixes'] = self.fix_test_failures()
-        
-        # Phase 8: Security scan (existing)
-        self.log("Phase 8: Final security scan...")
-        self.results['security'] = self.run_security_scan()
-        
-        # Phase 9: Quality analysis (existing)
-        self.log("Phase 9: Final quality analysis...")
-        self.results['quality'] = self.run_quality_analysis()
-        
-        # Phase 10: Final test run (existing)
-        self.log("Phase 10: Final test run...")
-        self.results['tests'] = self.run_tests()
+        # Execute analysis phases
+        for phase_name, phase_func, description in analysis_phases:
+            if self._execute_phase(phase_name, phase_func, description):
+                successful_phases += 1
         
         # Generate comprehensive report
-        report = self.generate_report()
+        try:
+            report = self.generate_report()
+        except Exception as e:
+            self.log(f"Report generation failed: {e}", "error")
+            report = {'error': 'report_generation_failed', 'details': str(e)}
         
-        # Enhanced summary
+        # Calculate and display summary
+        execution_time = time.time() - self.start_time
+        
         total_issues_found = sum([
             self.results.get('security_fixes', {}).get('issues_found', 0),
             self.results.get('undefined_fixes', {}).get('undefined_calls', 0),
@@ -1482,56 +2610,192 @@ def {func_call.name}(*args, **kwargs):
             self.results.get('type_fixes', {}).get('type_errors', 0),
         ])
         
-        self.log(f"🎉 Enhanced Autofix completed!", "success")
-        self.log(f"📊 Applied {self.fixes_applied} fixes across {total_issues_found} issues found")
-        self.log("📄 Check autofix-report.json for detailed results")
+        # Enhanced completion summary
+        self.log("="*60, "info")
+        self.log("🎉 Enhanced MCP Autofix Process Completed!", "success")
+        self.log(f"📊 Execution Summary:", "info")
+        self.log(f"  • Session ID: {self.session_id}", "info")
+        self.log(f"  • Execution time: {execution_time:.2f} seconds", "info")
+        self.log(f"  • Successful phases: {successful_phases}/{total_phases}", "info")
+        self.log(f"  • Total fixes applied: {self.fixes_applied}", "info")
+        self.log(f"  • Total issues found: {total_issues_found}", "info")
+        self.log(f"📄 Detailed report: autofix-reports/autofix-report-{self.session_id}.json", "info")
         
-        # Print summary by category
-        if self.verbose:
-            self.log("📋 Summary by category:", "info")
-            self.log(f"  Security: {self.results.get('security_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Undefined Functions: {self.results.get('undefined_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Duplicates: {self.results.get('duplicate_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Type Errors: {self.results.get('type_fixes', {}).get('fixes_applied', 0)} fixes", "info")
-            self.log(f"  Test Failures: {self.results.get('test_fixes', {}).get('fixes_applied', 0)} fixes", "info")
+        # Category breakdown if verbose
+        if self.verbose and total_issues_found > 0:
+            self.log("📋 Fixes by category:", "info")
+            categories = [
+                ('Security', 'security_fixes'),
+                ('Undefined Functions', 'undefined_fixes'),
+                ('Duplicates', 'duplicate_fixes'),
+                ('Type Errors', 'type_fixes'),
+                ('Test Failures', 'test_fixes'),
+            ]
+            
+            for category, key in categories:
+                fixes = self.results.get(key, {}).get('fixes_applied', 0)
+                if fixes > 0:
+                    self.log(f"  • {category}: {fixes} fixes", "info")
+        
+        self.log("="*60, "info")
+        
+        # Add execution metadata to report
+        if isinstance(report, dict):
+            report.update({
+                'session_id': self.session_id,
+                'execution_time': execution_time,
+                'successful_phases': successful_phases,
+                'total_phases': total_phases,
+                'completion_status': 'success' if successful_phases == total_phases else 'partial'
+            })
         
         return report
 
 
-@click.command()
-@click.option('--repo-path', type=click.Path(exists=True), help='Repository path')
-@click.option('--dry-run', is_flag=True, help='Show what would be fixed without applying changes')
-@click.option('--verbose', is_flag=True, help='Show detailed output')
-@click.option('--format-only', is_flag=True, help='Only run code formatting')
-@click.option('--scan-only', is_flag=True, help='Only run analysis without fixes')
-def main(repo_path, dry_run, verbose, format_only, scan_only):
-    """MCP Autofix Tool - Consolidated automated fixing system"""
+@click.command(context_settings={'help_option_names': ['-h', '--help']})
+@click.option('--repo-path', 
+              type=click.Path(exists=True), 
+              help='Repository path to process (default: current directory)')
+@click.option('--config-file', 
+              type=click.Path(exists=True), 
+              help='Configuration file path (JSON format)')
+@click.option('--dry-run', 
+              is_flag=True, 
+              help='Show what would be fixed without applying changes')
+@click.option('--verbose', '-v', 
+              is_flag=True, 
+              help='Show detailed output and debug information')
+@click.option('--format-only', 
+              is_flag=True, 
+              help='Only run code formatting (Black + isort)')
+@click.option('--security-only', 
+              is_flag=True, 
+              help='Only run security analysis and fixes')
+@click.option('--scan-only', 
+              is_flag=True, 
+              help='Only run analysis without applying any fixes')
+@click.option('--no-backup', 
+              is_flag=True, 
+              help='Disable backup file creation')
+@click.option('--session-id', 
+              help='Custom session ID for tracking (default: auto-generated)')
+@click.version_option(version='2.0.0', prog_name='MCP Autofix')
+def main(repo_path, config_file, dry_run, verbose, format_only, security_only, scan_only, no_backup, session_id):
+    """
+    MCP Autofix Tool - Consolidated automated fixing system
     
-    autofix = MCPAutofix(
-        repo_path=Path(repo_path) if repo_path else None,
-        dry_run=dry_run,
-        verbose=verbose
-    )
+    This tool provides comprehensive automated code fixing capabilities using
+    industry-standard tools including Black, isort, Bandit, Flake8, and MyPy.
     
-    if format_only:
-        # Only run formatting
-        autofix.log("🎨 Running code formatting only...")
-        results = autofix.fix_code_formatting()
-        autofix.log(f"Formatting completed: {results}")
+    Examples:
+    
+        # Run complete autofix process
+        python autofix.py
         
-    elif scan_only:
-        # Only run analysis
-        autofix.log("🔍 Running analysis only...")
-        security_results = autofix.run_security_scan()
-        quality_results = autofix.run_quality_analysis()
-        autofix.log(f"Analysis completed - Security: {security_results}, Quality: {quality_results}")
+        # Preview changes without applying them
+        python autofix.py --dry-run --verbose
         
-    else:
-        # Run complete autofix
-        results = autofix.run_complete_autofix()
+        # Only format code
+        python autofix.py --format-only
         
-        if 'error' in results:
-            sys.exit(1)
+        # Only security analysis and fixes
+        python autofix.py --security-only
+        
+        # Analysis only (no fixes applied)
+        python autofix.py --scan-only
+        
+        # Use custom configuration
+        python autofix.py --config-file config.json
+    """
+    
+    # Validate mutually exclusive options
+    exclusive_options = [format_only, security_only, scan_only]
+    if sum(exclusive_options) > 1:
+        click.echo("Error: --format-only, --security-only, and --scan-only are mutually exclusive", err=True)
+        sys.exit(1)
+    
+    try:
+        # Initialize autofix with configuration
+        autofix = MCPAutofix(
+            repo_path=Path(repo_path) if repo_path else None,
+            dry_run=dry_run,
+            verbose=verbose,
+            config_file=Path(config_file) if config_file else None
+        )
+        
+        # Override session ID if provided
+        if session_id:
+            autofix.session_id = session_id
+        
+        # Override backup setting if requested
+        if no_backup:
+            autofix.config.backup_enabled = False
+        
+        # Execute based on selected mode
+        if format_only:
+            autofix.log("🎨 Running code formatting only...")
+            results = autofix.fix_code_formatting()
+            
+            if results.get('black') and results.get('isort'):
+                autofix.log("Code formatting completed successfully", "success")
+                sys.exit(0)
+            else:
+                autofix.log("Code formatting completed with issues", "warning")
+                sys.exit(1)
+                
+        elif security_only:
+            autofix.log("🛡️ Running security analysis and fixes only...")
+            
+            # First scan for issues
+            scan_results = autofix.run_security_scan()
+            autofix.log(f"Security scan found {scan_results.get('issues_found', 0)} issues")
+            
+            # Apply fixes if issues found
+            if scan_results.get('issues_found', 0) > 0:
+                fix_results = autofix.fix_security_issues()
+                autofix.log(f"Applied {fix_results.get('fixes_applied', 0)} security fixes")
+            
+            sys.exit(0)
+            
+        elif scan_only:
+            autofix.log("🔍 Running analysis only...")
+            
+            # Run all analysis tools
+            security_results = autofix.run_security_scan()
+            quality_results = autofix.run_quality_analysis()
+            
+            # Display summary
+            autofix.log("Analysis Summary:", "info")
+            autofix.log(f"  Security issues: {security_results.get('issues_found', 0)}", "info")
+            autofix.log(f"  Security scan: {'✓' if security_results.get('scan_completed') else '✗'}", "info")
+            autofix.log(f"  Quality analysis: {'✓' if quality_results.get('flake8') and quality_results.get('mypy') else '✗'}", "info")
+            
+            sys.exit(0)
+            
+        else:
+            # Run complete autofix process
+            results = autofix.run_complete_autofix()
+            
+            # Determine exit code based on results
+            if isinstance(results, dict) and results.get('error'):
+                autofix.log(f"Autofix failed: {results['error']}", "error")
+                sys.exit(1)
+            elif isinstance(results, dict) and results.get('completion_status') == 'success':
+                autofix.log("Autofix completed successfully", "success")
+                sys.exit(0)
+            else:
+                autofix.log("Autofix completed with some issues", "warning")
+                sys.exit(2)
+    
+    except KeyboardInterrupt:
+        click.echo("\nOperation cancelled by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Unexpected error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
