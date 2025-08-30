@@ -8304,6 +8304,70 @@ def {func_call.name}(*args, **kwargs):
                     continue
         
         return issues
+
+    def _fix_syntax_issues(self) -> Dict:
+        """Fix syntax issues for cascading engine"""
+        if hasattr(self, 'syntax_autopilot'):
+            try:
+                return self.run_syntax_autopilot()
+            except Exception as e:
+                return {'fixes_applied': 0, 'error': str(e)}
+        else:
+            # Fallback syntax fixing
+            fixes_applied = 0
+            python_files = list(self.repo_path.rglob("*.py"))
+            
+            for py_file in python_files[:10]:  # Limit to avoid long processing
+                try:
+                    with open(py_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Try to parse and count as working file
+                    try:
+                        ast.parse(content)
+                    except SyntaxError:
+                        # Simple syntax fixes (this is very basic)
+                        if self._fix_simple_syntax_issues(py_file):
+                            fixes_applied += 1
+                            
+                except Exception:
+                    continue
+            
+            return {'fixes_applied': fixes_applied}
+
+    def _fix_simple_syntax_issues(self, file_path: Path) -> bool:
+        """Apply simple syntax fixes"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            original_content = content
+            
+            # Fix common simple issues
+            # Remove trailing whitespace which can cause issues
+            lines = content.split('\n')
+            fixed_lines = [line.rstrip() for line in lines]
+            content = '\n'.join(fixed_lines)
+            
+            # Ensure file ends with newline
+            if content and not content.endswith('\n'):
+                content += '\n'
+            
+            if content != original_content:
+                if not self.dry_run:
+                    try:
+                        # Validate syntax before writing
+                        ast.parse(content)
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        return True
+                    except SyntaxError:
+                        pass  # Don't write if syntax is still invalid
+                        
+        except Exception:
+            pass
+            
+        return False
         """
         Run syntax autopilot pre-processor to ensure code is parseable before main pipeline.
         This implements the antifragile architecture - becoming stronger when encountering errors.
