@@ -180,3 +180,5 @@ test-agent-123.json
 
 # Autofix results (temporary)
 autofix-results/autofix-reports/autofix-report-*.json
+autofix-reports/
+*.log
