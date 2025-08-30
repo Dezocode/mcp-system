@@ -26,6 +26,7 @@ Best Practices Implemented:
 import ast
 import difflib
 import importlib.util
+import io
 import json
 import logging
 import os
@@ -34,7 +35,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
+import tokenize
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -60,6 +63,623 @@ class SecurityIssue(NamedTuple):
     line_number: int
     issue_text: str
     severity: str
+
+
+class SyntaxRepairResult(NamedTuple):
+    """Track syntax repair results"""
+    
+    success: bool
+    original_content: str
+    repaired_content: str
+    repairs_applied: List[str]
+    confidence: float
+    strategy_used: str
+
+
+class SyntaxAutopilot:
+    """
+    Autonomous syntax error detection and repair system.
+    Runs as a pre-processor before main autofix pipeline to ensure code is parseable.
+    
+    Implements antifragile architecture - becomes stronger when encountering errors.
+    """
+    
+    def __init__(self, repo_path: Path, verbose: bool = False):
+        self.repo_path = repo_path
+        self.verbose = verbose
+        self.syntax_fixers = self._initialize_fixers()
+        self.fix_history = []
+        self.pattern_database = {}
+        self.confidence_threshold = 0.75
+        self.max_repair_attempts = 3
+        
+    def _initialize_fixers(self):
+        """Initialize all syntax fixing strategies"""
+        return [
+            # Standard library-based fixers
+            ASTSyntaxRepairer(),
+            TokenBasedRepairer(), 
+            PatternBasedRepairer(),
+            FStringBraceEscaper(),
+            IndentationNormalizer(),
+            QuoteConsistencyFixer(),
+            BracketBalancer(),
+            ImportSyntaxFixer(),
+        ]
+        
+    def scan_syntax_errors(self) -> List[Dict]:
+        """Scan repository for syntax errors"""
+        syntax_errors = []
+        python_files = list(self.repo_path.rglob('*.py'))
+        
+        for py_file in python_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                # Try to parse with AST
+                try:
+                    ast.parse(content)
+                except SyntaxError as e:
+                    syntax_errors.append({
+                        'file': py_file,
+                        'line': e.lineno,
+                        'offset': e.offset,
+                        'msg': e.msg,
+                        'content': content,
+                        'error_type': 'syntax_error'
+                    })
+                except Exception as e:
+                    syntax_errors.append({
+                        'file': py_file,
+                        'line': 1,
+                        'offset': 1,
+                        'msg': str(e),
+                        'content': content,
+                        'error_type': 'parse_error'
+                    })
+                    
+            except Exception:
+                continue
+                
+        return syntax_errors
+        
+    def repair_all_errors(self, syntax_errors: List[Dict]) -> Dict:
+        """Repair all detected syntax errors"""
+        results = {
+            'total_errors': len(syntax_errors),
+            'fixed_count': 0,
+            'failed_count': 0,
+            'repairs': []
+        }
+        
+        for error in syntax_errors:
+            repair_result = self.repair_file_errors(error['file'])
+            results['repairs'].append(repair_result)
+            
+            if repair_result.success:
+                results['fixed_count'] += 1
+            else:
+                results['failed_count'] += 1
+                
+        return results
+        
+    def repair_file_errors(self, file_path: Path) -> SyntaxRepairResult:
+        """Repair syntax errors in a single file using cascading strategies"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                original_content = f.read()
+                
+            current_content = original_content
+            repairs_applied = []
+            overall_confidence = 0.0
+            strategy_used = 'none'
+            
+            # Try each fixer in sequence until code is parseable
+            for fixer in self.syntax_fixers:
+                try:
+                    # Check if we still have syntax errors
+                    try:
+                        ast.parse(current_content)
+                        # Code is now parseable, we're done
+                        break
+                    except SyntaxError:
+                        # Still has errors, try this fixer
+                        pass
+                        
+                    repair_result = fixer.repair(current_content, file_path)
+                    
+                    if repair_result and repair_result['success']:
+                        current_content = repair_result['content']
+                        repairs_applied.extend(repair_result['repairs'])
+                        overall_confidence = max(overall_confidence, repair_result['confidence'])
+                        strategy_used = fixer.__class__.__name__
+                        
+                        # Validate the repair
+                        try:
+                            ast.parse(current_content)
+                            # Success! Write the fixed content
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(current_content)
+                            break
+                        except SyntaxError:
+                            # This fixer didn't fully resolve it, try next
+                            continue
+                            
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Fixer {fixer.__class__.__name__} failed: {e}")
+                    continue
+                    
+            # Final validation
+            success = False
+            try:
+                ast.parse(current_content)
+                success = True
+            except SyntaxError:
+                # Restoration to original if all fixers failed
+                current_content = original_content
+                
+            return SyntaxRepairResult(
+                success=success,
+                original_content=original_content,
+                repaired_content=current_content,
+                repairs_applied=repairs_applied,
+                confidence=overall_confidence,
+                strategy_used=strategy_used
+            )
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"Error repairing {file_path}: {e}")
+            return SyntaxRepairResult(
+                success=False,
+                original_content="",
+                repaired_content="",
+                repairs_applied=[],
+                confidence=0.0,
+                strategy_used='failed'
+            )
+
+
+class ASTSyntaxRepairer:
+    """Repair syntax errors using AST analysis and reconstruction"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.85
+        
+        try:
+            # Try to get more information about the syntax error
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': [], 'confidence': 1.0}
+            except SyntaxError as e:
+                # Attempt targeted repairs based on error message
+                if 'f-string' in str(e.msg):
+                    content = self._fix_fstring_errors(content)
+                    repairs.append('f-string brace escaping')
+                elif 'indent' in str(e.msg).lower():
+                    content = self._fix_indentation_errors(content)
+                    repairs.append('indentation normalization')
+                elif 'bracket' in str(e.msg).lower() or 'paren' in str(e.msg).lower():
+                    content = self._fix_bracket_errors(content)
+                    repairs.append('bracket balancing')
+                else:
+                    # Generic repairs
+                    content = self._apply_generic_repairs(content)
+                    repairs.append('generic syntax repair')
+                    
+            # Validate repair
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _fix_fstring_errors(self, content: str) -> str:
+        """Fix f-string brace escaping issues"""
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            # Simple f-string brace escaping
+            if 'f"' in line or "f'" in line:
+                # Pattern to find unescaped braces in f-strings
+                # This is a simple heuristic - could be more sophisticated
+                if '{' in line and '}' in line:
+                    # Count braces to ensure they're balanced for variables
+                    open_braces = line.count('{')
+                    close_braces = line.count('}')
+                    
+                    # If unbalanced, try to escape literal braces
+                    if open_braces != close_braces:
+                        # Simple approach: escape single braces not followed by Python identifiers
+                        import re
+                        # Look for single braces not followed by Python identifiers
+                        line = re.sub(r'(?<!{){(?![a-zA-Z_])', '{{', line)
+                        line = re.sub(r'(?<![a-zA-Z0-9_])}(?!})', '}}', line)
+                        
+            fixed_lines.append(line)
+            
+        return '\n'.join(fixed_lines)
+        
+    def _fix_indentation_errors(self, content: str) -> str:
+        """Fix indentation-related syntax errors"""
+        try:
+            # Use textwrap.dedent to normalize indentation
+            import textwrap
+            return textwrap.dedent(content)
+        except:
+            return content
+            
+    def _fix_bracket_errors(self, content: str) -> str:
+        """Attempt to balance brackets, parentheses, and braces"""
+        # Simple bracket balancing - count and try to balance
+        open_chars = {'(': ')', '[': ']', '{': '}'}
+        stack = []
+        
+        lines = content.split('\n')
+        
+        for i, line in enumerate(lines):
+            for char in line:
+                if char in open_chars:
+                    stack.append((char, i))
+                elif char in open_chars.values():
+                    if stack and open_chars[stack[-1][0]] == char:
+                        stack.pop()
+                        
+        # If we have unmatched opening brackets, try to close them
+        if stack:
+            # Add closing brackets at the end
+            closing_brackets = [open_chars[char] for char, _ in stack]
+            lines.append(''.join(closing_brackets))
+            
+        return '\n'.join(lines)
+        
+    def _apply_generic_repairs(self, content: str) -> str:
+        """Apply generic syntax repairs"""
+        # Remove trailing whitespace
+        lines = [line.rstrip() for line in content.split('\n')]
+        
+        # Ensure file ends with newline
+        if lines and lines[-1]:
+            lines.append('')
+            
+        return '\n'.join(lines)
+
+
+class TokenBasedRepairer:
+    """Repair syntax errors using tokenization analysis"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.80
+        
+        try:
+            # Try tokenizing to find issues
+            tokens = self._safe_tokenize(content)
+            if tokens is None:
+                return None
+                
+            # Analyze tokens for common issues
+            content = self._fix_token_issues(content, tokens)
+            repairs.append('token-based repair')
+            
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _safe_tokenize(self, content: str) -> Optional[List]:
+        """Safely tokenize content, returning None if it fails"""
+        try:
+            tokens = []
+            content_io = io.StringIO(content)
+            for token in tokenize.generate_tokens(content_io.readline):
+                tokens.append(token)
+            return tokens
+        except tokenize.TokenError:
+            return None
+        except Exception:
+            return None
+            
+    def _fix_token_issues(self, content: str, tokens: List) -> str:
+        """Fix issues detected through tokenization"""
+        # This is a placeholder for more sophisticated token-based repairs
+        # For now, just return content as-is
+        return content
+
+
+class PatternBasedRepairer:
+    """Repair syntax errors using regex patterns for common issues"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.75
+        original_content = content
+        
+        try:
+            # Apply pattern-based fixes
+            content = self._fix_common_patterns(content, repairs)
+            
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _fix_common_patterns(self, content: str, repairs: List[str]) -> str:
+        """Apply common pattern-based fixes"""
+        # Fix common Python syntax issues
+        
+        # 1. Fix missing colons after if/for/while/def/class
+        import re
+        
+        # This is a simple pattern - in practice would need more sophisticated parsing
+        colon_patterns = [
+            (r'(if\s+.+)(?<![:\n])\s*\n', r'\1:\n'),
+            (r'(for\s+.+)(?<![:\n])\s*\n', r'\1:\n'),
+            (r'(while\s+.+)(?<![:\n])\s*\n', r'\1:\n'),
+            (r'(def\s+\w+\s*\([^)]*\))(?<![:\n])\s*\n', r'\1:\n'),
+            (r'(class\s+\w+(?:\([^)]*\))?)(?<![:\n])\s*\n', r'\1:\n'),
+        ]
+        
+        for pattern, replacement in colon_patterns:
+            new_content = re.sub(pattern, replacement, content)
+            if new_content != content:
+                content = new_content
+                repairs.append('missing colon')
+                
+        return content
+
+
+class FStringBraceEscaper:
+    """Specialized fixer for f-string brace escaping issues"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.90
+        original_content = content
+        
+        try:
+            content = self._escape_fstring_braces(content)
+            if content != original_content:
+                repairs.append('f-string brace escaping')
+                
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _escape_fstring_braces(self, content: str) -> str:
+        """Intelligently escape braces in f-strings while preserving variables"""
+        import re
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            # Detect f-string patterns
+            if re.search(r'f["\']', line):
+                # More sophisticated f-string brace handling
+                line = self._fix_fstring_line(line)
+            fixed_lines.append(line)
+            
+        return '\n'.join(fixed_lines)
+        
+    def _fix_fstring_line(self, line: str) -> str:
+        """Fix f-string braces in a single line"""
+        import re
+        
+        # Pattern to match f-strings
+        fstring_pattern = r'f(["\'])(.*?)\1'
+        
+        def fix_fstring_content(match):
+            quote = match.group(1)
+            content = match.group(2)
+            
+            # Simple heuristic: escape braces that aren't part of variable expressions
+            # Look for braces not followed by valid Python identifiers
+            fixed_content = re.sub(r'{(?![a-zA-Z_])', '{{', content)
+            fixed_content = re.sub(r'(?<![a-zA-Z0-9_.])}', '}}', fixed_content)
+            
+            return f'f{quote}{fixed_content}{quote}'
+            
+        return re.sub(fstring_pattern, fix_fstring_content, line)
+
+
+class IndentationNormalizer:
+    """Fix mixed tabs/spaces and indentation issues"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.95
+        original_content = content
+        
+        try:
+            content = self._normalize_indentation(content)
+            if content != original_content:
+                repairs.append('indentation normalization')
+                
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _normalize_indentation(self, content: str) -> str:
+        """Convert all indentation to spaces and fix levels"""
+        import textwrap
+        
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            # Convert tabs to 4 spaces
+            line = line.expandtabs(4)
+            fixed_lines.append(line)
+            
+        # Use textwrap.dedent to normalize overall indentation
+        result = '\n'.join(fixed_lines)
+        return textwrap.dedent(result)
+
+
+class QuoteConsistencyFixer:
+    """Fix string quote mismatch issues"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.85
+        original_content = content
+        
+        try:
+            content = self._fix_quote_issues(content)
+            if content != original_content:
+                repairs.append('quote consistency')
+                
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _fix_quote_issues(self, content: str) -> str:
+        """Fix basic string quote issues"""
+        # This is a simplified implementation
+        # In practice, this would need much more sophisticated string parsing
+        
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            # Simple heuristic: if line has unmatched quotes, try to balance
+            single_quotes = line.count("'")
+            double_quotes = line.count('"')
+            
+            # If odd number of quotes, might be unclosed string
+            if single_quotes % 2 == 1 and '"' not in line:
+                # Try adding closing quote at end of line
+                line = line + "'"
+            elif double_quotes % 2 == 1 and "'" not in line:
+                line = line + '"'
+                
+            fixed_lines.append(line)
+            
+        return '\n'.join(fixed_lines)
+
+
+class BracketBalancer:
+    """Fix unclosed brackets, parentheses, and braces"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.85
+        original_content = content
+        
+        try:
+            content = self._balance_brackets(content)
+            if content != original_content:
+                repairs.append('bracket balancing')
+                
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _balance_brackets(self, content: str) -> str:
+        """Balance brackets, parentheses, and braces"""
+        open_chars = {'(': ')', '[': ']', '{': '}'}
+        stack = []
+        
+        for char in content:
+            if char in open_chars:
+                stack.append(char)
+            elif char in open_chars.values():
+                # Find matching opening bracket
+                for opener, closer in open_chars.items():
+                    if char == closer and stack and stack[-1] == opener:
+                        stack.pop()
+                        break
+                        
+        # Add missing closing brackets
+        closing_brackets = [open_chars[char] for char in reversed(stack)]
+        
+        if closing_brackets:
+            content = content + ''.join(closing_brackets)
+            
+        return content
+
+
+class ImportSyntaxFixer:
+    """Fix import statement syntax issues"""
+    
+    def repair(self, content: str, file_path: Path) -> Optional[Dict]:
+        repairs = []
+        confidence = 0.90
+        original_content = content
+        
+        try:
+            content = self._fix_import_syntax(content)
+            if content != original_content:
+                repairs.append('import syntax')
+                
+            # Validate
+            try:
+                ast.parse(content)
+                return {'success': True, 'content': content, 'repairs': repairs, 'confidence': confidence}
+            except SyntaxError:
+                return {'success': False, 'content': content, 'repairs': repairs, 'confidence': 0.0}
+                
+        except Exception:
+            return None
+            
+    def _fix_import_syntax(self, content: str) -> str:
+        """Fix common import syntax issues"""
+        import re
+        
+        lines = content.split('\n')
+        fixed_lines = []
+        
+        for line in lines:
+            # Fix hyphenated module names (common issue)
+            if 'import' in line and '-' in line:
+                # Convert hyphens to underscores in import statements
+                line = re.sub(r'(import\s+[a-zA-Z0-9_-]+)-([a-zA-Z0-9_-]+)', r'\1_\2', line)
+                line = re.sub(r'(from\s+[a-zA-Z0-9_.-]+)-([a-zA-Z0-9_-]+)', r'\1_\2', line)
+                
+            fixed_lines.append(line)
+            
+        return '\n'.join(fixed_lines)
 
 
 class EnhancedTemplateDetector:
@@ -2014,6 +2634,13 @@ class AutofixConfig:
         self.orphan_confidence_threshold = 0.9
         self.duplicate_similarity_threshold = 0.95
 
+        # Syntax Autopilot settings (from SYNTAX-ERROR-AUTOPILOT-ADDON.md)
+        self.enable_syntax_autopilot = True
+        self.syntax_autopilot_confidence_threshold = 0.75
+        self.syntax_autopilot_max_attempts = 3
+        self.syntax_autopilot_cascade_fixers = True
+        self.syntax_autopilot_pattern_learning = True
+
         # Tool availability tracking (set during runtime)
         self.available_tools = []
         self.missing_tools = []
@@ -2106,6 +2733,13 @@ class MCPAutofix:
             'dynamics_staticized': 0,
             'dependencies_fixed': 0
         }
+
+        # === SYNTAX AUTOPILOT INTEGRATION ===
+        # Initialize antifragile syntax error pre-processor 
+        self.syntax_autopilot_enabled = getattr(self.config, 'enable_syntax_autopilot', True)
+        if self.syntax_autopilot_enabled:
+            self.syntax_autopilot = SyntaxAutopilot(self.repo_path, self.verbose)
+            self.log("🛡️ Syntax Autopilot initialized - antifragile mode enabled", "info")
 
         self.log("🚀 Level 2 Enhancement Components initialized", "info")
 
@@ -7365,6 +7999,116 @@ def {func_call.name}(*args, **kwargs):
 
         return results
 
+    def run_syntax_autopilot(self) -> Dict:
+        """
+        Run syntax autopilot pre-processor to ensure code is parseable before main pipeline.
+        This implements the antifragile architecture - becoming stronger when encountering errors.
+        
+        Returns:
+            Dictionary with syntax repair results
+        """
+        # Check if syntax autopilot is enabled (CLI flag can override config)
+        if not getattr(self.config, 'enable_syntax_autopilot', True):
+            return {
+                'success': True, 
+                'skipped': True,
+                'reason': 'syntax_autopilot_disabled_by_config'
+            }
+            
+        # Check if syntax autopilot object exists
+        if not hasattr(self, 'syntax_autopilot'):
+            self.log("⚠️ Syntax Autopilot not initialized, skipping...", "warning")
+            return {
+                'success': True, 
+                'skipped': True,
+                'reason': 'syntax_autopilot_not_initialized'
+            }
+            
+        self.log("🛡️ Running Syntax Autopilot pre-processor...")
+        
+        try:
+            # Scan for syntax errors
+            syntax_errors = self.syntax_autopilot.scan_syntax_errors()
+            
+            if not syntax_errors:
+                self.log("✅ No syntax errors found - code is already parseable", "success")
+                return {
+                    'success': True,
+                    'errors_found': 0,
+                    'errors_fixed': 0,
+                    'skipped': False
+                }
+            
+            self.log(f"🔧 Found {len(syntax_errors)} syntax errors, applying repairs...")
+            
+            if self.dry_run:
+                self.log("[DRY RUN] Would repair syntax errors:", "info")
+                for error in syntax_errors:
+                    self.log(f"  • {error['file']}:{error['line']} - {error['msg']}", "info")
+                return {
+                    'success': True,
+                    'errors_found': len(syntax_errors),
+                    'errors_fixed': 0,
+                    'dry_run': True
+                }
+            
+            # Apply repairs
+            repair_results = self.syntax_autopilot.repair_all_errors(syntax_errors)
+            
+            # Log results
+            fixed_count = repair_results['fixed_count']
+            failed_count = repair_results['failed_count']
+            
+            if fixed_count > 0:
+                self.log(f"✅ Syntax Autopilot fixed {fixed_count} syntax errors", "success")
+                self.fixes_applied += fixed_count
+                
+            if failed_count > 0:
+                self.log(f"⚠️ {failed_count} syntax errors could not be automatically fixed", "warning")
+            
+            # Save repair report
+            report_file = self.report_dir / f"syntax-autopilot-{self.session_id}.json"
+            try:
+                with open(report_file, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        'session_id': self.session_id,
+                        'timestamp': datetime.now().isoformat(),
+                        'errors_found': len(syntax_errors),
+                        'errors_fixed': fixed_count,
+                        'errors_failed': failed_count,
+                        'repairs': [
+                            {
+                                'file': str(repair.original_content != repair.repaired_content),
+                                'success': repair.success,
+                                'confidence': repair.confidence,
+                                'strategy': repair.strategy_used,
+                                'repairs_applied': repair.repairs_applied
+                            }
+                            for repair in repair_results['repairs']
+                        ]
+                    }, f, indent=2)
+                self.log(f"📄 Syntax autopilot report saved: {report_file}", "verbose")
+            except Exception as e:
+                self.log(f"Warning: Could not save syntax autopilot report: {e}", "warning")
+            
+            return {
+                'success': True,
+                'errors_found': len(syntax_errors),
+                'errors_fixed': fixed_count,
+                'errors_failed': failed_count,
+                'repair_results': repair_results
+            }
+            
+        except Exception as e:
+            self.log(f"❌ Syntax Autopilot failed: {e}", "error")
+            self.logger.exception("Syntax Autopilot error")
+            return {
+                'success': False,
+                'error': str(e),
+                'errors_found': 0,
+                'errors_fixed': 0
+            }
+
     def run_complete_autofix(self) -> Dict:
         """
         Run complete autofix process with enhanced higher resolution capabilities
@@ -7434,6 +8178,13 @@ def {func_call.name}(*args, **kwargs):
         if not self.install_tools():
             return {"error": "tool_installation_failed", "session_id": self.session_id}
 
+        # === SYNTAX AUTOPILOT PRE-PROCESSOR ===
+        # Run syntax autopilot FIRST to ensure all code is parseable
+        # This implements the antifragile architecture from SELF-HEALING-AUTOFIX-ARCHITECTURE.md
+        syntax_autopilot_results = self.run_syntax_autopilot()
+        if not syntax_autopilot_results.get('success', True):
+            self.log("⚠️ Syntax Autopilot encountered issues, but continuing...", "warning")
+        
         # Enhanced phase definitions with higher resolution capabilities
         phases = [
             (
@@ -7613,6 +8364,9 @@ def {func_call.name}(*args, **kwargs):
     "--disable-surgical-fixes", is_flag=True, help="Disable surgical fix mode"
 )
 @click.option(
+    "--disable-syntax-autopilot", is_flag=True, help="Disable syntax error autopilot pre-processor"
+)
+@click.option(
     "--confidence-threshold", type=float, default=0.8, help="Minimum confidence threshold for automatic fixes (0.0-1.0)"
 )
 @click.version_option(version="2.0.0", prog_name="MCP Autofix")
@@ -7633,6 +8387,7 @@ def main(
     import_optimization,
     disable_smart_imports,
     disable_surgical_fixes,
+    disable_syntax_autopilot,
     confidence_threshold,
 ):
     """
@@ -7670,6 +8425,9 @@ def main(
 
         # Smart import optimization
         python autofix.py --import-optimization
+
+        # Disable syntax error autopilot (antifragile pre-processor)
+        python autofix.py --disable-syntax-autopilot
 
         # Run with real-time file monitoring
         python autofix.py --monitor
@@ -7729,9 +8487,13 @@ def main(
         if disable_surgical_fixes:
             autofix.config.surgical_fix_mode = False
 
+        if disable_syntax_autopilot:
+            autofix.config.enable_syntax_autopilot = False
+
         if confidence_threshold != 0.8:
             autofix.config.import_confidence_threshold = confidence_threshold
             autofix.config.typo_similarity_threshold = confidence_threshold
+            autofix.config.syntax_autopilot_confidence_threshold = confidence_threshold
 
         # Execute based on selected mode
         if undefined_functions_only:
