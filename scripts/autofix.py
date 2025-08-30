@@ -2079,6 +2079,9 @@ class MCPAutofix:
         # Setup logging (requires session_id to be set)
         self._setup_logging()
 
+        # Clear any stale cache from previous runs
+        self._clear_all_caches()
+
         # Initialize higher resolution components
         if self.config.enable_high_resolution:
             self.high_res_analyzer = HighResolutionAnalyzer(self.repo_path, self.config)
@@ -2175,6 +2178,36 @@ class MCPAutofix:
             # Only print to console if appropriate level
             if level != "verbose" or self.verbose:
                 print(f"{prefix} {message}")
+
+    def _clear_all_caches(self):
+        """Clear any cached analysis from previous runs"""
+        cache_patterns = [
+            ".mypy_cache",
+            ".autofix_cache", 
+            "*.cache",
+            "__pycache__"
+        ]
+        
+        self.log("🧹 Clearing cache files from previous runs...", "verbose")
+        cleared_count = 0
+        
+        for pattern in cache_patterns:
+            for cache in self.repo_path.glob(f"**/{pattern}"):
+                try:
+                    if cache.is_dir():
+                        shutil.rmtree(cache)
+                        self.log(f"Cleared cache directory: {cache.relative_to(self.repo_path)}", "verbose")
+                    else:
+                        cache.unlink()
+                        self.log(f"Cleared cache file: {cache.relative_to(self.repo_path)}", "verbose")
+                    cleared_count += 1
+                except Exception as e:
+                    self.log(f"Warning: Could not clear cache {cache}: {e}", "warning")
+        
+        if cleared_count > 0:
+            self.log(f"✅ Cleared {cleared_count} cache files/directories", "info")
+        else:
+            self.log("✅ No cache files to clear", "verbose")
 
     def run_command(
         self, cmd: List[str], description: str = ""
@@ -7661,6 +7694,18 @@ def main(
         sys.exit(1)
 
     try:
+        # Clear all cache files before starting
+        repo_path_obj = Path(repo_path) if repo_path else Path.cwd()
+        cache_files = repo_path_obj.glob("**/*.cache")
+        for cache in cache_files:
+            try:
+                cache.unlink()
+                if verbose:
+                    click.echo(f"Cleared cache file: {cache}")
+            except Exception as e:
+                if verbose:
+                    click.echo(f"Warning: Could not clear cache file {cache}: {e}")
+        
         # Initialize autofix with configuration
         autofix = MCPAutofix(
             repo_path=Path(repo_path) if repo_path else None,
