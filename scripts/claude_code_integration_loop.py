@@ -255,7 +255,6 @@ class EnhancedClaudeCodeIntegrationLoop:
             print()
             claude_step = self.run_claude_guided_fixes(analysis_step)
             iteration_result["steps"].append(claude_step)
-            iteration_result["issues_fixed"] += claude_step.get("fixes_applied", 0)
 
         # Step 5: Post-fix validation
         print()
@@ -268,6 +267,10 @@ class EnhancedClaudeCodeIntegrationLoop:
         iteration_result["steps"].append(assessment_step)
         iteration_result["issues_remaining"] = assessment_step["remaining_issues"]
         iteration_result["github_ready"] = assessment_step["github_ready"]
+        
+        # Use empirical validation data for accurate tracking
+        iteration_result["issues_fixed"] = assessment_step.get("actual_fixes_resolved", 0)
+        iteration_result["validation_method"] = assessment_step.get("validation_method", "unknown")
 
         # Determine if we should continue
         if assessment_step["github_ready"]:
@@ -287,8 +290,9 @@ class EnhancedClaudeCodeIntegrationLoop:
 
         print(f"\n📊 Iteration {iteration} Summary:")
         print(f"   Issues found: {iteration_result['issues_found']}")
-        print(f"   Issues fixed: {iteration_result['issues_fixed']}")
+        print(f"   Issues actually resolved: {iteration_result['issues_fixed']} (empirical)")
         print(f"   Issues remaining: {iteration_result['issues_remaining']}")
+        print(f"   Validation method: {iteration_result['validation_method']}")
         print(f"   GitHub ready: {'✅' if iteration_result['github_ready'] else '❌'}")
         print(f"   Continue: {'✅' if iteration_result['should_continue'] else '❌'}")
 
@@ -463,14 +467,16 @@ class EnhancedClaudeCodeIntegrationLoop:
     def apply_automatic_fixes(
         self, analysis: Dict[str, Any], auto_fix_threshold: int
     ) -> Dict[str, Any]:
-        """Apply automatic fixes using quality patcher"""
+        """Apply automatic fixes using quality patcher with before/after validation"""
 
         if not analysis.get("success") or analysis.get("auto_fixable", 0) == 0:
             return {
                 "step": "automatic_fixes",
                 "success": True,
                 "fixes_applied": 0,
+                "actual_issues_resolved": 0,
                 "reason": "no_auto_fixes_available",
+                "validation_method": "none_needed",
             }
 
         auto_fixable = analysis.get("auto_fixable", 0)
@@ -479,6 +485,13 @@ class EnhancedClaudeCodeIntegrationLoop:
 
         try:
             print(f"   🔧 Applying {fixes_to_apply} automatic fixes...")
+            
+            # BEFORE: Capture initial issue state for validation
+            initial_issues = analysis.get("total_issues", 0)
+            print(f"   📊 Pre-fix validation: {initial_issues} issues detected")
+
+            # Create temporary JSON output file for reliable fix counting
+            json_output_path = self._create_temp_json_path("autofix_report")
 
             result = subprocess.run(
                 [
@@ -487,6 +500,8 @@ class EnhancedClaudeCodeIntegrationLoop:
                     "--claude-agent",
                     f"--max-fixes={fixes_to_apply}",
                     "--no-interactive",
+                    "--output-format=json",
+                    f"--output-file={json_output_path}",
                 ],
                 capture_output=True,
                 text=True,
@@ -494,13 +509,44 @@ class EnhancedClaudeCodeIntegrationLoop:
                 timeout=1800,
             )  # 30 minutes for ALL fixes
 
-            # Parse result to extract fixes applied
-            fixes_applied = self.extract_fixes_applied(result.stdout)
+            # Parse result to extract fixes applied (reported by quality patcher)
+            reported_fixes_applied = self.extract_fixes_applied(result.stdout, str(json_output_path))
+            
+            # Clean up temporary JSON file
+            self._cleanup_temp_file(json_output_path)
+
+            # AFTER: Empirical validation - re-scan to verify actual issue resolution
+            post_fix_issues = self.rescan_for_actual_remaining_issues()
+            
+            if post_fix_issues >= 0:
+                # Calculate actual issues resolved using empirical data
+                actual_issues_resolved = max(0, initial_issues - post_fix_issues)
+                validation_method = "empirical"
+                
+                print(f"   ✅ Automatic fixes validation:")
+                print(f"      • Fixes reported: {reported_fixes_applied}")
+                print(f"      • Issues actually resolved: {actual_issues_resolved}")
+                print(f"      • Issues remaining: {post_fix_issues}")
+                
+                # Show effectiveness
+                if initial_issues > 0:
+                    effectiveness = (actual_issues_resolved / initial_issues) * 100
+                    print(f"      • Fix effectiveness: {effectiveness:.1f}%")
+                
+            else:
+                # Fallback: assume reported fixes equal actual resolution
+                actual_issues_resolved = reported_fixes_applied
+                validation_method = "fallback_reported"
+                print(f"   ⚠️ Validation fallback - assuming reported fixes = actual resolution")
 
             return {
                 "step": "automatic_fixes",
                 "success": result.returncode == 0,
-                "fixes_applied": fixes_applied,
+                "fixes_applied": reported_fixes_applied,
+                "actual_issues_resolved": actual_issues_resolved,
+                "validation_method": validation_method,
+                "initial_issues": initial_issues,
+                "post_fix_issues": post_fix_issues if post_fix_issues >= 0 else None,
                 "stdout": result.stdout,
                 "stderr": result.stderr,
             }
@@ -509,8 +555,10 @@ class EnhancedClaudeCodeIntegrationLoop:
             return {
                 "step": "automatic_fixes",
                 "success": False,
-                "error": "Auto-fix timed out after 10 minutes",
+                "error": "Auto-fix timed out after 30 minutes",
                 "fixes_applied": 0,
+                "actual_issues_resolved": 0,
+                "validation_method": "timeout_error",
             }
         except Exception as e:
             return {
@@ -518,6 +566,8 @@ class EnhancedClaudeCodeIntegrationLoop:
                 "success": False,
                 "error": str(e),
                 "fixes_applied": 0,
+                "actual_issues_resolved": 0,
+                "validation_method": "exception_error",
             }
 
     def needs_claude_fixes(self, analysis: Dict[str, Any]) -> bool:
@@ -525,14 +575,16 @@ class EnhancedClaudeCodeIntegrationLoop:
         return not analysis.get("success") or analysis.get("auto_fixable", 0) == 0
 
     def run_claude_guided_fixes(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Run Claude-guided fixes for manual issues"""
+        """Run Claude-guided fixes for manual issues with before/after validation"""
 
         if not analysis.get("requires_manual_fixes"):
             return {
                 "step": "claude_guided_fixes",
                 "success": True,
                 "fixes_applied": 0,
+                "actual_issues_resolved": 0,
                 "reason": "no_manual_fixes_required",
+                "validation_method": "none_needed",
             }
 
         # PROCESS ALL MANUAL FIXES - NO LIMITS
@@ -555,6 +607,10 @@ class EnhancedClaudeCodeIntegrationLoop:
         print("")
         print()
 
+        # BEFORE: Capture initial issue state for validation
+        initial_issues = analysis.get("total_issues", 0)
+        print(f"   📊 Pre-fix validation: {initial_issues} issues detected for manual resolution")
+
         # Run quality patcher to get REAL fix count
         print(f"   🔄 Running quality patcher to apply {manual_fixes_limit} fixes...")
         print("\n" + "=" * 80)
@@ -566,6 +622,9 @@ class EnhancedClaudeCodeIntegrationLoop:
         print("=" * 80 + "\n")
 
         try:
+            # Create temporary JSON output file for reliable fix counting
+            json_output_path = self._create_temp_json_path("claude_fixes")
+            
             patcher_result = subprocess.run(
                 [
                     "python3",
@@ -573,6 +632,8 @@ class EnhancedClaudeCodeIntegrationLoop:
                     f"--max-fixes={manual_fixes_limit}",
                     "--claude-agent",
                     "--no-interactive",
+                    "--output-format=json",
+                    f"--output-file={json_output_path}",
                 ],
                 capture_output=True,
                 text=True,
@@ -589,13 +650,51 @@ class EnhancedClaudeCodeIntegrationLoop:
                 print(patcher_result.stderr)
                 print("-" * 60)
 
-            # Extract actual fixes applied
-            actual_fixes = self.extract_fixes_applied(patcher_result.stdout)
+            # Extract reported fixes applied (from quality patcher)
+            reported_fixes_applied = self.extract_fixes_applied(patcher_result.stdout, str(json_output_path))
+            
+            # Clean up temporary JSON file
+            self._cleanup_temp_file(json_output_path)
+
+            # AFTER: Empirical validation - re-scan to verify actual issue resolution
+            print("   🔍 Validating Claude-guided fixes with post-fix scan...")
+            post_fix_issues = self.rescan_for_actual_remaining_issues()
+            
+            if post_fix_issues >= 0:
+                # Calculate actual issues resolved using empirical data
+                actual_issues_resolved = max(0, initial_issues - post_fix_issues)
+                validation_method = "empirical"
+                
+                print(f"   ✅ Claude-guided fixes validation:")
+                print(f"      • Fixes reported: {reported_fixes_applied}")
+                print(f"      • Issues actually resolved: {actual_issues_resolved}")
+                print(f"      • Issues remaining: {post_fix_issues}")
+                
+                # Show effectiveness and any discrepancies
+                if initial_issues > 0:
+                    effectiveness = (actual_issues_resolved / initial_issues) * 100
+                    print(f"      • Fix effectiveness: {effectiveness:.1f}%")
+                
+                # Alert to discrepancies between reported and actual
+                if actual_issues_resolved != reported_fixes_applied:
+                    discrepancy = abs(actual_issues_resolved - reported_fixes_applied)
+                    print(f"   ⚠️ Resolution discrepancy: {discrepancy} difference between")
+                    print(f"      reported fixes ({reported_fixes_applied}) and actual resolution ({actual_issues_resolved})")
+                    
+            else:
+                # Fallback: assume reported fixes equal actual resolution
+                actual_issues_resolved = reported_fixes_applied
+                validation_method = "fallback_reported"
+                print(f"   ⚠️ Validation fallback - assuming reported fixes = actual resolution")
 
             return {
                 "step": "claude_guided_fixes",
                 "success": patcher_result.returncode == 0,
-                "fixes_applied": actual_fixes,
+                "fixes_applied": reported_fixes_applied,
+                "actual_issues_resolved": actual_issues_resolved,
+                "validation_method": validation_method,
+                "initial_issues": initial_issues,
+                "post_fix_issues": post_fix_issues if post_fix_issues >= 0 else None,
             }
 
         except Exception as e:
@@ -604,8 +703,10 @@ class EnhancedClaudeCodeIntegrationLoop:
                 "step": "claude_guided_fixes",
                 "success": False,
                 "fixes_applied": 0,
+                "actual_issues_resolved": 0,
                 "error": str(e),
                 "method": "failed_quality_patcher",
+                "validation_method": "exception_error",
             }
 
     def post_fix_validation(self) -> Dict[str, Any]:
@@ -690,25 +791,111 @@ class EnhancedClaudeCodeIntegrationLoop:
 
         return validation_results
 
+    def rescan_for_actual_remaining_issues(self) -> int:
+        """Re-scan codebase to get empirical count of remaining issues
+        
+        This provides empirical validation rather than arithmetic assumptions
+        about fix effectiveness.
+        
+        Returns:
+            Actual number of remaining issues found by fresh lint scan
+        """
+        print("   🔍 Re-scanning codebase to validate actual remaining issues...")
+        
+        try:
+            # Run fresh comprehensive lint to get current state
+            rescan_result = self.run_comprehensive_lint()
+            
+            if not rescan_result["success"]:
+                print("   ⚠️ Re-scan failed, falling back to arithmetic estimate")
+                return -1  # Indicate re-scan failure
+            
+            # Count actual remaining issues in fresh report
+            if rescan_result.get("report_path"):
+                actual_remaining = self.count_issues_in_report(Path(rescan_result["report_path"]))
+                print(f"   📊 Empirical validation: {actual_remaining} issues actually remain")
+                return actual_remaining
+            else:
+                print("   ⚠️ No report generated, re-scan inconclusive")
+                return -1
+                
+        except Exception as e:
+            print(f"   ⚠️ Re-scan error: {e}, falling back to arithmetic")
+            return -1
+
     def assess_iteration_progress(
         self, iteration_result: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Assess progress made in this iteration"""
+        """Assess progress made in this iteration with empirical validation"""
 
-        # Calculate remaining issues based on fixes applied in this iteration
-        print("   📊 Calculating remaining issues based on iteration progress...")
+        print("   📊 Assessing iteration progress with before/after validation...")
 
         issues_found = iteration_result.get("issues_found", 0)
         total_fixes_applied = sum(
             step.get("fixes_applied", 0) for step in iteration_result.get("steps", [])
         )
 
-        # Conservative calculation: assume issues found minus fixes actually applied
-        remaining_issues = max(0, issues_found - total_fixes_applied)
-
         print(f"   📊 Issues at start: {issues_found}")
         print(f"   📊 Total fixes applied: {total_fixes_applied}")
-        print(f"   📊 Estimated remaining: {remaining_issues}")
+
+        # NEW: Use empirical validation data from fix methods if available
+        steps_with_validation = [
+            step for step in iteration_result.get("steps", [])
+            if step.get("validation_method") in ["empirical", "fallback_reported"]
+        ]
+        
+        if steps_with_validation:
+            # Use empirical data from individual fix steps
+            total_actual_resolved = sum(
+                step.get("actual_issues_resolved", 0) for step in steps_with_validation
+            )
+            
+            # Use the most recent post-fix scan for remaining issues
+            most_recent_scan = None
+            for step in reversed(steps_with_validation):
+                if step.get("post_fix_issues") is not None:
+                    most_recent_scan = step.get("post_fix_issues")
+                    break
+                    
+            if most_recent_scan is not None:
+                remaining_issues = most_recent_scan
+                validation_method = "step_empirical"
+                
+                print(f"   ✅ Using empirical validation from fix steps:")
+                print(f"      • Issues actually resolved: {total_actual_resolved}")
+                print(f"      • Issues actually remaining: {remaining_issues}")
+                print(f"      • Fix effectiveness: {(total_actual_resolved / max(1, issues_found)) * 100:.1f}%")
+                
+                # Show discrepancy if fixes reported vs. actual resolution differ
+                if total_actual_resolved != total_fixes_applied:
+                    discrepancy = abs(total_actual_resolved - total_fixes_applied)
+                    print(f"   ⚠️ Fix reporting discrepancy: {discrepancy} difference between")
+                    print(f"      reported fixes ({total_fixes_applied}) and actual resolution ({total_actual_resolved})")
+            else:
+                # Fallback to re-scan
+                print("   🔍 No post-fix scan data available, performing fresh validation...")
+                actual_remaining_issues = self.rescan_for_actual_remaining_issues()
+                
+                if actual_remaining_issues >= 0:
+                    remaining_issues = actual_remaining_issues
+                    total_actual_resolved = max(0, issues_found - remaining_issues)
+                    validation_method = "fresh_rescan"
+                    
+                    print(f"   ✅ Fresh empirical validation:")
+                    print(f"      • Issues actually resolved: {total_actual_resolved}")
+                    print(f"      • Issues actually remaining: {remaining_issues}")
+                else:
+                    # Complete fallback to arithmetic
+                    remaining_issues = max(0, issues_found - total_fixes_applied)
+                    total_actual_resolved = total_fixes_applied
+                    validation_method = "arithmetic_fallback"
+                    print(f"   ⚠️ Using arithmetic fallback - empirical validation failed")
+        else:
+            # No validation data available, use arithmetic fallback
+            remaining_issues = max(0, issues_found - total_fixes_applied)
+            total_actual_resolved = total_fixes_applied
+            validation_method = "arithmetic_fallback"
+            print(f"   ⚠️ No empirical validation data available, using arithmetic estimate")
 
         # Check if we meet GitHub-ready criteria
         github_ready = self.meets_github_criteria(remaining_issues)
@@ -726,31 +913,94 @@ class EnhancedClaudeCodeIntegrationLoop:
         return {
             "step": "iteration_assessment",
             "remaining_issues": remaining_issues,
+            "actual_fixes_resolved": total_actual_resolved,
+            "validation_method": validation_method,
             "github_ready": github_ready,
             "no_progress": no_progress,
             "meets_security_threshold": remaining_issues
             <= self.target_quality_threshold["max_quality_issues"],
-            "meets_critical_threshold": True,  # Assume no critical errors
-            # if validation passed
+            "meets_critical_threshold": True,  # Assume no critical errors if validation passed
         }
 
-    def extract_fixes_applied(self, stdout: str) -> int:
-        """Extract number of fixes applied from quality patcher output"""
-        # Look for multiple possible patterns for fixes applied
+    def _create_temp_json_path(self, prefix: str = "temp_fix_report") -> Path:
+        """Create a temporary path for JSON output files"""
+        return self.repo_path / f"{prefix}_{int(time.time())}_{id(self)}.json"
+    
+    def _cleanup_temp_file(self, file_path: Path) -> None:
+        """Safely clean up temporary files"""
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except (OSError, PermissionError) as e:
+            print(f"   ⚠️ Could not clean up temporary file {file_path}: {e}")
+
+    def extract_fixes_applied(self, stdout: str, json_output_path: Optional[str] = None) -> int:
+        """Extract number of fixes applied from quality patcher output
+        
+        Args:
+            stdout: Standard output from quality patcher
+            json_output_path: Optional path to JSON output file for more reliable data
+            
+        Returns:
+            Number of fixes actually applied (validated from JSON when available)
+        """
+        import json
+        
+        # First priority: Use JSON output file if available (most reliable)
+        if json_output_path and Path(json_output_path).exists():
+            try:
+                with open(json_output_path, 'r') as f:
+                    json_data = json.load(f)
+                
+                # Extract fixes_applied from JSON structure
+                fixes_applied = json_data.get('summary', {}).get('fixes_applied', 0)
+                
+                # Validate the number is reasonable
+                if isinstance(fixes_applied, int) and fixes_applied >= 0:
+                    print(f"   📊 Raw fix count from JSON: {fixes_applied}")
+                    return fixes_applied
+                else:
+                    print(f"   ⚠️ Invalid fixes_applied value in JSON: {fixes_applied}")
+            except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
+                print(f"   ⚠️ Failed to parse JSON output: {e}")
+        
+        # Second priority: Look for JSON output embedded in stdout
+        json_match = re.search(r'\{[^{}]*"fixes_applied"\s*:\s*(\d+)[^{}]*\}', stdout, re.DOTALL)
+        if json_match:
+            try:
+                json_str = json_match.group(0)
+                json_data = json.loads(json_str)
+                fixes_applied = json_data.get('fixes_applied', 0)
+                if isinstance(fixes_applied, int) and fixes_applied >= 0:
+                    print(f"   📊 Raw fix count from embedded JSON: {fixes_applied}")
+                    return fixes_applied
+            except json.JSONDecodeError:
+                pass
+        
+        # Third priority: Enhanced regex patterns for text parsing
         patterns = [
             r"✅\s*(\d+)\s*fix(?:es)?\s*applied",  # "✅ 5 fixes applied"
             r"Fixes\s*Applied:\s*(\d+)",  # "Fixes Applied: 5"
             r'fixes_applied["\']:\s*(\d+)',  # JSON output format
             r"(\d+)\s*fix(?:es)?\s*successfully\s*applied",  # Success pattern
             r"Applied\s*(\d+)\s*fix(?:es)?",  # "Applied 5 fixes"
+            r"📊\s*SUMMARY:.*?✅\s*Fixes\s*Applied:\s*(\d+)",  # Summary section
+            r"Total.*fixes.*applied:\s*(\d+)",  # Alternative total format
+            r"Successfully\s*applied\s*(\d+)",  # Success count
         ]
 
         for pattern in patterns:
-            match = re.search(pattern, stdout, re.IGNORECASE)
+            match = re.search(pattern, stdout, re.IGNORECASE | re.DOTALL)
             if match:
-                return int(match.group(1))
+                try:
+                    fixes_count = int(match.group(1))
+                    if fixes_count >= 0:  # Validate non-negative
+                        print(f"   📊 Raw fix count from text parsing: {fixes_count}")
+                        return fixes_count
+                except (ValueError, IndexError):
+                    continue
 
-        # Fallback: count success indicators if no direct fix count found
+        # Fallback: count success indicators (least reliable but better than nothing)
         success_indicators = len(
             re.findall(
                 r"✅.*(?:applied|fixed|resolved)",
@@ -758,7 +1008,13 @@ class EnhancedClaudeCodeIntegrationLoop:
                 re.IGNORECASE,
             )
         )
-        return success_indicators if success_indicators > 0 else 0
+        
+        if success_indicators > 0:
+            print(f"   ⚠️ Using fallback count (success indicators): {success_indicators}")
+            return success_indicators
+        
+        print("   ❌ Could not extract reliable fix count, returning 0")
+        return 0
 
     def extract_remaining_issues(self, stdout: str) -> int:
         """Extract remaining issues count from lint output"""
