@@ -480,6 +480,9 @@ class EnhancedClaudeCodeIntegrationLoop:
         try:
             print(f"   🔧 Applying {fixes_to_apply} automatic fixes...")
 
+            # Create temporary JSON output file for reliable fix counting
+            json_output_path = self._create_temp_json_path("autofix_report")
+
             result = subprocess.run(
                 [
                     "/usr/bin/python3",  # Security: Use absolute path
@@ -487,6 +490,8 @@ class EnhancedClaudeCodeIntegrationLoop:
                     "--claude-agent",
                     f"--max-fixes={fixes_to_apply}",
                     "--no-interactive",
+                    "--output-format=json",
+                    f"--output-file={json_output_path}",
                 ],
                 capture_output=True,
                 text=True,
@@ -494,8 +499,11 @@ class EnhancedClaudeCodeIntegrationLoop:
                 timeout=1800,
             )  # 30 minutes for ALL fixes
 
-            # Parse result to extract fixes applied
-            fixes_applied = self.extract_fixes_applied(result.stdout)
+            # Parse result to extract fixes applied (now with JSON support)
+            fixes_applied = self.extract_fixes_applied(result.stdout, str(json_output_path))
+            
+            # Clean up temporary JSON file
+            self._cleanup_temp_file(json_output_path)
 
             return {
                 "step": "automatic_fixes",
@@ -566,6 +574,9 @@ class EnhancedClaudeCodeIntegrationLoop:
         print("=" * 80 + "\n")
 
         try:
+            # Create temporary JSON output file for reliable fix counting
+            json_output_path = self._create_temp_json_path("claude_fixes")
+            
             patcher_result = subprocess.run(
                 [
                     "python3",
@@ -573,6 +584,8 @@ class EnhancedClaudeCodeIntegrationLoop:
                     f"--max-fixes={manual_fixes_limit}",
                     "--claude-agent",
                     "--no-interactive",
+                    "--output-format=json",
+                    f"--output-file={json_output_path}",
                 ],
                 capture_output=True,
                 text=True,
@@ -589,8 +602,11 @@ class EnhancedClaudeCodeIntegrationLoop:
                 print(patcher_result.stderr)
                 print("-" * 60)
 
-            # Extract actual fixes applied
-            actual_fixes = self.extract_fixes_applied(patcher_result.stdout)
+            # Extract actual fixes applied (now with JSON support)
+            actual_fixes = self.extract_fixes_applied(patcher_result.stdout, str(json_output_path))
+            
+            # Clean up temporary JSON file
+            self._cleanup_temp_file(json_output_path)
 
             return {
                 "step": "claude_guided_fixes",
@@ -734,23 +750,85 @@ class EnhancedClaudeCodeIntegrationLoop:
             # if validation passed
         }
 
-    def extract_fixes_applied(self, stdout: str) -> int:
-        """Extract number of fixes applied from quality patcher output"""
-        # Look for multiple possible patterns for fixes applied
+    def _create_temp_json_path(self, prefix: str = "temp_fix_report") -> Path:
+        """Create a temporary path for JSON output files"""
+        return self.repo_path / f"{prefix}_{int(time.time())}_{id(self)}.json"
+    
+    def _cleanup_temp_file(self, file_path: Path) -> None:
+        """Safely clean up temporary files"""
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except (OSError, PermissionError) as e:
+            print(f"   ⚠️ Could not clean up temporary file {file_path}: {e}")
+
+    def extract_fixes_applied(self, stdout: str, json_output_path: Optional[str] = None) -> int:
+        """Extract number of fixes applied from quality patcher output
+        
+        Args:
+            stdout: Standard output from quality patcher
+            json_output_path: Optional path to JSON output file for more reliable data
+            
+        Returns:
+            Number of fixes actually applied (validated from JSON when available)
+        """
+        import json
+        
+        # First priority: Use JSON output file if available (most reliable)
+        if json_output_path and Path(json_output_path).exists():
+            try:
+                with open(json_output_path, 'r') as f:
+                    json_data = json.load(f)
+                
+                # Extract fixes_applied from JSON structure
+                fixes_applied = json_data.get('summary', {}).get('fixes_applied', 0)
+                
+                # Validate the number is reasonable
+                if isinstance(fixes_applied, int) and fixes_applied >= 0:
+                    print(f"   📊 Raw fix count from JSON: {fixes_applied}")
+                    return fixes_applied
+                else:
+                    print(f"   ⚠️ Invalid fixes_applied value in JSON: {fixes_applied}")
+            except (json.JSONDecodeError, KeyError, FileNotFoundError) as e:
+                print(f"   ⚠️ Failed to parse JSON output: {e}")
+        
+        # Second priority: Look for JSON output embedded in stdout
+        json_match = re.search(r'\{[^{}]*"fixes_applied"\s*:\s*(\d+)[^{}]*\}', stdout, re.DOTALL)
+        if json_match:
+            try:
+                json_str = json_match.group(0)
+                json_data = json.loads(json_str)
+                fixes_applied = json_data.get('fixes_applied', 0)
+                if isinstance(fixes_applied, int) and fixes_applied >= 0:
+                    print(f"   📊 Raw fix count from embedded JSON: {fixes_applied}")
+                    return fixes_applied
+            except json.JSONDecodeError:
+                pass
+        
+        # Third priority: Enhanced regex patterns for text parsing
         patterns = [
             r"✅\s*(\d+)\s*fix(?:es)?\s*applied",  # "✅ 5 fixes applied"
             r"Fixes\s*Applied:\s*(\d+)",  # "Fixes Applied: 5"
             r'fixes_applied["\']:\s*(\d+)',  # JSON output format
             r"(\d+)\s*fix(?:es)?\s*successfully\s*applied",  # Success pattern
             r"Applied\s*(\d+)\s*fix(?:es)?",  # "Applied 5 fixes"
+            r"📊\s*SUMMARY:.*?✅\s*Fixes\s*Applied:\s*(\d+)",  # Summary section
+            r"Total.*fixes.*applied:\s*(\d+)",  # Alternative total format
+            r"Successfully\s*applied\s*(\d+)",  # Success count
         ]
 
         for pattern in patterns:
-            match = re.search(pattern, stdout, re.IGNORECASE)
+            match = re.search(pattern, stdout, re.IGNORECASE | re.DOTALL)
             if match:
-                return int(match.group(1))
+                try:
+                    fixes_count = int(match.group(1))
+                    if fixes_count >= 0:  # Validate non-negative
+                        print(f"   📊 Raw fix count from text parsing: {fixes_count}")
+                        return fixes_count
+                except (ValueError, IndexError):
+                    continue
 
-        # Fallback: count success indicators if no direct fix count found
+        # Fallback: count success indicators (least reliable but better than nothing)
         success_indicators = len(
             re.findall(
                 r"✅.*(?:applied|fixed|resolved)",
@@ -758,7 +836,13 @@ class EnhancedClaudeCodeIntegrationLoop:
                 re.IGNORECASE,
             )
         )
-        return success_indicators if success_indicators > 0 else 0
+        
+        if success_indicators > 0:
+            print(f"   ⚠️ Using fallback count (success indicators): {success_indicators}")
+            return success_indicators
+        
+        print("   ❌ Could not extract reliable fix count, returning 0")
+        return 0
 
     def extract_remaining_issues(self, stdout: str) -> int:
         """Extract remaining issues count from lint output"""
